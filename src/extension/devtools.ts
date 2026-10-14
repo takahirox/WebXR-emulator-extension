@@ -1,4 +1,5 @@
-const port = chrome.runtime.connect(null, {name: 'devtools'});
+export {};
+const port = chrome.runtime.connect( {name: 'devtools'});
 
 chrome.devtools.panels.create(
   "WebXR",

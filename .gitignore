@@ -59,3 +59,9 @@ typings/
 
 # next.js build output
 .next
+
+# Intermediate TypeScript emission
+.build/
+
+# Local browser validation screenshots
+test-results/

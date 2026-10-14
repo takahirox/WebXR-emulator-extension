@@ -1,3 +1,4 @@
+import type { PolyfillGlobal } from '../types/polyfill';
 import WebXRPolyfill from 'webxr-polyfill/src/WebXRPolyfill';
 import {XR_COMPATIBLE} from 'webxr-polyfill/src/constants';
 import XRSystem from 'webxr-polyfill/src/api/XRSystem';
@@ -22,7 +23,7 @@ export default class CustomWebXRPolyfill extends WebXRPolyfill {
     //       Exiting without user gesture in the page might violate security policy
     //       so there might be a chance that we remove this feature at some point.
 
-    let activeImmersiveSession = null;
+    let activeImmersiveSession: XRSession | null = null;
     const originalRequestSession = XRSystem.prototype.requestSession;
     XRSystem.prototype.requestSession = function(mode, enabledFeatures = {}) {
       return originalRequestSession.call(this, mode, enabledFeatures).then(session => {
@@ -121,7 +122,7 @@ export default class CustomWebXRPolyfill extends WebXRPolyfill {
       let overridden = false;
       const overrideIfNeeded = () => {
         if (overridden) { return false; }
-        if (isNativeFunction(this.global.XRSystem)) {
+        if (isNativeFunction((this.global as unknown as Record<string, unknown>).XRSystem)) {
           overrideAPI(this.global);
           overridden = true;
           return true;
@@ -131,7 +132,7 @@ export default class CustomWebXRPolyfill extends WebXRPolyfill {
       const observer = new MutationObserver(list => {
         for (const record of list) {
           for (const node of record.addedNodes) {
-            if (node.localName === 'script' && overrideIfNeeded()) {
+            if (node instanceof Element && node.localName === 'script' && overrideIfNeeded()) {
               observer.disconnect();
               break;
             }
@@ -140,7 +141,7 @@ export default class CustomWebXRPolyfill extends WebXRPolyfill {
         }
       });
       observer.observe(document, {subtree: true, childList: true});
-      const onLoad = event => {
+      const onLoad = (event: Event) => {
         if (!overridden) {
           observer.disconnect();
           overrideIfNeeded();
@@ -161,10 +162,10 @@ export default class CustomWebXRPolyfill extends WebXRPolyfill {
   }
 }
 
-const requestXRDevice = async (global, config) => {
+const requestXRDevice = async (global: PolyfillGlobal): Promise<EmulatedXRDevice> => {
   // resolve when receiving configuration parameters from content-script as an event
   return new Promise((resolve, reject) => {
-    const callback = (event) => {
+    const callback = (event: WindowEventMap['webxr-device-init']) => {
       window.removeEventListener('webxr-device-init', callback);
       resolve(new EmulatedXRDevice(global,
         Object.assign({},
@@ -177,14 +178,14 @@ const requestXRDevice = async (global, config) => {
 };
 
 // Easy native function detection.
-const isNativeFunction = func => {
-  return /\[native code\]/i.test(func.toString());
+const isNativeFunction = (func: unknown) => {
+  return typeof func === 'function' && /\[native code\]/i.test(func.toString());
 };
 
-const overrideAPI = global => {
+const overrideAPI = (global: PolyfillGlobal) => {
   console.log('WebXR emulator extension overrides native WebXR API with polyfill.');
   for (const className in API) {
-    global[className] = API[className];
+    (global as unknown as Record<string, unknown>)[className] = API[className];
   }
   installEX_API(global);
 
@@ -201,15 +202,15 @@ const overrideAPI = global => {
   }
 };
 
-const installEX_API = global => {
+const installEX_API = (global: PolyfillGlobal) => {
   for (const className in EX_API) {
-    global[className] = EX_API[className];
+    (global as unknown as Record<string, unknown>)[className] = EX_API[className as keyof typeof EX_API];
   }
 };
 
-const overrideMakeXRCompatible = Context => {
+const overrideMakeXRCompatible = (Context: typeof WebGLRenderingContext | typeof WebGL2RenderingContext) => {
   Context.prototype.makeXRCompatible = function () {
-    this[XR_COMPATIBLE] = true;
+    (this as (WebGLRenderingContext | WebGL2RenderingContext) & {[XR_COMPATIBLE]: boolean})[XR_COMPATIBLE] = true;
     // This is all fake, so just resolve immediately.
     return Promise.resolve();
   };

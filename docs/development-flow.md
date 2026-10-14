@@ -30,11 +30,11 @@ This repository is a browser extension with extension code in `src/extension/`, 
 
 Choose validation for the changed files and the actual tooling:
 
-- `package.json` provides `npm run build` (`rollup -c`), which builds `src/polyfill/CustomWebXRPolyfill.js` into `polyfill/webxr-polyfill.js`. For changes affecting that bundle, install dependencies with `npm install` as needed and run the build. Inspect generated changes before including them.
+- `package.json` provides `npm run typecheck` and `npm run build`, which check all maintained TypeScript and compile/bundle `src/polyfill/CustomWebXRPolyfill.ts` into `polyfill/webxr-polyfill.js` plus the extension and panel entry points into `dist/`. For changes affecting that bundle, install dependencies with `npm install` as needed and run the build. Inspect generated changes before including them.
 - For extension behavior changes, use the README's developer installation instructions and validate the affected behavior in a desktop browser. Record the browser, reproduction steps, and results. Physical XR hardware is required only when the Issue explains why emulator/browser checks are insufficient.
 - For templates or documentation only, check template front matter, Markdown structure, links, whitespace (`git diff --check`), and consistency against the Issue. No new runtime tests, polyfill build, headset/device checks, or deployed-site verification are required for that scope.
 
-There are no test, lint, or Markdown-check scripts in the current `package.json`. Use applicable available tools and report what was checked; do not invent repository commands or add dependencies or CI merely to validate documentation.
+For runtime regression checks, `npm run test:browser` loads the unpacked extension in a fresh desktop Chromium profile; follow the README for the Manifest V2 compatible browser executable. There are no lint or Markdown-check scripts. Use applicable available tools and report what was checked; do not add dependencies or CI merely to validate documentation.
 
 ## 3. Create a Pull Request for the Issue
 

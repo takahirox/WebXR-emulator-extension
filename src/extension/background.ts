@@ -1,10 +1,12 @@
-const connections = {};
+import type { ExtensionMessage } from '../types/contracts';
+
+const connections: Record<number, Record<string, chrome.runtime.Port[]>> = {};
 
 chrome.runtime.onConnect.addListener(port => {
   // @TODO: release connection when disconnected
 
-  port.onMessage.addListener((message, sender, reply) => {
-    const tabId = message.tabId !== undefined ? message.tabId : sender.sender.tab.id;
+  port.onMessage.addListener((message: ExtensionMessage, sender) => {
+    const tabId = message.tabId !== undefined ? message.tabId : sender.sender!.tab!.id!;
 
     if (connections[tabId] === undefined) {
       connections[tabId] = {};
@@ -45,7 +47,7 @@ chrome.runtime.onConnect.addListener(port => {
   });
 });
 
-const postMessageToPorts = (ports, message) => {
+const postMessageToPorts = (ports: chrome.runtime.Port[] | undefined, message: ExtensionMessage) => {
   ports && ports.forEach(port => {
     port.postMessage(message);
   });

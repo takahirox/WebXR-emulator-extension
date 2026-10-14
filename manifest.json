@@ -13,7 +13,7 @@
     "128": "icons/icon128.png"
   },
   "background": {
-    "scripts": ["src/extension/background.js"]
+    "scripts": ["dist/extension/background.js"]
   },
   "permissions": [
     "file://*/*",
@@ -29,8 +29,7 @@
     ],
     "js": [
       "polyfill/webxr-polyfill.js",
-      "src/ConfigurationManager.js",
-      "src/extension/content-script.js"
+      "dist/extension/content-script.js"
     ],
     "run_at": "document_start",
     "all_frames": true

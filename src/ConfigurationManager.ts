@@ -1,20 +1,27 @@
 // @TODO: write json format comment
 
-class ConfigurationManager {
-  constructor(deviceDefinitions) {
+import type { DeviceDefinitions } from './types/contracts';
+
+export default class ConfigurationManager {
+  private _deviceDefinitions: DeviceDefinitions;
+  private _deviceKey: string;
+  private _stereoEffect: boolean;
+  private _storageKey: string;
+
+  constructor(deviceDefinitions: DeviceDefinitions) {
     this._deviceDefinitions = deviceDefinitions;
     this._deviceKey = this.defaultDeviceKey;
     this._stereoEffect = this.defaultStereoEffect;
     this._storageKey = 'webxr-extension';
   }
 
-  static createFromJsonFile(path) {
-    return new Promise((resolve, reject) => {
+  static createFromJsonFile(path: string): Promise<ConfigurationManager> {
+    return new Promise<ConfigurationManager>((resolve, reject) => {
       fetch(chrome.runtime.getURL(path))
         .then(response => response.json())
         .then(json => {
-          resolve(new ConfigurationManager(json));
-        });
+          resolve(new ConfigurationManager(json as DeviceDefinitions));
+        }).catch(reject);
     });
   }
 
@@ -56,9 +63,9 @@ class ConfigurationManager {
     });
   }
 
-  deserialize(str) {
+  deserialize(str: string) {
     if (!str) { str = '{}'; }
-    const json = JSON.parse(str);
+    const json = JSON.parse(str) as { deviceKey?: string; stereoEffect?: boolean };
     const deviceKey = this._validDeviceKey(json.deviceKey)
       ? json.deviceKey : this.defaultDeviceKey;
     const stereoEffect = json.stereoEffect !== undefined
@@ -68,7 +75,7 @@ class ConfigurationManager {
     this.updateStereoEffect(stereoEffect);
   }
 
-  updateDeviceKey(key) {
+  updateDeviceKey(key: string) {
     if (!this._validDeviceKey(key)) {
       // @TODO: throw error?
       return false;
@@ -80,7 +87,7 @@ class ConfigurationManager {
     return false;
   }
 
-  updateStereoEffect(enabled) {
+  updateStereoEffect(enabled: boolean) {
     if (this._stereoEffect !== enabled) {
       this._stereoEffect = enabled;
       return true;
@@ -89,17 +96,18 @@ class ConfigurationManager {
   }
 
   loadFromStorage() {
-    return new Promise((resolve, reject) => {
+    return new Promise<Record<string, unknown>>((resolve, reject) => {
       chrome.storage.local.get(this._storageKey, result => {
-        this.deserialize(result[this._storageKey] || '');
+        const value = result[this._storageKey];
+        this.deserialize(typeof value === 'string' ? value : '');
         resolve(result);
       });
     });
   }
 
   storeToStorage() {
-    return new Promise((resolve, reject) => {
-      const storedValue = {};
+    return new Promise<Record<string, string>>((resolve, reject) => {
+      const storedValue: Record<string, string> = {};
       storedValue[this._storageKey] = this.serialize();
       chrome.storage.local.set(storedValue, () => {
         resolve(storedValue);
@@ -109,7 +117,7 @@ class ConfigurationManager {
 
   // private methods
 
-  _validDeviceKey(key) {
-    return this._deviceDefinitions.devices[key] !== undefined;
+  _validDeviceKey(key: string | undefined): key is string {
+    return key !== undefined && this._deviceDefinitions.devices[key] !== undefined;
   }
 }
