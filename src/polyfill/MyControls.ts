@@ -1,4 +1,5 @@
 import {
+  Object3D,
   Euler,
   EventDispatcher,
   Quaternion,
@@ -24,7 +25,22 @@ const EPS = 0.000001;
 
 // @TODO: Rename
 export default class MyControls extends EventDispatcher {
-  constructor(object, domElement) {
+  object: Object3D;
+  domElement: HTMLElement;
+  _enabled: boolean;
+  state: number;
+  screen: {left: number; top: number; width: number; height: number};
+  rotateSpeed: number;
+  forwardSpeed: number;
+  panSpeed: number;
+  _rotateStart: Vector2;
+  _rotateEnd: Vector2;
+  _forwardStart: Vector2;
+  _forwardEnd: Vector2;
+  _panStart: Vector2;
+  _panEnd: Vector2;
+
+  constructor(object: Object3D, domElement: HTMLElement) {
     super();
     this.object = object;
     this.domElement = domElement;
@@ -133,7 +149,7 @@ export default class MyControls extends EventDispatcher {
     }, false);
 
     const vector2 = new Vector2();
-    const getMouseOnScreen = (pageX, pageY) => {
+    const getMouseOnScreen = (event: MouseEvent) => {
       const rect = domElement.getBoundingClientRect();
       // left-top (0, 0), right-bottom (1, 1)
       vector2.set(
@@ -159,7 +175,7 @@ export default class MyControls extends EventDispatcher {
   forwardCamera() {
     const vector2 = new Vector2().copy(this._forwardEnd).sub(this._forwardStart);
     const direction = new Vector3(0, 0, vector2.y).applyQuaternion(this.object.quaternion);
-    this.object.position.add(direction) * this.forwardSpeed;
+    this.object.position.add(direction);
     this._forwardStart.copy(this._forwardEnd);
     this.dispatchEvent(changeEvent);
   }
@@ -167,7 +183,7 @@ export default class MyControls extends EventDispatcher {
   panCamera() {
     const vector2 = new Vector2().copy(this._panEnd).sub(this._panStart);
     const direction = new Vector3(-vector2.x, vector2.y, 0).applyQuaternion(this.object.quaternion);
-    this.object.position.add(direction) * this.panSpeed;
+    this.object.position.add(direction);
     this._panStart.copy(this._panEnd);
     this.dispatchEvent(changeEvent);
   }
@@ -197,7 +213,7 @@ export default class MyControls extends EventDispatcher {
     return this._enabled;
   }
 
-  set enabled(value) {
+  set enabled(value: boolean) {
     this._enabled = value;
     if (!value) {
       this.state = STATE.NONE;

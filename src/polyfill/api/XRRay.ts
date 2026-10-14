@@ -7,7 +7,9 @@ import {
 } from 'gl-matrix';
 
 export default class XRRay {
-  constructor(origin, direction) {
+  [PRIVATE]: {origin: DOMPointReadOnly; direction: DOMPointReadOnly; matrix: mat4 | null};
+
+  constructor(origin?: DOMPointInit | XRRigidTransform, direction?: DOMPointInit) {
     const _origin = {x: 0, y: 0, z: 0, w: 1};
     const _direction = {x: 0, y: 0, z: -1, w: 0};
 
@@ -22,22 +24,22 @@ export default class XRRay {
       _origin.y = originVec4[1];
       _origin.z = originVec4[2];
       _origin.w = originVec4[3];
-      _directionVec4.x = directionVec4[0];
-      _directionVec4.y = directionVec4[1];
-      _directionVec4.z = directionVec4[2];
-      _directionVec4.w = directionVec4[3];
+      _direction.x = directionVec4[0];
+      _direction.y = directionVec4[1];
+      _direction.z = directionVec4[2];
+      _direction.w = directionVec4[3];
     } else {
       if (origin) {
-        _origin.x = origin.x;
-        _origin.y = origin.y;
-        _origin.z = origin.z;
-        _origin.w = origin.w;
+        _origin.x = origin.x ?? _origin.x;
+        _origin.y = origin.y ?? _origin.y;
+        _origin.z = origin.z ?? _origin.z;
+        _origin.w = origin.w ?? _origin.w;
       } 
       if (direction) {
-        _direction.x = direction.x;
-        _direction.y = direction.y;
-        _direction.z = direction.z;
-        _direction.w = direction.w;
+        _direction.x = direction.x ?? _direction.x;
+        _direction.y = direction.y ?? _direction.y;
+        _direction.z = direction.z ?? _direction.z;
+        _direction.w = direction.w ?? _direction.w;
       }
     }
 

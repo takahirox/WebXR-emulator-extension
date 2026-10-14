@@ -1,15 +1,13 @@
+import ConfigurationManager from '../ConfigurationManager';
+import type { ExtensionMessage } from '../types/contracts';
+import { dispatchCustomEvent } from '../types/contracts';
 const port = chrome.runtime.connect({name: 'contentScript'});
-
-const dispatchCustomEvent = (type, detail) => {
-  window.dispatchEvent(new CustomEvent(type, {
-    detail: typeof cloneInto !== 'undefined' ? cloneInto(detail, window) : detail
-  }));
-};
+const postMessage = (message: ExtensionMessage) => port.postMessage(message);
 
 // receive message from panel via background
 // and transfer to polyfill as event on window
 
-port.onMessage.addListener(message => {
+port.onMessage.addListener((message: ExtensionMessage) => {
   switch (message.action) {
     case 'webxr-device':
       dispatchCustomEvent('webxr-device', {
@@ -56,7 +54,7 @@ port.onMessage.addListener(message => {
 // Transfer to panel via background.
 
 window.addEventListener('device-pose', event => {
-  port.postMessage({
+  postMessage({
     action: 'device-pose',
     position: event.detail.position,
     quaternion: event.detail.quaternion
@@ -64,7 +62,7 @@ window.addEventListener('device-pose', event => {
 }, false);
 
 window.addEventListener('device-input-pose', event => {
-  port.postMessage({
+  postMessage({
     action: 'device-input-pose',
     objectName: event.detail.objectName,
     position: event.detail.position,
@@ -73,13 +71,13 @@ window.addEventListener('device-input-pose', event => {
 }, false);
 
 window.addEventListener('device-enter-immersive', event => {
-  port.postMessage({
+  postMessage({
     action: 'device-enter-immersive'
   });
 }, false);
 
 window.addEventListener('device-leave-immersive', event => {
-  port.postMessage({
+  postMessage({
     action: 'device-leave-immersive'
   });
 }, false);
@@ -97,14 +95,13 @@ window.addEventListener('webxr-virtual-room-request', event => {
   });
 }, false);
 
-
 // function to load script in a web page
 
-const loadScript = source => {
+const loadScript = (source: string) => {
   const script = document.createElement('script');
   script.textContent = source;
   (document.head || document.documentElement).appendChild(script);
-  script.parentNode.removeChild(script);
+  script.parentNode!.removeChild(script);
 };
 
 // Synchronously adding WebXR polyfill because
@@ -130,7 +127,7 @@ ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
       deviceDefinition: manager.deviceDefinition,
       stereoEffect: manager.stereoEffect
     });
-    port.postMessage({
+    postMessage({
       action: 'webxr-startup'
     });
   });

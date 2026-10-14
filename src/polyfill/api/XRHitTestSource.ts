@@ -1,14 +1,20 @@
-export const PRIVATE = Symbol('@@webxr-polyfill/XRTransientInputHitTestSource');
+export const PRIVATE = Symbol('@@webxr-polyfill/XRHitTestSource');
 
-export default class XRTransientInputHitTestSource {
-  constructor(session, options) {
+import XRRay from './XRRay';
+import type XRSession from 'webxr-polyfill/src/api/XRSession';
+import type { HitTestOptions, HitTestState } from '../../types/polyfill';
+
+export default class XRHitTestSource {
+  [PRIVATE]: HitTestState;
+
+  constructor(session: XRSession, options: HitTestOptions) {
     // @TODO: Support options.entityTypes and options.offsetRay
     if (options.entityTypes && options.entityTypes.length > 0) {
       throw new Error('XRHitTestSource does not support entityTypes option yet.');
     }
     this[PRIVATE] = {
       session,
-      profile: options.profile,
+      space: options.space,
       offsetRay: options.offsetRay || new XRRay(),
       active: true
     };
@@ -19,8 +25,8 @@ export default class XRTransientInputHitTestSource {
     this[PRIVATE].active = false;
   }
 
-  get _profile() {
-    return this[PRIVATE].profile;
+  get _space() {
+    return this[PRIVATE].space;
   }
 
   get _session() {

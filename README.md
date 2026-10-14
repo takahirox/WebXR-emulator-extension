@@ -109,18 +109,38 @@ Use the [Issue template](.github/ISSUE_TEMPLATE/issue.md) and [PR template](.git
 
 ### How to install the newest version
 
-If you want to develop or debug this extension or if you want to use the under development (not released yet) version, download this repositoy and install the extension into your browser as developer mode. ([Firefox](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Temporary_Installation_in_Firefox), [Chrome](https://developer.chrome.com/extensions/getstarted))
+If you want to develop or debug this extension or if you want to use the under development (not released yet) version, download this repository, run the build below, and install the extension into your browser as developer mode. ([Firefox](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Temporary_Installation_in_Firefox), [Chrome](https://developer.chrome.com/extensions/getstarted))
 
-### How to build polyfill/webxr-polyfill.js
+### How to build the extension and polyfill
 
-`polyfill/webxr-polyfill.js` is created with npm.
+Use Node.js 22 or newer and npm. All maintained source and build tooling is TypeScript. The build emits the injected `polyfill/webxr-polyfill.js` bundle and classic browser scripts in `dist/extension/` and `dist/app/`; the manifest and HTML already reference those outputs. Build before loading the repository root as an unpacked extension.
 
 ```sh
-$ git clone https://github.com/MozillaReality/WebXR-emulator-extension.git
+$ git clone https://github.com/takahirox/WebXR-emulator-extension.git
 $ cd WebXR-emulator-extension
 $ npm install
+$ npm run typecheck
 $ npm run build
 ```
+
+Run `npm run build` after editing TypeScript, then reload the extension and inspected page. Commit the regenerated `dist/` scripts, polyfill bundle, and `package-lock.json` with source changes. `.build/` is temporary compiler output and is removed after a successful build. `npm ci` reproduces the locked dependencies.
+
+`npm run typecheck` checks every maintained source, build script, and test with strict TypeScript settings. The unmodified third-party JavaScript in `src/app/three/` and generated output are not TypeScript sources. Three.js r111 remains the polyfill dependency; the panel's existing vendored Three.js/controls/loaders remain unchanged. Narrow dependency declarations and lifecycle assumptions are documented in [TypeScript development notes](docs/typescript-migration.md).
+
+The extension still uses Manifest V2. Use a desktop browser that can load it; current Chrome releases may reject it (see the [Chrome migration timeline](https://developer.chrome.com/docs/extensions/develop/migrate/mv2-deprecation-timeline)). This migration does not change the manifest version.
+
+### Browser regression checks
+
+`npm run test:browser` loads the actual unpacked extension in a fresh, temporary desktop Chromium profile, opens its real DevTools panel, and checks configuration persistence, synchronous injection, VR pose messages and select/squeeze, AR room rendering, persistent/transient hit testing, and mouse input. It serves a local TypeScript regression sample and deletes the profile afterward; no personal browser profile is used.
+
+Set `WEBXR_CHROMIUM_EXECUTABLE` to a Chromium executable that supports Manifest V2 (validated with Chromium **131.0.6778.33**). The current Playwright browser download may be too new for this manifest. For the validated historical test binary, `PLAYWRIGHT_BROWSERS_PATH="$PWD/test-results/browsers" npx --package=playwright@1.49.1 playwright install chromium` installs build 1148 in a dedicated local cache; point the environment variable at that installation's desktop executable, not its headless shell. Test dependencies use current Playwright to drive that binary.
+
+```sh
+$ npm run build
+$ WEBXR_CHROMIUM_EXECUTABLE=/absolute/path/to/Chromium npm run test:browser
+```
+
+The check requires a desktop display and WebGL (software rendering is enabled for this test profile). It writes local screenshots to ignored `test-results/`. See [recorded validation](docs/typescript-migration.md#validation) for results and limitations.
 
 ## Note
 

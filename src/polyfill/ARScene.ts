@@ -3,6 +3,7 @@ import {
   CanvasTexture,
   Color,
   DirectionalLight,
+  Object3D,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -18,7 +19,8 @@ import {
 } from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import MyControls from './MyControls.js';
+import MyControls from './MyControls';
+import type {DeviceSize} from '../types/contracts';
 
 // @TODO: These default values should be imported from somewhere common place
 const DEFAULT_CAMERA_POSITION = [0, 1.6, 0];
@@ -29,12 +31,21 @@ const dummyCanvasTexture = new CanvasTexture(document.createElement('canvas'));
 const raycaster = new Raycaster();
 
 export default class ARScene {
-  constructor(deviceSize) {
-    this.renderer = null;
-    this.camera = null;
-    this.tablet = null;
-    this.pointer = null;
-    this.screen = null;
+  renderer!: WebGLRenderer;
+  scene!: Scene;
+  camera!: PerspectiveCamera;
+  tablet!: Mesh & {material: MeshStandardMaterial};
+  pointer!: Mesh & {material: MeshBasicMaterial};
+  screen!: Mesh & {material: MeshBasicMaterial};
+  tabletCamera!: PerspectiveCamera;
+  room: Object3D | null = null;
+  isTouched: boolean;
+  onCameraPoseUpdate: ((position: number[], quaternion: number[]) => void) | null;
+  onTabletPoseUpdate: ((position: number[], quaternion: number[]) => void) | null;
+  onTouch: ((position: number[]) => void) | null;
+  onRelease: (() => void) | null;
+
+  constructor(deviceSize: DeviceSize) {
 
     // for mouse click on the tablet screen
     this.isTouched = false;
@@ -46,7 +57,7 @@ export default class ARScene {
     this._init(deviceSize);
   }
 
-  _init(deviceSize) {
+  _init(deviceSize: DeviceSize) {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
@@ -55,7 +66,7 @@ export default class ARScene {
     // @TODO: Error message for non WebGL2 support browser?
     const context = canvas.getContext('webgl2', {antialias: true});
 
-    const renderer = new WebGLRenderer({canvas: canvas, context: context});
+    const renderer = new WebGLRenderer({canvas: canvas, context: context!});
     renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.domElement.oncontextmenu = () => { return false; };
@@ -81,7 +92,7 @@ export default class ARScene {
     const screen = new Mesh(
       new PlaneBufferGeometry(deviceSize.width - outsideFrameWidth, deviceSize.height - outsideFrameWidth),
       new MeshBasicMaterial({color: 0xffffff, map: renderTarget.texture})
-    );
+    ) as Mesh & {material: MeshBasicMaterial};
     screen.position.z = deviceSize.depth * 0.5 + 0.0001;  // 0.0001 is for not hiding the screen by the device
     screen.material.userData.map2 = {value: {needsUpdate: true}}; // Dummy. Updated in onBeforeCompile()
     screen.add(tabletCamera);
@@ -115,7 +126,7 @@ export default class ARScene {
     const tablet = new Mesh(
       new BoxBufferGeometry(deviceSize.width, deviceSize.height, deviceSize.depth),
       new MeshStandardMaterial({color: 0x000000})
-    );
+    ) as Mesh & {material: MeshStandardMaterial};
     tablet.position.fromArray(DEFAULT_TABLET_POSITION);
     tablet.add(screen);
     scene.add(tablet);
@@ -123,7 +134,7 @@ export default class ARScene {
     const pointer = new Mesh(
       new SphereBufferGeometry(0.01),
       new MeshBasicMaterial({color: 0xff8888, transparent: true, opacity: 0.6})
-    );
+    ) as Mesh & {material: MeshBasicMaterial};
     pointer.visible = false;
     pointer.position.fromArray(DEFAULT_POINTER_POSITION);
     scene.add(pointer);
@@ -160,7 +171,7 @@ export default class ARScene {
     const mouse = new Vector2();
     const targetObjects = [screen, tablet];
 
-    let mouseDownTime = null;
+    let mouseDownTime: number | null = null;
     const transformModes = {
       disabled: 0,
       translate: 1,
@@ -168,7 +179,7 @@ export default class ARScene {
     };
     let transformMode = transformModes.translate;
 
-    const raycast = event => {
+    const raycast = (event: MouseEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
       // left-top (0, 0), right-bottom (1, 1)
       const point = {
@@ -319,7 +330,7 @@ export default class ARScene {
     this.room = null;
   }
 
-  inject(div) {
+  inject(div: HTMLElement) {
     const appendCanvas = () => {
       div.appendChild(this.renderer.domElement);
     };
@@ -333,10 +344,10 @@ export default class ARScene {
 
   eject() {
     const element = this.renderer.domElement;
-    element.parentElement.removeChild(element);
+    element.parentElement!.removeChild(element);
   }
 
-  setCanvas(canvas) {
+  setCanvas(canvas: HTMLCanvasElement) {
     this.screen.material.userData.map2.value = new CanvasTexture(canvas);
   }
 
@@ -345,7 +356,7 @@ export default class ARScene {
   }
 
   // Raycasting for AR hit testing API
-  getHitTestResults(origin, direction) {
+  getHitTestResults(origin: ArrayLike<number>, direction: ArrayLike<number>) {
     raycaster.set(new Vector3().fromArray(origin), new Vector3().fromArray(direction));
     const targets = [];
     if (this.room) {
@@ -354,26 +365,26 @@ export default class ARScene {
     return raycaster.intersectObjects(targets, true);
   }
 
-  loadVirtualRoomAsset(buffer) {
+  loadVirtualRoomAsset(buffer: ArrayBuffer) {
     new GLTFLoader().parse(buffer, '', gltf => {
       this.scene.add(gltf.scene);
       this.room = gltf.scene;
-    }, undefined, error => {
+    }, error => {
       console.error(error);
     });
   }
 
-  updateCameraTransform(positionArray, quaternionArray) {
+  updateCameraTransform(positionArray: ArrayLike<number>, quaternionArray: ArrayLike<number>) {
     this.camera.position.fromArray(positionArray);
     this.camera.quaternion.fromArray(quaternionArray);
   }
 
-  updateTabletTransform(positionArray, quaternionArray) {
+  updateTabletTransform(positionArray: ArrayLike<number>, quaternionArray: ArrayLike<number>) {
     this.tablet.position.fromArray(positionArray);
     this.tablet.quaternion.fromArray(quaternionArray);
   }
 
-  updatePointerTransform(positionArray, quaternionArray) {
+  updatePointerTransform(positionArray: ArrayLike<number>, quaternionArray: ArrayLike<number>) {
     this.pointer.position.fromArray(positionArray);
     this.pointer.quaternion.fromArray(quaternionArray);
   }

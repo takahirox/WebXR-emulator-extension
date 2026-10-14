@@ -1,3 +1,8 @@
+import type { DeviceConfig, DeviceSize, SessionMode, EmulatedGamepad } from '../types/contracts';
+import type { PolyfillGlobal, BaseLayer, RenderState, Viewport } from '../types/polyfill';
+import type XRSpace from 'webxr-polyfill/src/api/XRSpace';
+import type XRHitTestSource from './api/XRHitTestSource';
+import { dispatchCustomEvent } from '../types/contracts';
 import XRDevice from 'webxr-polyfill/src/devices/XRDevice';
 import XRInputSource from 'webxr-polyfill/src/api/XRInputSource';
 import XRTransientInputHitTestSource from './api/XRTransientInputHitTestSource';
@@ -10,7 +15,7 @@ import {
 } from 'gl-matrix';
 import ARScene from './ARScene';
 
-const DEFAULT_MODES = ['inline'];
+const DEFAULT_MODES: SessionMode[] = ['inline'];
 
 // @TODO: This value should shared with panel.js?
 const DEFAULT_HEADSET_POSITION = [0, 1.6, 0];
@@ -24,17 +29,42 @@ const DEFAULT_RESOLUTION = {width: 1024, height: 2048};
 const DEFAULT_DEVICE_SIZE = {width: 0.05, height: 0.1, depth: 0.005};
 
 // @TODO: Duplicated with content-scripts.js. Move to somewhere common place?
-const dispatchCustomEvent = (type, detail) => {
-  window.dispatchEvent(new CustomEvent(type, {
-    detail: typeof cloneInto !== 'undefined' ? cloneInto(detail, window) : detail
-  }));
-};
 
 export default class EmulatedXRDevice extends XRDevice {
+  sessions: Map<number, Session>;
+  modes: SessionMode[];
+  features: string[];
+  position: vec3;
+  quaternion: quat;
+  scale: vec3;
+  gamepads: EmulatedGamepad[];
+  gamepadInputSources: GamepadXRInputSource[];
+  stereoEffectEnabled: boolean;
+  div: HTMLDivElement;
+  originalCanvasParams: {parentElement: HTMLElement | null; width: number; height: number};
+  domOverlayRoot: HTMLElement | null;
+  arDevice: boolean;
+  resolution: {width: number; height: number};
+  deviceSize: DeviceSize;
+  arScene: ARScene | null;
+  touched: boolean;
+  isPointerAndTabledCloseEnough: boolean;
+  hitTestSources: XRHitTestSource[];
+  hitTestResults: Map<XRHitTestSource, mat4[]>;
+  hitTestSourcesForTransientInput: XRTransientInputHitTestSource[];
+  hitTestResultsForTransientInput: Map<XRTransientInputHitTestSource, mat4[]>;
+  originalOverlayZIndex: string | undefined = undefined;
+  matrix: mat4;
+  projectionMatrix: mat4;
+  leftProjectionMatrix: mat4;
+  rightProjectionMatrix: mat4;
+  viewMatrix: mat4;
+  leftViewMatrix: mat4;
+  rightViewMatrix: mat4;
 
   // @TODO: write config parameter comment
 
-  constructor(global, config={}) {
+  constructor(global: PolyfillGlobal, config: DeviceConfig = {}) {
     super(global);
 
     this.sessions = new Map();
@@ -102,8 +132,8 @@ export default class EmulatedXRDevice extends XRDevice {
     this._setupEventListeners();
   }
 
-  onBaseLayerSet(sessionId, layer) {
-    const session = this.sessions.get(sessionId);
+  onBaseLayerSet(sessionId: number, layer: BaseLayer) {
+    const session = this.sessions.get(sessionId)!;
 
     // Remove old canvas first
     if (session.immersive && session.baseLayer) {
@@ -114,10 +144,10 @@ export default class EmulatedXRDevice extends XRDevice {
     if (session.immersive && session.baseLayer) {
       this._appendBaseLayerCanvasToDiv(sessionId);
       if (session.ar) {
-        const canvas = session.baseLayer.context.canvas;
+        const canvas = session.baseLayer!.context.canvas;
         canvas.width = this.resolution.width;
         canvas.height = this.resolution.height;
-        this.arScene.setCanvas(canvas);
+        this.arScene!.setCanvas(canvas);
         if (canvas.parentElement) {
           // Not sure why but this is necessary for Firefox.
           // Otherwise, the canvas won't be rendered in AR scene.
@@ -128,11 +158,11 @@ export default class EmulatedXRDevice extends XRDevice {
     }
   }
 
-  isSessionSupported(mode) {
+  isSessionSupported(mode: SessionMode) {
     return this.modes.includes(mode);
   }
 
-  isFeatureSupported(featureDescriptor) {
+  isFeatureSupported(featureDescriptor: string) {
     if (this.features.includes(featureDescriptor)) {
       return true;
     }
@@ -147,7 +177,7 @@ export default class EmulatedXRDevice extends XRDevice {
     }
   }
 
-  async requestSession(mode, enabledFeatures) { 
+  async requestSession(mode: SessionMode, enabledFeatures: Set<string>) {
     if(!this.isSessionSupported(mode)) {
       return Promise.reject();
     }
@@ -158,29 +188,29 @@ export default class EmulatedXRDevice extends XRDevice {
       if (!this.arScene) {
         this.arScene = new ARScene(this.deviceSize);
         this._requestVirtualRoomAsset();
-        this.arScene.onTouch = position => {
+        this.arScene!.onTouch = position => {
           this.touched = true;
           for (let i = 0; i < 3; i++) {
             this.gamepads[0].pose.position[i] = position[i];
           }
-          this.arScene.updatePointerTransform(this.gamepads[0].pose.position, this.gamepads[0].pose.orientation);
+          this.arScene!.updatePointerTransform(this.gamepads[0].pose.position, this.gamepads[0].pose.orientation);
           this._notifyInputPoseUpdate(0);
         };
-        this.arScene.onRelease = () => {
+        this.arScene!.onRelease = () => {
           this.touched = false;
         };
-        this.arScene.onCameraPoseUpdate = (positionArray, quaternionArray) => {
+        this.arScene!.onCameraPoseUpdate = (positionArray, quaternionArray) => {
           this._updatePose(positionArray, quaternionArray);
-          this.arScene.updateCameraTransform(positionArray, quaternionArray);
+          this.arScene!.updateCameraTransform(positionArray, quaternionArray);
           this._notifyPoseUpdate();
         };
-        this.arScene.onTabletPoseUpdate = (positionArray, quaternionArray) => {
+        this.arScene!.onTabletPoseUpdate = (positionArray, quaternionArray) => {
           this._updateInputPose(positionArray, quaternionArray, 1);
-          this.arScene.updateTabletTransform(positionArray, quaternionArray);
+          this.arScene!.updateTabletTransform(positionArray, quaternionArray);
           this._notifyInputPoseUpdate(1);
         };
       }
-      this.arScene.inject(this.div);
+      this.arScene!.inject(this.div);
     }
     if (immersive) {
       this.dispatchEvent('@@webxr-polyfill/vr-present-start', session.id);
@@ -189,18 +219,18 @@ export default class EmulatedXRDevice extends XRDevice {
     return Promise.resolve(session.id);
   }
 
-  requestAnimationFrame(callback) {
+  requestAnimationFrame(callback: FrameRequestCallback) {
     return this.global.requestAnimationFrame(callback);
   }
 
-  cancelAnimationFrame(handle) {
+  cancelAnimationFrame(handle: number) {
     this.global.cancelAnimationFrame(handle);
   }
 
-  onFrameStart(sessionId, renderState) {
-    const session = this.sessions.get(sessionId);
+  onFrameStart(sessionId: number, renderState: RenderState) {
+    const session = this.sessions.get(sessionId)!;
     // guaranteed by the caller that session.baseLayer is not null
-    const context = session.baseLayer.context;
+    const context = session.baseLayer!.context;
     const canvas = context.canvas;
     const near = renderState.depthNear;
     const far = renderState.depthFar;
@@ -216,7 +246,7 @@ export default class EmulatedXRDevice extends XRDevice {
       const currentClearDepth = context.getParameter(context.DEPTH_CLEAR_VALUE);
       const currentClearStencil = context.getParameter(context.STENCIL_CLEAR_VALUE);
       context.clearColor(0.0, 0.0, 0.0, 0.0);
-      context.clearDepth(1,0);
+      context.clearDepth(1);
       context.clearStencil(0.0);
       context.clear(context.DEPTH_BUFFER_BIT | context.COLOR_BUFFER_BIT | context.STENCIL_BUFFER_BIT );
       context.clearColor(currentClearColor[0], currentClearColor[1], currentClearColor[2], currentClearColor[3]);
@@ -258,7 +288,7 @@ export default class EmulatedXRDevice extends XRDevice {
           if (!this.isPointerAndTabledCloseEnough) {
             this._updateInputButtonPressed(true, 0, 0);
             this.isPointerAndTabledCloseEnough = true;
-            this.arScene.touched();
+            this.arScene!.touched();
           }
           const coordinates = this._getTouchCoordinates();
           this._updateInputAxes(0, coordinates[0], -coordinates[1]);
@@ -266,7 +296,7 @@ export default class EmulatedXRDevice extends XRDevice {
           if (this.isPointerAndTabledCloseEnough) {
             this._updateInputButtonPressed(false, 0, 0);
             this.isPointerAndTabledCloseEnough = false;
-            this.arScene.released();
+            this.arScene!.released();
           }
           this._updateInputAxes(0, 0, 0);
         }
@@ -315,7 +345,7 @@ export default class EmulatedXRDevice extends XRDevice {
     }
   }
 
-  onFrameEnd(sessionId) {
+  onFrameEnd(sessionId: number) {
     // We handle touch event on AR device as transient input for now.
     // If primary action happens on transient input
     // 1. First fire intputsourceschange event
@@ -325,7 +355,7 @@ export default class EmulatedXRDevice extends XRDevice {
     // So I need to postpone input select event until onFrameEnd() here.
     // Regarding select and select end events, they should be fired
     // before inputsourceschange event, so ok to be in onFrameStart().
-    const session = this.sessions.get(sessionId);
+    const session = this.sessions.get(sessionId)!;
     if (session.immersive) {
       for (let i = 0; i < this.gamepads.length; ++i) {
         const gamepad = this.gamepads[i];
@@ -343,7 +373,7 @@ export default class EmulatedXRDevice extends XRDevice {
     }
   }
 
-  async requestFrameOfReferenceTransform(type, options) {
+  async requestFrameOfReferenceTransform(type: string, options: unknown) {
     // @TODO: Add note
     const matrix = mat4.create();
     switch (type) {
@@ -363,14 +393,14 @@ export default class EmulatedXRDevice extends XRDevice {
     }
   }
 
-  endSession(sessionId) {
-    const session = this.sessions.get(sessionId);
+  endSession(sessionId: number) {
+    const session = this.sessions.get(sessionId)!;
     if (session.immersive && session.baseLayer) {
       this._removeBaseLayerCanvasFromDiv(sessionId);
       this.domOverlayRoot = null;
       if (session.ar) {
-        this.arScene.eject();
-        this.arScene.releaseCanvas();
+        this.arScene!.eject();
+        this.arScene!.releaseCanvas();
       }
       this.dispatchEvent('@@webxr-polyfill/vr-present-end', sessionId);
       this._notifyLeaveImmersive();
@@ -378,17 +408,17 @@ export default class EmulatedXRDevice extends XRDevice {
     session.ended = true;
   }
 
-  doesSessionSupportReferenceSpace(sessionId, type) {
-    const session = this.sessions.get(sessionId);
+  doesSessionSupportReferenceSpace(sessionId: number, type: string) {
+    const session = this.sessions.get(sessionId)!;
     if (session.ended) {
       return false;
     }
     return session.enabledFeatures.has(type);
   }
 
-  getViewport(sessionId, eye, layer, target) {
-    const session = this.sessions.get(sessionId);
-    const canvas = session.baseLayer.context.canvas;
+  getViewport(sessionId: number, eye: string, layer: BaseLayer, target: Viewport) {
+    const session = this.sessions.get(sessionId)!;
+    const canvas = session.baseLayer!.context.canvas;
     const width = canvas.width;
     const height = canvas.height;
     if (session.ar) {
@@ -417,7 +447,7 @@ export default class EmulatedXRDevice extends XRDevice {
     return true;
   }
 
-  getProjectionMatrix(eye) {
+  getProjectionMatrix(eye: string) {
     return this.arDevice || eye === 'none' ? this.projectionMatrix :
            eye === 'left' ? this.leftProjectionMatrix : this.rightProjectionMatrix;
   }
@@ -426,7 +456,7 @@ export default class EmulatedXRDevice extends XRDevice {
     return this.matrix;
   }
 
-  getBaseViewMatrix(eye) {
+  getBaseViewMatrix(eye: string) {
     if (eye === 'none' || this.arDevice || !this.stereoEffectEnabled) { return this.viewMatrix; }
     return eye === 'left' ? this.leftViewMatrix : this.rightViewMatrix;
   }
@@ -441,10 +471,11 @@ export default class EmulatedXRDevice extends XRDevice {
     return inputSources;
   }
 
-  getInputPose(inputSource, coordinateSystem, poseType) {
+  getInputPose(inputSource: XRInputSource, coordinateSystem: XRSpace, poseType: string) {
     for (const inputSourceImpl of this.gamepadInputSources) {
       if (inputSourceImpl.inputSource === inputSource) {
         const pose = inputSourceImpl.getXRPose(coordinateSystem, poseType);
+        if (!pose) { return null; }
 
         // In AR mode, calculate the input pose for right controller
         // from the relation of right controller(pointer) and left controller(tablet)
@@ -452,9 +483,9 @@ export default class EmulatedXRDevice extends XRDevice {
           if (!inputSourceImpl.active) { return null; }
           // @TODO: Add note about this matrix
           // @TODO: Optimize if possible
-          const viewMatrixInverse = mat4.invert(mat4.create(), this.viewMatrix);
+          const viewMatrixInverse = mat4.invert(mat4.create(), this.viewMatrix)!;
           coordinateSystem._transformBasePoseMatrix(viewMatrixInverse, viewMatrixInverse);
-          const viewMatrix = mat4.invert(mat4.create(), viewMatrixInverse);
+          const viewMatrix = mat4.invert(mat4.create(), viewMatrixInverse)!;
           mat4.multiply(pose.transform.matrix, viewMatrix, pose.transform.matrix);
           const matrix = mat4.identity(mat4.create());
           // Assuming FOV is 90 degree @TODO: Remove this constraint
@@ -487,25 +518,25 @@ export default class EmulatedXRDevice extends XRDevice {
 
   // DOM Overlay API
 
-  setDomOverlayRoot(root) {
+  setDomOverlayRoot(root: HTMLElement) {
     this.domOverlayRoot = root;
   }
 
   // AR Hitting test
 
-  addHitTestSource(source) {
+  addHitTestSource(source: XRHitTestSource) {
     this.hitTestSources.push(source);
   }
 
-  getHitTestResults(source) {
+  getHitTestResults(source: XRHitTestSource) {
     return this.hitTestResults.get(source) || [];
   }
 
-  addHitTestSourceForTransientInput(source) {
+  addHitTestSourceForTransientInput(source: XRTransientInputHitTestSource) {
     this.hitTestSourcesForTransientInput.push(source);
   }
 
-  getHitTestResultsForTransientInput(source) {
+  getHitTestResultsForTransientInput(source: XRTransientInputHitTestSource) {
     return this.hitTestResultsForTransientInput.get(source) || [];
   }
 
@@ -516,9 +547,9 @@ export default class EmulatedXRDevice extends XRDevice {
   // the special div. They are restored when exiting immersive mode.
   // @TODO: Simplify the method names
 
-  _appendBaseLayerCanvasToDiv(sessionId) {
-    const session = this.sessions.get(sessionId);
-    const canvas = session.baseLayer.context.canvas;
+  _appendBaseLayerCanvasToDiv(sessionId: number) {
+    const session = this.sessions.get(sessionId)!;
+    const canvas = session.baseLayer!.context.canvas;
 
     this.originalCanvasParams.width = canvas.width;
     this.originalCanvasParams.height = canvas.height;
@@ -539,7 +570,7 @@ export default class EmulatedXRDevice extends XRDevice {
     //        Should we observe?
     if (this.domOverlayRoot) {
       const el = this.domOverlayRoot;
-      el.style._zIndex = el.style.zIndex; // Polluting is bad...
+      this.originalOverlayZIndex = el.style.zIndex;
       if (this.domOverlayRoot.contains(this.div)) {
         this.div.style.zIndex = '';
       } else {
@@ -548,9 +579,9 @@ export default class EmulatedXRDevice extends XRDevice {
     }
   }
 
-  _removeBaseLayerCanvasFromDiv(sessionId) {
-    const session = this.sessions.get(sessionId);
-    const canvas = session.baseLayer.context.canvas;
+  _removeBaseLayerCanvasFromDiv(sessionId: number) {
+    const session = this.sessions.get(sessionId)!;
+    const canvas = session.baseLayer!.context.canvas;
 
     canvas.width = this.originalCanvasParams.width;
     canvas.height = this.originalCanvasParams.height;
@@ -577,8 +608,8 @@ export default class EmulatedXRDevice extends XRDevice {
     // @TODO: Is this the best place to handle?
     if (this.domOverlayRoot) {
       const el = this.domOverlayRoot;
-      el.style.zIndex = el.style._zIndex;
-      delete el.style._zIndex;
+      el.style.zIndex = this.originalOverlayZIndex!;
+      this.originalOverlayZIndex = undefined;
       this.div.style.zIndex = DIV_Z_INDEX;
     }
   }
@@ -611,7 +642,7 @@ export default class EmulatedXRDevice extends XRDevice {
 
   // Hit Test
 
-  _hitTest(sessionId, hitTestSources, hitTestResults) {
+  _hitTest<T extends XRHitTestSource | XRTransientInputHitTestSource>(sessionId: number, hitTestSources: T[], hitTestResults: Map<T, mat4[]>) {
     // Remove inactive sources first
     let activeHitTestSourceNum = 0;
     for (let i = 0; i < hitTestSources.length; i++) {
@@ -624,7 +655,7 @@ export default class EmulatedXRDevice extends XRDevice {
 
     // Do hit test next
     hitTestResults.clear();
-    for (const source of hitTestSources) {
+    for (const source of hitTestSources as (XRHitTestSource | XRTransientInputHitTestSource)[]) {
       if (sessionId !== source._session[XRSESSION_PRIVATE].id) {
         continue;
       }
@@ -658,7 +689,7 @@ export default class EmulatedXRDevice extends XRDevice {
       vec3.transformQuat(direction, direction, mat4.getRotation(quat.create(), baseMatrix));
 
       // Do hit test in AR scene and stores the result matrices
-      const arHitTestResults = this.arScene.getHitTestResults(origin, direction);
+      const arHitTestResults = this.arScene!.getHitTestResults(origin, direction);
       const results = [];
       for (const result of arHitTestResults) {
         const matrix = mat4.create();
@@ -668,7 +699,7 @@ export default class EmulatedXRDevice extends XRDevice {
         matrix[14] = result.point.z;
         results.push(matrix);
       }
-      hitTestResults.set(source, results);
+      hitTestResults.set(source as T, results);
     }
   }
 
@@ -682,7 +713,7 @@ export default class EmulatedXRDevice extends XRDevice {
   }
 
   // controllerIndex: 0 => Right, 1 => Left
-  _notifyInputPoseUpdate(controllerIndex) {
+  _notifyInputPoseUpdate(controllerIndex: number) {
     const pose = this.gamepads[controllerIndex].pose;
     const objectName = controllerIndex === 0 ? 'rightController' : 'leftController';
     dispatchCustomEvent('device-input-pose', {
@@ -708,11 +739,11 @@ export default class EmulatedXRDevice extends XRDevice {
 
   // Device status update methods invoked from event listeners.
 
-  _updateStereoEffect(enabled) {
+  _updateStereoEffect(enabled: boolean) {
     this.stereoEffectEnabled = enabled;
   }
 
-  _updatePose(positionArray, quaternionArray) {
+  _updatePose(positionArray: ArrayLike<number>, quaternionArray: ArrayLike<number>) {
     for (let i = 0; i < 3; i++) {
       this.position[i] = positionArray[i];
     }
@@ -721,7 +752,7 @@ export default class EmulatedXRDevice extends XRDevice {
     }
   }
 
-  _updateInputPose(positionArray, quaternionArray, index) {
+  _updateInputPose(positionArray: ArrayLike<number>, quaternionArray: ArrayLike<number>, index: number) {
     if (index >= this.gamepads.length) { return; }
     const gamepad = this.gamepads[index];
     const pose = gamepad.pose;
@@ -733,7 +764,7 @@ export default class EmulatedXRDevice extends XRDevice {
     }
   }
 
-  _updateInputButtonPressed(pressed, controllerIndex, buttonIndex) {
+  _updateInputButtonPressed(pressed: boolean, controllerIndex: number, buttonIndex: number) {
     if (controllerIndex >= this.gamepads.length) { return; }
     const gamepad = this.gamepads[controllerIndex];
     if (buttonIndex >= gamepad.buttons.length) { return; }
@@ -741,20 +772,20 @@ export default class EmulatedXRDevice extends XRDevice {
     gamepad.buttons[buttonIndex].value = pressed ? 1.0 : 0.0;
   }
 
-  _updateInputAxes(controllerIndex, x, y) {
+  _updateInputAxes(controllerIndex: number, x: number, y: number) {
     if (controllerIndex >= this.gamepads.length) { return; }
     const gamepad = this.gamepads[controllerIndex];
     gamepad.axes[0] = x;
     gamepad.axes[1] = y;
   }
 
-  _initializeControllers(config) {
+  _initializeControllers(config: DeviceConfig) {
     const hasController = config.controllers !== undefined;
-    const controllerNum = hasController ? config.controllers.length : 0;
+    const controllerNum = hasController ? config.controllers!.length : 0;
     this.gamepads.length = 0;
     this.gamepadInputSources.length = 0;
     for (let i = 0; i < controllerNum; i++) {
-      const controller = config.controllers[i];
+      const controller = config.controllers![i];
       const id = controller.id || '';
       const hasPosition = controller.hasPosition || false;
       const buttonNum = controller.buttonNum || 0;
@@ -809,7 +840,7 @@ export default class EmulatedXRDevice extends XRDevice {
         if (this.arScene) {
           this._updatePose(positionArray, quaternionArray);
           // In AR-mode, emulated headset corresponds to camera in AR scene
-          this.arScene.updateCameraTransform(positionArray, quaternionArray);
+          this.arScene!.updateCameraTransform(positionArray, quaternionArray);
         }
       } else {
         this._updatePose(positionArray, quaternionArray);
@@ -827,13 +858,13 @@ export default class EmulatedXRDevice extends XRDevice {
           case 'rightController':
             this._updateInputPose(positionArray, quaternionArray, 0);
             if (this.arScene) {
-              this.arScene.updatePointerTransform(positionArray, quaternionArray);
+              this.arScene!.updatePointerTransform(positionArray, quaternionArray);
             }
             break;
           case 'leftController':
             this._updateInputPose(positionArray, quaternionArray, 1);
             if (this.arScene) {
-              this.arScene.updateTabletTransform(positionArray, quaternionArray);
+              this.arScene!.updateTabletTransform(positionArray, quaternionArray);
             }
             break;
         }
@@ -875,14 +906,23 @@ export default class EmulatedXRDevice extends XRDevice {
 
     window.addEventListener('webxr-virtual-room-response', event => {
       const virtualRoomAssetBuffer = event.detail.buffer;
-      this.arScene.loadVirtualRoomAsset(virtualRoomAssetBuffer);
+      this.arScene!.loadVirtualRoomAsset(virtualRoomAssetBuffer);
     });
   }
 };
 
 let SESSION_ID = 0;
 class Session {
-  constructor(mode, enabledFeatures) {
+  mode: SessionMode;
+  immersive: boolean;
+  vr: boolean;
+  ar: boolean;
+  id: number;
+  baseLayer: BaseLayer | null;
+  inlineVerticalFieldOfView: number;
+  ended: boolean;
+  enabledFeatures: Set<string>;
+  constructor(mode: SessionMode, enabledFeatures: Set<string>) {
     this.mode = mode;
     this.immersive = mode == 'immersive-vr' || mode == 'immersive-ar';
     this.vr = mode === 'immersive-vr';
@@ -895,7 +935,7 @@ class Session {
   }
 }
 
-const createGamepad = (id, hand, buttonNum, hasPosition) => {
+const createGamepad = (id: string, hand: 'right' | 'left', buttonNum: number, hasPosition: boolean): EmulatedGamepad => {
   const buttons = [];
   for (let i = 0; i < buttonNum; i++) {
     buttons.push({
@@ -919,7 +959,7 @@ const createGamepad = (id, hand, buttonNum, hasPosition) => {
 };
 
 const tmpVec3 = vec3.create();
-const translateOnX = (matrix, distance) => {
+const translateOnX = (matrix: mat4, distance: number) => {
   vec3.set(tmpVec3, distance, 0, 0);
   return mat4.translate(matrix, matrix, tmpVec3);
 };
