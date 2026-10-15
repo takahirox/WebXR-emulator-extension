@@ -1,5 +1,6 @@
 /** Contracts shared across the panel, isolated content script, and injected page. */
 export type SessionMode = 'inline' | 'immersive-vr' | 'immersive-ar';
+export type ImmersiveMode = Exclude<SessionMode, 'inline'>;
 export type ControllerName = 'rightController' | 'leftController';
 export interface Capabilities { hasPosition: boolean; hasRotation: boolean; hasSqueezeButton?: boolean }
 export interface ControllerDefinition extends Capabilities {
@@ -8,6 +9,7 @@ export interface ControllerDefinition extends Capabilities {
 export interface DeviceSize { width: number; height: number; depth: number }
 export interface DeviceDefinition {
   id: string; name: string; modes: SessionMode[]; features?: string[];
+  formFactor?: 'headset' | 'handheld'; emulationMode?: ImmersiveMode;
   headset?: Capabilities; controllers?: ControllerDefinition[];
   resolution?: { width: number; height: number }; size?: DeviceSize;
 }

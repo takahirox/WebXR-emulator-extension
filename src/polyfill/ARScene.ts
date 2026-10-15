@@ -4,6 +4,7 @@ import {
   Color,
   DirectionalLight,
   Object3D,
+  OrthographicCamera,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -42,6 +43,10 @@ export default class ARScene {
   screen!: Mesh & {material: MeshBasicMaterial};
   tabletCamera!: PerspectiveCamera;
   room: Object3D | null = null;
+  stereoEffectEnabled = true;
+  private disposed = false;
+  private resetControls = () => {};
+  private cleanup: (() => void)[] = [];
   private readonly appTexture = {value: dummyCanvasTexture};
   isTouched: boolean;
   onCameraPoseUpdate: ((position: number[], quaternion: number[]) => void) | null;
@@ -49,7 +54,7 @@ export default class ARScene {
   onTouch: ((position: number[]) => void) | null;
   onRelease: (() => void) | null;
 
-  constructor(deviceSize: DeviceSize) {
+  constructor(deviceSize: DeviceSize, private handheld = true) {
 
     // for mouse click on the tablet screen
     this.isTouched = false;
@@ -137,6 +142,10 @@ export default class ARScene {
     // Controls
 
     const cameraControls = new MyControls(camera, renderer.domElement);
+    this.resetControls = () => {
+      cameraControls.enabled = false;
+      cameraControls.enabled = true;
+    };
     cameraControls.addEventListener('change', () => {
       if (this.onCameraPoseUpdate) {
         this.onCameraPoseUpdate(camera.position.toArray(), camera.quaternion.toArray());
@@ -158,6 +167,13 @@ export default class ARScene {
       cameraControls.enabled = true;
     });
     scene.add(transformControls.getHelper());
+    if (!this.handheld) {
+      transformControls.enabled = false;
+      transformControls.getHelper().visible = false;
+      tablet.visible = false;
+      screen.remove(tabletCamera);
+    }
+    this.cleanup.push(() => { cameraControls.dispose(); transformControls.dispose(); renderTarget.dispose(); });
 
     // Raycasting for
     //   - switching transform operation mode by left clicking
@@ -187,6 +203,7 @@ export default class ARScene {
     };
 
     renderer.domElement.addEventListener('mousedown', event => {
+      if (!this.handheld) return;
       if (event.button === 0) {
         // left click for translate operation mode
         mouseDownTime = null;
@@ -211,6 +228,7 @@ export default class ARScene {
     }, false);
 
     renderer.domElement.addEventListener('mouseup', event => {
+      if (!this.handheld) return;
       if (event.button === 0) {
         // left click for translate operation mode
         if (mouseDownTime === null) {
@@ -274,8 +292,50 @@ export default class ARScene {
 
     // animation frame
 
+    // MR composites the same application texture over a stereo virtual room,
+    // without the handheld phone or its touch gizmo in the headset view.
+    const compositeScene = new Scene();
+    const compositeCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const composite = new Mesh(new PlaneGeometry(2, 2), screen.material.clone());
+    composite.material.depthTest = false;
+    composite.material.depthWrite = false;
+    composite.material.onBeforeCompile = screen.material.onBeforeCompile;
+    composite.material.customProgramCacheKey = screen.material.customProgramCacheKey;
+    compositeScene.add(composite);
+    this.cleanup.push(() => { composite.geometry.dispose(); composite.material.dispose(); });
+
     const animate = () => {
+      if (this.disposed) return;
       requestAnimationFrame(animate);
+      if (!renderer.domElement.isConnected) return;
+      if (!this.handheld) {
+        cameraControls.update();
+        this.appTexture.value.needsUpdate = true;
+        const width = renderer.domElement.width;
+        const height = renderer.domElement.height;
+        if (renderTarget.width !== width || renderTarget.height !== height) renderTarget.setSize(width, height);
+        const eyes = this.stereoEffectEnabled ? [-0.02, 0.02] : [0];
+        const eyeCamera = tabletCamera;
+        eyeCamera.fov = 90;
+        eyeCamera.aspect = width / eyes.length / height;
+        eyeCamera.updateProjectionMatrix();
+        renderTarget.scissorTest = true;
+        for (let i = 0; i < eyes.length; i++) {
+          eyeCamera.position.copy(camera.position);
+          eyeCamera.quaternion.copy(camera.quaternion);
+          eyeCamera.translateX(eyes[i]);
+          // Render target rectangles use physical pixels. Renderer setters use
+          // logical pixels and would apply the display pixel ratio a second time.
+          renderTarget.viewport.set(i * width / eyes.length, 0, width / eyes.length, height);
+          renderTarget.scissor.copy(renderTarget.viewport);
+          renderer.setRenderTarget(renderTarget);
+          renderer.render(scene, eyeCamera);
+        }
+        renderer.setRenderTarget(null);
+        renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+        renderer.render(compositeScene, compositeCamera);
+        return;
+      }
 
       // First pass. Rendering ARScene to renderTarget.
 
@@ -308,13 +368,16 @@ export default class ARScene {
 
     //
 
-    window.addEventListener('resize', event => {
+    const onResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
+      renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-    }, false);
+    };
+    window.addEventListener('resize', onResize);
+    this.cleanup.push(() => window.removeEventListener('resize', onResize));
 
     this.renderer = renderer;
     this.scene = scene;
@@ -340,7 +403,24 @@ export default class ARScene {
 
   eject() {
     const element = this.renderer.domElement;
-    element.parentElement!.removeChild(element);
+    element.remove();
+    this.isTouched = false;
+    this.resetControls();
+    this.released();
+  }
+
+  dispose() {
+    this.disposed = true;
+    this.eject();
+    this.releaseCanvas();
+    for (const cleanup of this.cleanup) cleanup();
+    this.scene.traverse(object => {
+      const mesh = object as Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry.dispose();
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) material.dispose();
+    });
+    this.renderer.dispose();
   }
 
   setCanvas(canvas: HTMLCanvasElement) {

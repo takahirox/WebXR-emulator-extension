@@ -5,7 +5,7 @@
     synchronousXR: !!appWindow.navigator.xr,
     synchronousGlobals: ['XRSystem', 'XRSession', 'XRFrame', 'XRRay', 'XRRigidTransform'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'),
     overridesNativeXR: !!appWindow.navigator.xr && !/\[native code\]/.test(appWindow.navigator.xr.requestSession.toString()),
-    frames: 0, viewerPosition: [], inputPositions: {}, events: {},
+    frames: 0, views: [], framebuffer: {width: 0, height: 0}, inputModes: [], viewerPosition: [], inputPositions: {}, events: {},
     hits: 0, hitPosition: null, transientHits: 0, ended: true, errors: [],
   };
   const canvas = document.createElement('canvas');
@@ -19,8 +19,10 @@
     state,
     setTextureMode(mode) { textureMode = mode; },
     async start(mode) {
+      hitSource = undefined; transientSource = undefined;
       session = await appWindow.navigator.xr.requestSession(mode, {requiredFeatures: mode === 'immersive-ar' ? ['hit-test'] : []});
       state.ended = false;
+      state.frames = 0; state.views = []; state.inputModes = [];
       state.hits = 0;
       state.transientHits = 0;
       const activeSession = session;
@@ -28,8 +30,9 @@
       const gl = canvas.getContext('webgl', {alpha: true, premultipliedAlpha: false});
       if (!gl) throw new Error('WebGL unavailable');
       await gl.makeXRCompatible();
-      session.updateRenderState({baseLayer: new appWindow.XRWebGLLayer(session, gl)});
-      const reference = await session.requestReferenceSpace('local');
+      const layer = new appWindow.XRWebGLLayer(session, gl);
+      session.updateRenderState({baseLayer: layer});
+      const reference = await session.requestReferenceSpace(mode === 'inline' ? 'viewer' : 'local');
       if (mode === 'immersive-ar') {
         hitSource = await session.requestHitTestSource({space: await session.requestReferenceSpace('viewer')});
         transientSource = await session.requestHitTestSourceForTransientInput({profile: 'generic-touchscreen'});
@@ -41,8 +44,15 @@
       const frame: Parameters<typeof activeSession.requestAnimationFrame>[0] = (time, xrFrame) => {
         try {
           state.frames++;
+          state.framebuffer = {width: gl.drawingBufferWidth, height: gl.drawingBufferHeight};
           const pose = xrFrame.getViewerPose(reference);
           if (pose) state.viewerPosition = Array.from(pose.transform.matrix).slice(12, 15);
+          state.views = pose?.views.map(view => {
+            const viewport = layer.getViewport(view);
+            return {eye: view.eye, x: view.transform.matrix[12], projection: view.projectionMatrix[0],
+              viewport: {x: viewport.x, y: viewport.y, width: viewport.width, height: viewport.height}};
+          }) || [];
+          state.inputModes = Array.from(activeSession.inputSources, input => input.targetRayMode);
           state.inputPositions = {};
           for (const input of activeSession.inputSources) {
             const inputPose = xrFrame.getPose(input.gripSpace || input.targetRaySpace, reference);

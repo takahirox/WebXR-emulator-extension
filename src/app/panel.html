@@ -22,7 +22,14 @@
         margin: 0 0.6rem;
       }
 
+      #deviceSelect { max-width: calc(100% - 1.2rem); }
+
+      #modeHelp { flex-shrink: 0; }
+
       label {
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
         cursor: pointer;
       }
 
@@ -45,6 +52,8 @@
 
       .main-component {
         flex: 1;
+        min-height: 0;
+        min-width: 0;
       }
 
       .device-properties-component {
@@ -67,13 +76,16 @@
       .title-bar {
         display: flex;
         flex-direction: row;
-        height: 25px;
+        min-height: 25px;
+        flex-shrink: 0;
+        row-gap: 4px;
+        flex-wrap: wrap;
         background-color: #f9f9fa;
         border-width: 0px 0px 1px 0px;
         border-style: solid;
         border-color: #ddd;
         align-items: center;
-        padding: 0 22px;
+        padding: 4px 22px;
       }
 
       .device-properties-component .title-bar {
@@ -146,10 +158,14 @@
   <body>
     <div class="component main-component">
       <div class="title-bar">
-        <select id="deviceSelect"></select>
+        <select id="deviceSelect" aria-label="Device profile"></select>
+        <label id="questModeLabel">Quest mode<select id="questModeSelect" aria-label="Quest emulation mode">
+          <option value="immersive-vr">VR</option><option value="immersive-ar">MR (immersive AR)</option>
+        </select></label>
         <label id="stereoEffectLabel"><input id="stereoCheckbox" type="checkbox" checked>Stereo effect</label>
         <span id="devicePropertiesExpandIcon" class="item-left icon">&#9660;</span>
       </div>
+      <div id="modeHelp" style="padding: 6px 12px"></div>
       <div id="renderComponent" class="component main-component"></div>
       <div class="title-bar border-top">
         <button id="resetPoseButton">Reset pose</button>
@@ -158,14 +174,14 @@
     </div>
     <div id="devicePropertiesComponent" class="component device-properties-component">
       <div id="headsetComponent" class="component device-property-component">
-        <div class="title-bar"><span class="icon">&#9660;</span>Headset</div>
+        <div class="title-bar"><span class="icon">&#9660;</span><span id="headsetTitle">Headset</span></div>
         <div class="component device-property-content">
           <div><span class="key">position:</span> <span class="value" id="headsetPosition"></span></div>
           <div><span class="key">rotation:</span> <span class="value" id="headsetRotation"></span></div>
         </div>
       </div>
       <div id="rightControllerComponent" class="component device-property-component">
-        <div class="title-bar"><span class="icon">&#9660;</span>Right controller</div>
+        <div class="title-bar"><span class="icon">&#9660;</span><span id="rightControllerTitle">Right controller</span></div>
         <div class="component device-property-content">
           <div><span class="key">position:</span> <span class="value" id="rightControllerPosition"></span></div>
           <div><span class="key">rotation:</span> <span class="value" id="rightControllerRotation"></span></div>
@@ -174,7 +190,7 @@
         </div>
       </div>
       <div id="leftControllerComponent" class="component device-property-component">
-        <div class="title-bar"><span class="icon">&#9660;</span>Left controller</div>
+        <div class="title-bar"><span class="icon">&#9660;</span><span id="leftControllerTitle">Left controller</span></div>
         <div class="component device-property-content">
           <div><span class="key">position:</span> <span class="value" id="leftControllerPosition"></span></div>
           <div><span class="key">rotation:</span> <span class="value" id="leftControllerRotation"></span></div>

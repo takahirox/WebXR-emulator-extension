@@ -9,7 +9,7 @@ WebXR emulator extension is a browser extension which helps your WebXR content c
 ## Features
 
 - [WebXR API polyfill](https://github.com/immersive-web/webxr-polyfill)
-- Multiple XR devices emulation
+- Two development profiles: Meta Quest 3 and Generic Android Phone (ARCore)
 - Both VR and AR support
 - Graphical device emulator control with [Three.js](https://threejs.org/)
 - Cross browsers support with [WebExtensions API](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions)
@@ -45,20 +45,24 @@ You can configure some settings from the top in the WebXR tab.
 
 ### Device
 
-You can switch emulated device. The difference between devices is just degrees of freedom and the number of controllers for now.
+The device picker exposes exactly two profiles. **Meta Quest 3** is the default.
 
-| Device | Description |
+| Device | Emulated behavior |
 | ---- | ---- |
-| None | No device |
-| Google Cardboard | 3dof headset and no controller |
-| HTC Vive | 6dof headset and two 6dof controllers |
-| Oculus Go | 3dof headset and 3dof controller |
-| Oculus Quest | 6dof headset and two 6dof controllers |
-| Samsung Gear VR | 3dof headset and 3dof controller |
+| Meta Quest 3 | 6DoF headset and two tracked 6DoF controllers with select/squeeze; VR or MR in one profile |
+| Generic Android Phone (ARCore) | 6DoF handheld AR camera, virtual phone screen, transient touch input, and virtual-room hit tests |
+
+These profiles represent development targets, not physical-device fidelity or a claim of complete Quest 3/ARCore API support. They preserve the existing emulated APIs; hand tracking, anchors, and depth sensing are not implemented.
+
+### Quest mode
+
+Select **VR** (`immersive-vr`) or **MR (immersive AR)** (`immersive-ar`) in the separate **Quest mode** control, then start that session in the application. Only the selected immersive mode is available to the page. Both modes retain tracked controllers and headset pose controls. MR composites the application over the packaged virtual room with headset views; it does not provide a real camera passthrough feed. Use transparent application pixels to see the room.
+
+Changing the profile or Quest mode ends the current immersive session. Start a new session in the application afterward. The profile, Quest mode, and stereo preference persist across panel/page reloads. Switching to the phone preserves the Quest mode preference for the next switch back. Removed headset profiles (including None) fall back to Quest VR; the old Samsung AR selection migrates to the generic phone. Inline sessions remain available in either profile.
 
 ### Stereo Effect
 
-You can enable/disable Stereo Effect which renders two views.
+Stereo effect enables two side-by-side headset views in both Quest VR and MR. Disabling it draws one full-width view while retaining the two-eye session structure. The phone uses one monoscopic `none` view regardless of this preference.
 
 ## AR mode
 
@@ -70,7 +74,7 @@ WebXR emulator extension also supports AR. You can test WebXR AR application on 
 
 1. [Download and manually install the newest extension from dev branch](#how-to-install-the-newest-version)
 
-2. Select "Samsung Galaxy S8+ (AR)" device from the device list on the top of WebXR devtool panel
+2. Select "Generic Android Phone (ARCore)" from the device list on the top of WebXR devtool panel
 
 3. Go to WebXR application page, for example [Three.js WebXR AR examples](https://threejs.org/examples/?q=webxr#webxr_ar_paint)
 
@@ -80,26 +84,26 @@ WebXR emulator extension also supports AR. You can test WebXR AR application on 
 
 ### How to control
 
-You can control the camera (view) and tablet in the application window.
+You can control the observer camera (view) and virtual phone in the application window. The WebXR viewer pose follows the phone, while the observer camera lets you inspect it from outside.
 
-| user action | camera/tablet control |
+| user action | camera/phone control |
 |----|----|
 | Left mouse button drag | Camera rotation |
 | Right mouse button drag | Camera pan |
 | Middle mouse button drag or wheel | Move camera forward/backward |
-| Mouse click on the tablet | Change the tablet gizmo mode |
-| Gizmo on the tablet | Tablet rotation/translation |
-| Right mouse button click on the tablet screen | touch input |
+| Mouse click on the phone | Change the phone gizmo mode |
+| Gizmo on the phone | Phone rotation/translation |
+| Right mouse button click on the phone screen | touch input |
 
 ### How to control in the devtool panel
 
-You can still control the camera and tablet in the devtool panel similar to VR.
+You can still control the camera and phone in the devtool panel similar to VR.
 
 | Devtool panel | AR virtual room |
 |----|----|
-| Camera | View |
-| Right controller | Finger (not shown in the application window) |
-| Left controller | Tablet |
+| Observer camera | View |
+| Touch pointer (virtual) | Finger (not a physical controller) |
+| Phone | Phone |
 
 ## For development
 
@@ -134,9 +138,9 @@ Chrome uses a service worker and two manifest-declared `document_start` content 
 
 ### Browser regression checks
 
-`npm run test:browser` loads the actual unpacked extension in a fresh, temporary desktop Chromium profile, opens its real DevTools panel, and checks configuration persistence, synchronous injection under a restrictive script CSP, service-worker shutdown/recovery, matching same-origin and cross-origin frames, tab isolation, VR pose messages and select/squeeze, AR room rendering, persistent/transient hit testing, and mouse input. It serves a local TypeScript regression sample and deletes the profile afterward; no personal browser profile is used.
+`npm run test:browser` loads the actual unpacked extension in a fresh, temporary desktop Chromium profile, opens its real DevTools panel, and checks legacy profile migration, Quest VR/MR selection and persistence, session switching/restart, stereo and monoscopic views, configuration persistence, synchronous injection under a restrictive script CSP, service-worker shutdown/recovery, matching same-origin and cross-origin frames, tab isolation, VR pose messages and select/squeeze, AR room rendering, persistent/transient hit testing, and mouse input. It serves a local TypeScript regression sample and deletes the profile afterward; no personal browser profile is used.
 
-Install the current Playwright desktop Chromium with `npx playwright install chromium`, then run `npm run test:browser`. To test a specific current stable build, set `WEBXR_CHROMIUM_EXECUTABLE` to a desktop Chromium / Chrome for Testing executable (not its headless shell). The MV3 acceptance run used stable **Chrome for Testing 155.0.8059.79**. No MV2 compatibility flags are used. Branded Chrome/Edge no longer accept the automation sideloading flags; use Chrome for Testing or Playwright Chromium for automation and Load unpacked in Chrome's UI for manual installation.
+Install the current Playwright desktop Chromium with `npx playwright install chromium`, then run `npm run test:browser`. To test a specific current stable build, set `WEBXR_CHROMIUM_EXECUTABLE` to a desktop Chromium / Chrome for Testing executable (not its headless shell). The original MV3 acceptance run used stable **Chrome for Testing 155.0.8059.79**; the two-profile regression passed on Playwright desktop **Chromium 156.0.8078.4**. No MV2 compatibility flags are used. Branded Chrome/Edge no longer accept the automation sideloading flags; use Chrome for Testing or Playwright Chromium for automation and Load unpacked in Chrome's UI for manual installation.
 
 ```sh
 $ npm run build
@@ -146,7 +150,7 @@ $ npm run test:browser
 $ WEBXR_CHROMIUM_EXECUTABLE=/absolute/path/to/Chrome-for-Testing npm run test:browser
 ```
 
-The check requires a desktop display and WebGL (software rendering is enabled for this test profile). It writes local screenshots to ignored `test-results/`. See [recorded MV3 validation](docs/manifest-v3.md#validation) for steps, results, and limitations.
+The check requires a desktop display and WebGL (software rendering is enabled for this test profile). It writes local screenshots to ignored `test-results/`. See [device-profile implementation and validation](docs/device-profiles.md) for current behavior, results, screenshots, and limitations, and [recorded MV3 validation](docs/manifest-v3.md#validation) for the original migration checks.
 
 ## Note
 

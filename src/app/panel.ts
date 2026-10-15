@@ -124,12 +124,6 @@ const notifyExitImmersive = () => {
 
 //
 
-const IMMERSIVE_MODE = {
-  NONE: 0,
-  VR: 1,
-  AR: 2
-};
-
 const DEVICE = {
   HEADSET: '0',
   CONTROLLER: '1', // use this in case you don't distinguish left/right
@@ -155,7 +149,7 @@ OBJECT_NAME[DEVICE.LEFT_CONTROLLER] = 'leftController';
 const states = {
   inImmersive: false,
   buttonPressed: {} as Record<string, Record<number, boolean>>,
-  immersiveMode: IMMERSIVE_MODE.NONE
+  handheld: false
 };
 states.buttonPressed[DEVICE.RIGHT_CONTROLLER] = {};
 states.buttonPressed[DEVICE.RIGHT_CONTROLLER][BUTTON.SELECT] = false;
@@ -309,14 +303,19 @@ const setupTransformControlsMode = (controls: TransformControls, capabilities: C
 
 // device assets
 
-const loadHeadsetAsset = () => {
+let assetGeneration = 0;
+const loadHeadsetAsset = (handheld: boolean) => {
+  const generation = assetGeneration;
   new OBJLoader().load(ASSET_PATH[DEVICE.HEADSET], headset => {
+    if (generation !== assetGeneration) return;
     const parent = new THREE.Object3D();
     parent.position.copy(defaultTransforms[DEVICE.HEADSET].position);
     parent.rotation.copy(defaultTransforms[DEVICE.HEADSET].rotation);
     headset.rotation.y = -Math.PI;
 
-    scene.add(parent.add(headset));
+    scene.add(parent.add(handheld
+      ? new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.1, 0.08), new THREE.MeshStandardMaterial({color: 0x888888}))
+      : headset));
     assetNodes[DEVICE.HEADSET] = parent;
 
     const onChange = () => {
@@ -332,8 +331,10 @@ const loadHeadsetAsset = () => {
   });
 };
 
-const loadControllersAsset = (loadRight: boolean, loadLeft: boolean) => {
+const loadControllersAsset = (loadRight: boolean, loadLeft: boolean, handheld: boolean) => {
+  const generation = assetGeneration;
   new GLTFLoader().load(ASSET_PATH[DEVICE.CONTROLLER], gltf => {
+    if (generation !== assetGeneration) return;
     const baseController = gltf.scene;
     baseController.scale.multiplyScalar(6);
 
@@ -361,11 +362,14 @@ const loadControllersAsset = (loadRight: boolean, loadLeft: boolean) => {
 
     const setupController = (key: string) => {
       const parent = new THREE.Object3D();
-      const controller = recursivelyClone(baseController);
+      const controller = handheld
+        ? new THREE.Mesh(key === DEVICE.RIGHT_CONTROLLER ? new THREE.SphereGeometry(0.025) : new THREE.BoxGeometry(0.075, 0.15, 0.008),
+          new THREE.MeshStandardMaterial({color: key === DEVICE.RIGHT_CONTROLLER ? 0xff8888 : 0x333333}))
+        : recursivelyClone(baseController);
 
       // @TODO: Simplify
       let keyForDefaultTransform = key;
-      if (states.immersiveMode === IMMERSIVE_MODE.AR) {
+      if (handheld) {
         keyForDefaultTransform = key === DEVICE.RIGHT_CONTROLLER ? DEVICE.POINTER :
               key === DEVICE.LEFT_CONTROLLER ? DEVICE.TABLET :
               key;
@@ -406,12 +410,16 @@ const loadControllersAsset = (loadRight: boolean, loadLeft: boolean) => {
 };
 
 const updateAssetNodes = (deviceDefinition: DeviceDefinition) => {
-  // @TODO: Move more proper place to check?
-  const modes = deviceDefinition.modes;
-  // @TODO: What if the device supports both immersive-vr and immersive-ar?
-  states.immersiveMode = modes.includes('immersive-ar') ? IMMERSIVE_MODE.AR :
-                         modes.includes('immersive-vr') ? IMMERSIVE_MODE.VR :
-                         IMMERSIVE_MODE.NONE;
+  assetGeneration++;
+  const handheld = deviceDefinition.formFactor === 'handheld';
+  states.handheld = handheld;
+  document.getElementById('headsetTitle')!.textContent = handheld ? 'Observer camera' : 'Headset';
+  document.getElementById('rightControllerTitle')!.textContent = handheld ? 'Touch pointer (virtual)' : 'Right controller';
+  document.getElementById('leftControllerTitle')!.textContent = handheld ? 'Phone' : 'Left controller';
+  document.getElementById('questModeLabel')!.style.display = handheld ? 'none' : '';
+  document.getElementById('modeHelp')!.textContent = handheld
+    ? 'Phone AR: move the phone and observer camera. Right-click the phone screen in the page to touch.'
+    : 'Choose VR or MR, then start that session in the page. Changing mode ends the active session.';
 
   // Reset input feedback before replacing device assets.
   if (assetNodes[DEVICE.RIGHT_CONTROLLER]) {
@@ -469,7 +477,7 @@ const updateAssetNodes = (deviceDefinition: DeviceDefinition) => {
 
   // secondly load new assets and enable necessary panel controls
 
-  const hasImmersiveVR = deviceDefinition.modes && !! deviceDefinition.modes.includes('immersive-vr');
+  const hasTrackedControllers = !handheld;
   const hasHeadset = !! deviceDefinition.headset;
   const hasRightController = !!deviceDefinition.controllers && deviceDefinition.controllers.length > 0;
   const hasLeftController = !!deviceDefinition.controllers && deviceDefinition.controllers.length > 1;
@@ -483,23 +491,23 @@ const updateAssetNodes = (deviceDefinition: DeviceDefinition) => {
   const hasPosition = deviceCapabilities[DEVICE.HEADSET].hasPosition ||
     deviceCapabilities[DEVICE.CONTROLLER].hasPosition;
 
-  if (hasImmersiveVR) {
+  if (hasTrackedControllers) {
     document.getElementById('stereoEffectLabel')!.style.display = '';
   }
 
   if (hasHeadset) {
-    loadHeadsetAsset();
+    loadHeadsetAsset(handheld);
     document.getElementById('headsetComponent')!.style.display = 'flex';
     document.getElementById('exitButton')!.style.display = '';
   }
 
   if (hasRightController || hasLeftController) {
-    loadControllersAsset(hasRightController, hasLeftController);
+    loadControllersAsset(hasRightController, hasLeftController, handheld);
   }
 
   if (hasRightController) {
     document.getElementById('rightControllerComponent')!.style.display = 'flex';
-    if (hasImmersiveVR) {
+    if (hasTrackedControllers) {
       document.getElementById('rightSelectButton')!.style.display = '';
     }
     if (deviceCapabilities[DEVICE.CONTROLLER].hasSqueezeButton) {
@@ -509,7 +517,7 @@ const updateAssetNodes = (deviceDefinition: DeviceDefinition) => {
 
   if (hasLeftController) {
     document.getElementById('leftControllerComponent')!.style.display = 'flex';
-    if (hasImmersiveVR) {
+    if (hasTrackedControllers) {
       document.getElementById('leftSelectButton')!.style.display = '';
     }
     if (deviceCapabilities[DEVICE.CONTROLLER].hasSqueezeButton) {
@@ -521,6 +529,7 @@ const updateAssetNodes = (deviceDefinition: DeviceDefinition) => {
     document.getElementById('resetPoseButton')!.style.display = '';
   }
 
+  onResize();
   render();
 };
 
@@ -752,7 +761,7 @@ document.getElementById('resetPoseButton')!.addEventListener('click', event => {
 
     let defaultTransformKey = key;
     // @TODO: Simplify
-    if (states.immersiveMode === IMMERSIVE_MODE.AR) {
+    if (states.handheld) {
       defaultTransformKey = key === DEVICE.RIGHT_CONTROLLER ? DEVICE.POINTER :
                             key === DEVICE.LEFT_CONTROLLER ? DEVICE.TABLET :
                             key;
@@ -793,14 +802,9 @@ ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
 
   // set up devices select element
 
-  // Assuming the order of Object.keys() isn't predictable.
-  // Alphabetical sort first and then place 'None' at top of the list.
+  const questModeSelect = document.getElementById('questModeSelect') as HTMLSelectElement;
   const devices = manager.devices;
-  const deviceKeys = Object.keys(devices).sort();
-  if (deviceKeys.includes('None')) {
-    deviceKeys.splice(deviceKeys.indexOf('None'), 1);
-    deviceKeys.unshift('None');
-  }
+  const deviceKeys = Object.keys(devices);
   for (const key of deviceKeys) {
     const deviceDefinition = devices[key];
     const option = document.createElement('option');
@@ -824,14 +828,15 @@ ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
 
     const deviceKeyIsUpdated = manager.updateDeviceKey(deviceKey);
     const stereoEffectIsUpdated = manager.updateStereoEffect(stereoEffect);
+    const modeIsUpdated = manager.updateQuestMode(questModeSelect.value as 'immersive-vr' | 'immersive-ar');
 
-    if (deviceKeyIsUpdated || stereoEffectIsUpdated) {
+    if (deviceKeyIsUpdated || modeIsUpdated || stereoEffectIsUpdated) {
       manager.storeToStorage().then(storedValues => {
         // console.log(storedValues);
       });
     }
 
-    if (deviceKeyIsUpdated) {
+    if (deviceKeyIsUpdated || modeIsUpdated) {
       notifyDeviceChange(manager.deviceDefinition);
       updateAssetNodes(manager.deviceDefinition);
     }
@@ -842,6 +847,7 @@ ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
   };
 
   deviceSelect.addEventListener('change', onChange);
+  questModeSelect.addEventListener('change', onChange);
   stereoCheckbox.addEventListener('change', onChange);
 
   // load configuration and then load assets
@@ -858,6 +864,7 @@ ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
       }
     }
 
+    questModeSelect.value = manager.questMode;
     stereoCheckbox.checked = stereoEffect;
     updateAssetNodes(manager.deviceDefinition);
   });

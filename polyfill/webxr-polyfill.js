@@ -33741,6 +33741,7 @@ void main() {
                                     this._panEnd.copy(getMouseOnScreen(event));
                                     break;
                             }
+                            this.update();
                             this.state = STATE.NONE;
                         }, false);
                         domElement.addEventListener('mousemove', event => {
@@ -33851,8 +33852,13 @@ void main() {
                 dummyCanvasTexture.colorSpace = SRGBColorSpace;
                 const raycaster = new Raycaster();
                 class ARScene {
-                    constructor(deviceSize) {
+                    constructor(deviceSize, handheld = true) {
+                        this.handheld = handheld;
                         this.room = null;
+                        this.stereoEffectEnabled = true;
+                        this.disposed = false;
+                        this.resetControls = () => { };
+                        this.cleanup = [];
                         this.appTexture = { value: dummyCanvasTexture };
                         this.isTouched = false;
                         this.onCameraPoseUpdate = null;
@@ -33905,6 +33911,10 @@ void main() {
                         pointer.position.fromArray(DEFAULT_POINTER_POSITION);
                         scene.add(pointer);
                         const cameraControls = new MyControls(camera, renderer.domElement);
+                        this.resetControls = () => {
+                            cameraControls.enabled = false;
+                            cameraControls.enabled = true;
+                        };
                         cameraControls.addEventListener('change', () => {
                             if (this.onCameraPoseUpdate) {
                                 this.onCameraPoseUpdate(camera.position.toArray(), camera.quaternion.toArray());
@@ -33925,6 +33935,13 @@ void main() {
                             cameraControls.enabled = true;
                         });
                         scene.add(transformControls.getHelper());
+                        if (!this.handheld) {
+                            transformControls.enabled = false;
+                            transformControls.getHelper().visible = false;
+                            tablet.visible = false;
+                            screen.remove(tabletCamera);
+                        }
+                        this.cleanup.push(() => { cameraControls.dispose(); transformControls.dispose(); renderTarget.dispose(); });
                         const mouse = new Vector2();
                         const targetObjects = [screen, tablet];
                         let mouseDownTime = null;
@@ -33945,6 +33962,8 @@ void main() {
                             return raycaster.intersectObjects(targetObjects, false);
                         };
                         renderer.domElement.addEventListener('mousedown', event => {
+                            if (!this.handheld)
+                                return;
                             if (event.button === 0) {
                                 mouseDownTime = null;
                                 if (!transformControls.dragging && raycast(event).length > 0) {
@@ -33967,6 +33986,8 @@ void main() {
                             event.preventDefault();
                         }, false);
                         renderer.domElement.addEventListener('mouseup', event => {
+                            if (!this.handheld)
+                                return;
                             if (event.button === 0) {
                                 if (mouseDownTime === null) {
                                     return;
@@ -34025,8 +34046,48 @@ void main() {
                                 this.onTouch(results[0].point.toArray());
                             }
                         }, false);
+                        const compositeScene = new Scene();
+                        const compositeCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+                        const composite = new Mesh(new PlaneGeometry(2, 2), screen.material.clone());
+                        composite.material.depthTest = false;
+                        composite.material.depthWrite = false;
+                        composite.material.onBeforeCompile = screen.material.onBeforeCompile;
+                        composite.material.customProgramCacheKey = screen.material.customProgramCacheKey;
+                        compositeScene.add(composite);
+                        this.cleanup.push(() => { composite.geometry.dispose(); composite.material.dispose(); });
                         const animate = () => {
+                            if (this.disposed)
+                                return;
                             requestAnimationFrame(animate);
+                            if (!renderer.domElement.isConnected)
+                                return;
+                            if (!this.handheld) {
+                                cameraControls.update();
+                                this.appTexture.value.needsUpdate = true;
+                                const width = renderer.domElement.width;
+                                const height = renderer.domElement.height;
+                                if (renderTarget.width !== width || renderTarget.height !== height)
+                                    renderTarget.setSize(width, height);
+                                const eyes = this.stereoEffectEnabled ? [-0.02, 0.02] : [0];
+                                const eyeCamera = tabletCamera;
+                                eyeCamera.fov = 90;
+                                eyeCamera.aspect = width / eyes.length / height;
+                                eyeCamera.updateProjectionMatrix();
+                                renderTarget.scissorTest = true;
+                                for (let i = 0; i < eyes.length; i++) {
+                                    eyeCamera.position.copy(camera.position);
+                                    eyeCamera.quaternion.copy(camera.quaternion);
+                                    eyeCamera.translateX(eyes[i]);
+                                    renderTarget.viewport.set(i * width / eyes.length, 0, width / eyes.length, height);
+                                    renderTarget.scissor.copy(renderTarget.viewport);
+                                    renderer.setRenderTarget(renderTarget);
+                                    renderer.render(scene, eyeCamera);
+                                }
+                                renderer.setRenderTarget(null);
+                                renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+                                renderer.render(compositeScene, compositeCamera);
+                                return;
+                            }
                             screen.visible = false;
                             scene.traverse(object => {
                                 if (object.userData.virtual) {
@@ -34047,13 +34108,16 @@ void main() {
                             renderer.render(scene, camera);
                         };
                         animate();
-                        window.addEventListener('resize', event => {
+                        const onResize = () => {
                             const width = window.innerWidth;
                             const height = window.innerHeight;
+                            renderer.setPixelRatio(window.devicePixelRatio);
                             renderer.setSize(width, height);
                             camera.aspect = width / height;
                             camera.updateProjectionMatrix();
-                        }, false);
+                        };
+                        window.addEventListener('resize', onResize);
+                        this.cleanup.push(() => window.removeEventListener('resize', onResize));
                         this.renderer = renderer;
                         this.scene = scene;
                         this.camera = camera;
@@ -34076,7 +34140,26 @@ void main() {
                     }
                     eject() {
                         const element = this.renderer.domElement;
-                        element.parentElement.removeChild(element);
+                        element.remove();
+                        this.isTouched = false;
+                        this.resetControls();
+                        this.released();
+                    }
+                    dispose() {
+                        this.disposed = true;
+                        this.eject();
+                        this.releaseCanvas();
+                        for (const cleanup of this.cleanup)
+                            cleanup();
+                        this.scene.traverse(object => {
+                            const mesh = object;
+                            if (!mesh.isMesh)
+                                return;
+                            mesh.geometry.dispose();
+                            for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material])
+                                material.dispose();
+                        });
+                        this.renderer.dispose();
                     }
                     setCanvas(canvas) {
                         this.releaseCanvas();
@@ -34143,6 +34226,7 @@ void main() {
                 class EmulatedXRDevice extends XRDevice {
                     constructor(global, config = {}) {
                         super(global);
+                        this.monoView = new MonoscopicViewSpace();
                         this.originalOverlayZIndex = undefined;
                         this.sessions = new Map();
                         this.modes = config.modes || DEFAULT_MODES;
@@ -34173,7 +34257,8 @@ void main() {
                             height: 0
                         };
                         this.domOverlayRoot = null;
-                        this.arDevice = this.modes.includes('immersive-ar');
+                        this.handheld = config.formFactor === 'handheld';
+                        this.emulationMode = config.emulationMode || (this.handheld ? 'immersive-ar' : 'immersive-vr');
                         this.resolution = config.resolution !== undefined ? config.resolution : DEFAULT_RESOLUTION;
                         this.deviceSize = config.size !== undefined ? config.size : DEFAULT_DEVICE_SIZE;
                         this.arScene = null;
@@ -34196,8 +34281,8 @@ void main() {
                             this._appendBaseLayerCanvasToDiv(sessionId);
                             if (session.ar) {
                                 const canvas = session.baseLayer.context.canvas;
-                                canvas.width = this.resolution.width;
-                                canvas.height = this.resolution.height;
+                                canvas.width = this.handheld ? this.resolution.width : this.arScene.renderer.domElement.width;
+                                canvas.height = this.handheld ? this.resolution.height : this.arScene.renderer.domElement.height;
                                 this.arScene.setCanvas(canvas);
                                 if (canvas.parentElement) {
                                     canvas.parentElement.removeChild(canvas);
@@ -34206,7 +34291,10 @@ void main() {
                         }
                     }
                     isSessionSupported(mode) {
-                        return this.modes.includes(mode);
+                        return this.modes.includes(mode) && (mode === 'inline' || mode === this.emulationMode);
+                    }
+                    getViewSpaces(mode) {
+                        return mode === 'immersive-ar' && this.handheld ? [this.monoView] : undefined;
                     }
                     isFeatureSupported(featureDescriptor) {
                         if (this.features.includes(featureDescriptor)) {
@@ -34224,14 +34312,28 @@ void main() {
                     }
                     async requestSession(mode, enabledFeatures) {
                         if (!this.isSessionSupported(mode)) {
-                            return Promise.reject();
+                            throw new DOMException(`The selected emulation mode does not support ${mode}.`, 'NotSupportedError');
                         }
                         const immersive = mode === 'immersive-vr' || mode === 'immersive-ar';
                         const session = new Session(mode, enabledFeatures);
                         this.sessions.set(session.id, session);
+                        if (immersive) {
+                            this.touched = false;
+                            this.isPointerAndTabledCloseEnough = false;
+                            for (const input of this.gamepadInputSources) {
+                                input.active = !this.handheld;
+                                input.primaryActionPressed = false;
+                                input.primarySqueezeActionPressed = false;
+                            }
+                            for (const gamepad of this.gamepads)
+                                for (const button of gamepad.buttons) {
+                                    button.pressed = false;
+                                    button.value = 0;
+                                }
+                        }
                         if (mode === 'immersive-ar') {
                             if (!this.arScene) {
-                                this.arScene = new ARScene(this.deviceSize);
+                                this.arScene = new ARScene(this.deviceSize, this.handheld);
                                 this._requestVirtualRoomAsset();
                                 this.arScene.onTouch = position => {
                                     this.touched = true;
@@ -34255,6 +34357,10 @@ void main() {
                                     this._notifyInputPoseUpdate(1);
                                 };
                             }
+                            this.arScene.updateCameraTransform(this.position, this.quaternion);
+                            if (this.handheld) {
+                                this.arScene.updateTabletTransform(this.gamepads[1].pose.position, this.gamepads[1].pose.orientation);
+                            }
                             this.arScene.inject(this.div);
                         }
                         if (immersive) {
@@ -34273,6 +34379,14 @@ void main() {
                         const session = this.sessions.get(sessionId);
                         const context = session.baseLayer.context;
                         const canvas = context.canvas;
+                        if (session.ar && !this.handheld && this.arScene) {
+                            const display = this.arScene.renderer.domElement;
+                            if (canvas.width !== display.width || canvas.height !== display.height) {
+                                canvas.width = display.width;
+                                canvas.height = display.height;
+                                this.arScene.setCanvas(canvas);
+                            }
+                        }
                         const near = renderState.depthNear;
                         const far = renderState.depthFar;
                         const width = canvas.width;
@@ -34289,7 +34403,7 @@ void main() {
                             context.clearDepth(currentClearDepth);
                             context.clearStencil(currentClearStencil);
                         }
-                        if (session.vr) {
+                        if (session.immersive && !this.handheld) {
                             const aspect = width * (this.stereoEffectEnabled ? 0.5 : 1.0) / height;
                             perspective(this.leftProjectionMatrix, Math.PI / 2, aspect, near, far);
                             perspective(this.rightProjectionMatrix, Math.PI / 2, aspect, near, far);
@@ -34302,7 +34416,7 @@ void main() {
                             const aspect = width / height;
                             perspective(this.projectionMatrix, renderState.inlineVerticalFieldOfView, aspect, near, far);
                         }
-                        if (session.ar) {
+                        if (session.ar && this.handheld) {
                             fromRotationTranslationScale(this.matrix, this.gamepads[1].pose.orientation, this.gamepads[1].pose.position, this.scale);
                         }
                         else {
@@ -34311,8 +34425,10 @@ void main() {
                         invert(this.viewMatrix, this.matrix);
                         invert(this.leftViewMatrix, translateOnX(copy$1(this.leftViewMatrix, this.matrix), -0.02));
                         invert(this.rightViewMatrix, translateOnX(copy$1(this.rightViewMatrix, this.matrix), 0.02));
+                        if (session.ar && this.arScene)
+                            this.arScene.stereoEffectEnabled = this.stereoEffectEnabled;
                         if (session.immersive) {
-                            if (this.arDevice) {
+                            if (session.ar && this.handheld) {
                                 if (this.touched && this._isPointerCloseEnoughToTablet()) {
                                     if (!this.isPointerAndTabledCloseEnough) {
                                         this._updateInputButtonPressed(true, 0, 0);
@@ -34335,13 +34451,14 @@ void main() {
                                 const gamepad = this.gamepads[i];
                                 const inputSourceImpl = this.gamepadInputSources[i];
                                 inputSourceImpl.updateFromGamepad(gamepad);
-                                if (this.arDevice && i === 0) {
+                                if (this.handheld && i === 0) {
+                                    inputSourceImpl.handedness = 'none';
                                     inputSourceImpl.targetRayMode = 'screen';
                                 }
                                 if (inputSourceImpl.primaryButtonIndex !== -1) {
                                     const primaryActionPressed = gamepad.buttons[inputSourceImpl.primaryButtonIndex].pressed;
                                     if (primaryActionPressed && !inputSourceImpl.primaryActionPressed) {
-                                        if (this.arDevice) {
+                                        if (this.handheld) {
                                             inputSourceImpl.active = true;
                                         }
                                         else {
@@ -34349,7 +34466,7 @@ void main() {
                                         }
                                     }
                                     else if (!primaryActionPressed && inputSourceImpl.primaryActionPressed) {
-                                        if (this.arDevice) {
+                                        if (this.handheld) {
                                             inputSourceImpl.active = false;
                                         }
                                         this.dispatchEvent('@@webxr-polyfill/input-select-end', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
@@ -34366,8 +34483,11 @@ void main() {
                                     inputSourceImpl.primarySqueezeActionPressed = primarySqueezeActionPressed;
                                 }
                             }
-                            this._hitTest(sessionId, this.hitTestSources, this.hitTestResults);
-                            this._hitTest(sessionId, this.hitTestSourcesForTransientInput, this.hitTestResultsForTransientInput);
+                            if (session.ar) {
+                                this._hitTest(sessionId, this.hitTestSources, this.hitTestResults);
+                                if (this.handheld)
+                                    this._hitTest(sessionId, this.hitTestSourcesForTransientInput, this.hitTestResultsForTransientInput);
+                            }
                         }
                     }
                     onFrameEnd(sessionId) {
@@ -34379,7 +34499,7 @@ void main() {
                                 if (inputSourceImpl.primaryButtonIndex !== -1) {
                                     const primaryActionPressed = gamepad.buttons[inputSourceImpl.primaryButtonIndex].pressed;
                                     if (primaryActionPressed && !inputSourceImpl.primaryActionPressed) {
-                                        if (this.arDevice) {
+                                        if (this.handheld) {
                                             this.dispatchEvent('@@webxr-polyfill/input-select-start', { sessionId: session.id, inputSource: inputSourceImpl.inputSource });
                                         }
                                     }
@@ -34405,17 +34525,28 @@ void main() {
                     }
                     endSession(sessionId) {
                         const session = this.sessions.get(sessionId);
-                        if (session.immersive && session.baseLayer) {
-                            this._removeBaseLayerCanvasFromDiv(sessionId);
+                        if (session.ended)
+                            return;
+                        session.ended = true;
+                        if (session.immersive) {
+                            if (session.baseLayer)
+                                this._removeBaseLayerCanvasFromDiv(sessionId);
                             this.domOverlayRoot = null;
-                            if (session.ar) {
+                            if (session.ar && this.arScene) {
                                 this.arScene.eject();
                                 this.arScene.releaseCanvas();
                             }
+                            this.touched = false;
+                            this.isPointerAndTabledCloseEnough = false;
+                            for (const input of this.gamepadInputSources)
+                                input.active = false;
+                            this.hitTestSources = this.hitTestSources.filter(source => source._session[PRIVATE$9].id !== sessionId);
+                            this.hitTestSourcesForTransientInput = this.hitTestSourcesForTransientInput.filter(source => source._session[PRIVATE$9].id !== sessionId);
+                            this.hitTestResults.clear();
+                            this.hitTestResultsForTransientInput.clear();
                             this.dispatchEvent('@@webxr-polyfill/vr-present-end', sessionId);
                             this._notifyLeaveImmersive();
                         }
-                        session.ended = true;
                     }
                     doesSessionSupportReferenceSpace(sessionId, type) {
                         const session = this.sessions.get(sessionId);
@@ -34429,7 +34560,7 @@ void main() {
                         const canvas = session.baseLayer.context.canvas;
                         const width = canvas.width;
                         const height = canvas.height;
-                        if (session.ar) {
+                        if (session.ar && this.handheld) {
                             target.x = 0;
                             target.y = 0;
                             target.width = width;
@@ -34454,14 +34585,14 @@ void main() {
                         return true;
                     }
                     getProjectionMatrix(eye) {
-                        return this.arDevice || eye === 'none' ? this.projectionMatrix :
+                        return eye === 'none' ? this.projectionMatrix :
                             eye === 'left' ? this.leftProjectionMatrix : this.rightProjectionMatrix;
                     }
                     getBasePoseMatrix() {
                         return this.matrix;
                     }
                     getBaseViewMatrix(eye) {
-                        if (eye === 'none' || this.arDevice || !this.stereoEffectEnabled) {
+                        if (eye === 'none' || !this.stereoEffectEnabled) {
                             return this.viewMatrix;
                         }
                         return eye === 'left' ? this.leftViewMatrix : this.rightViewMatrix;
@@ -34482,7 +34613,7 @@ void main() {
                                 if (!pose) {
                                     return null;
                                 }
-                                if (this.arDevice && inputSourceImpl === this.gamepadInputSources[0]) {
+                                if (this.handheld && inputSourceImpl === this.gamepadInputSources[0]) {
                                     if (!inputSourceImpl.active) {
                                         return null;
                                     }
@@ -34726,55 +34857,46 @@ void main() {
                             const buttonNum = controller.buttonNum || 0;
                             const primaryButtonIndex = controller.primaryButtonIndex !== undefined ? controller.primaryButtonIndex : 0;
                             const primarySqueezeButtonIndex = controller.primarySqueezeButtonIndex !== undefined ? controller.primarySqueezeButtonIndex : -1;
-                            this.gamepads.push(createGamepad(id, i === 0 ? 'right' : 'left', buttonNum, hasPosition));
+                            const gamepad = createGamepad(id, i === 0 ? 'right' : 'left', buttonNum, hasPosition);
+                            gamepad.pose.position = this.handheld ? [0, 1.6, i === 0 ? -0.15 : -0.2] : [i === 0 ? 0.5 : -0.5, 1.5, -1];
+                            this.gamepads.push(gamepad);
                             const imputSourceImpl = new GamepadXRInputSource(this, {}, primaryButtonIndex, primarySqueezeButtonIndex);
-                            imputSourceImpl.active = !this.arDevice;
+                            imputSourceImpl.active = !this.handheld;
                             this.gamepadInputSources.push(imputSourceImpl);
                         }
                     }
                     _setupEventListeners() {
                         window.addEventListener('webxr-device', event => {
                             const config = event.detail.deviceDefinition;
+                            for (const session of this.sessions.values()) {
+                                if (session.immersive && !session.ended)
+                                    this.endSession(session.id);
+                            }
+                            const wasHandheld = this.handheld;
                             this.modes = config.modes || DEFAULT_MODES;
                             this.features = config.features || [];
-                            this.arDevice = this.modes.includes('immersive-ar');
-                            this.resolution = config.resolution !== undefined ? config.resolution : DEFAULT_RESOLUTION;
-                            this.deviceSize = config.size !== undefined ? config.size : DEFAULT_DEVICE_SIZE;
-                            for (let i = 0; i < this.gamepads.length; ++i) {
-                                const gamepad = this.gamepads[i];
-                                const inputSourceImpl = this.gamepadInputSources[i];
-                                inputSourceImpl.active = !this.arDevice;
-                                if (inputSourceImpl.primaryButtonIndex !== -1) {
-                                    gamepad.buttons[inputSourceImpl.primaryButtonIndex].pressed = false;
-                                }
-                                if (inputSourceImpl.primarySqueezeButtonIndex !== -1) {
-                                    gamepad.buttons[inputSourceImpl.primarySqueezeButtonIndex].pressed = false;
-                                }
+                            this.handheld = config.formFactor === 'handheld';
+                            this.emulationMode = config.emulationMode || (this.handheld ? 'immersive-ar' : 'immersive-vr');
+                            this.resolution = config.resolution || DEFAULT_RESOLUTION;
+                            this.deviceSize = config.size || DEFAULT_DEVICE_SIZE;
+                            if (wasHandheld !== this.handheld && this.arScene) {
+                                this.arScene.dispose();
+                                this.arScene = null;
                             }
-                            this.requestAnimationFrame(() => {
-                                this.requestAnimationFrame(() => {
-                                    this._initializeControllers(config);
-                                });
-                            });
+                            this._initializeControllers(config);
                         });
                         window.addEventListener('webxr-pose', event => {
+                            var _a;
                             const positionArray = event.detail.position;
                             const quaternionArray = event.detail.quaternion;
-                            if (this.arDevice) {
-                                if (this.arScene) {
-                                    this._updatePose(positionArray, quaternionArray);
-                                    this.arScene.updateCameraTransform(positionArray, quaternionArray);
-                                }
-                            }
-                            else {
-                                this._updatePose(positionArray, quaternionArray);
-                            }
+                            this._updatePose(positionArray, quaternionArray);
+                            (_a = this.arScene) === null || _a === void 0 ? void 0 : _a.updateCameraTransform(positionArray, quaternionArray);
                         }, false);
                         window.addEventListener('webxr-input-pose', event => {
                             const positionArray = event.detail.position;
                             const quaternionArray = event.detail.quaternion;
                             const objectName = event.detail.objectName;
-                            if (this.arDevice) {
+                            if (this.handheld) {
                                 switch (objectName) {
                                     case 'rightController':
                                         this._updateInputPose(positionArray, quaternionArray, 0);
@@ -34800,7 +34922,7 @@ void main() {
                             }
                         });
                         window.addEventListener('webxr-input-button', event => {
-                            if (this.arDevice) {
+                            if (this.handheld) {
                                 return;
                             }
                             const pressed = event.detail.pressed;
@@ -34818,9 +34940,17 @@ void main() {
                             this._updateStereoEffect(event.detail.enabled);
                         });
                         window.addEventListener('webxr-virtual-room-response', event => {
+                            var _a;
                             const virtualRoomAssetBuffer = event.detail.buffer;
-                            this.arScene.loadVirtualRoomAsset(virtualRoomAssetBuffer);
+                            (_a = this.arScene) === null || _a === void 0 ? void 0 : _a.loadVirtualRoomAsset(virtualRoomAssetBuffer);
                         });
+                    }
+                }
+                class MonoscopicViewSpace extends XRSpace {
+                    constructor() { super('none'); }
+                    get eye() { return 'none'; }
+                    _onPoseUpdate(device) {
+                        this._inverseBaseMatrix = device.getBaseViewMatrix('none');
                     }
                 }
                 let SESSION_ID = 0;

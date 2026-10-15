@@ -104,6 +104,8 @@ export default class MyControls extends EventDispatcher<{change: {}}> {
           this._panEnd.copy(getMouseOnScreen(event));
           break;
       }
+      // A quick drag can finish between animation frames; apply its final delta.
+      this.update();
       this.state = STATE.NONE;
     }, false);
 

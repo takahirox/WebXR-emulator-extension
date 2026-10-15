@@ -59,6 +59,8 @@ declare module 'webxr-polyfill/src/api/XRFrame' {
 declare module 'webxr-polyfill/src/api/XRSpace' {
   import type { mat4 } from 'gl-matrix';
   export default class XRSpace {
+    constructor(type?: string);
+    _inverseBaseMatrix: mat4 | null;
     _baseMatrix: mat4 | null;
     _transformBasePoseMatrix(out: mat4, matrix: mat4): mat4;
   }
@@ -84,7 +86,7 @@ declare module 'webxr-polyfill/src/devices/GamepadXRInputSource' {
   type EmulatedGamepad = import('./contracts').EmulatedGamepad;
   export default class GamepadXRInputSource {
     constructor(device: XRDevice, display: object, primaryButton: number, squeezeButton: number);
-    active: boolean; targetRayMode: string; primaryButtonIndex: number; primarySqueezeButtonIndex: number;
+    active: boolean; handedness: string; targetRayMode: string; primaryButtonIndex: number; primarySqueezeButtonIndex: number;
     primaryActionPressed: boolean; primarySqueezeActionPressed: boolean; inputSource: XRInputSource;
     updateFromGamepad(gamepad: EmulatedGamepad): void;
     getXRPose(space: XRSpace, type: string): XRPose | null;
