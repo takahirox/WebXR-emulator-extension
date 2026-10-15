@@ -15,7 +15,9 @@ export class XREventTarget extends EventTarget {
   _emit(event: Event) {
     this.dispatchEvent(event);
     const handler = (this as unknown as Record<string, unknown>)[`on${event.type}`];
-    if (typeof handler === 'function') handler.call(this, event);
+    if (typeof handler === 'function') {
+      try { handler.call(this, event); } catch (error) { reportError(error); }
+    }
   }
 }
 export class XRSessionEvent extends Event { constructor(type: string, init: EventInit & {session: XRSession}) { super(type, init); this.session = init.session; } readonly session: XRSession; }
@@ -69,7 +71,10 @@ export class XRSystem extends XREventTarget {
         let supported = device.isFeatureSupported(feature, mode);
         if (feature === 'depth-sensing') {
           if (!options.depthSensing) { supported = false; }
-          else supported = supported && options.depthSensing.usagePreference.includes('cpu-optimized') && options.depthSensing.dataFormatPreference.includes('float32');
+          else {
+            const {usagePreference, dataFormatPreference} = options.depthSensing;
+            supported = supported && (!usagePreference.length || usagePreference.includes('cpu-optimized')) && (!dataFormatPreference.length || dataFormatPreference.includes('float32'));
+          }
         }
         if (!supported && required.has(feature)) unsupported(`Required feature ${feature} is unavailable in ${mode}.`);
         if (supported) enabled.add(feature);
@@ -77,17 +82,17 @@ export class XRSystem extends XREventTarget {
       const id = await device.requestSession(mode, enabled);
       const session = new XRSession(device, mode, id, enabled);
       this.sessions.add(session);
-      if (mode === 'inline' && this.immersive) session._setVisibility('hidden');
+      if (mode === 'inline' && this.immersive) session._setImmersiveSuppressed(true);
       session.addEventListener('end', () => {
         this.sessions.delete(session);
         if (this.immersive === session) {
           this.immersive = null;
-          for (const inline of this.sessions) inline._setVisibility(document.hidden ? 'hidden' : 'visible');
+          for (const inline of this.sessions) inline._setImmersiveSuppressed(false);
         }
       });
       if (mode !== 'inline') {
         this.immersive = session;
-        for (const other of this.sessions) if (other !== session) other._setVisibility('hidden');
+        for (const other of this.sessions) if (other !== session) other._setImmersiveSuppressed(true);
       }
       return session;
     } finally { if (mode !== 'inline') this.requesting = false; }
@@ -110,7 +115,8 @@ export class XRSession extends XREventTarget {
   private signals: {type: typeof inputEvents[number]; source: DeviceInput}[] = [];
   private listeners: [string, (detail: InputSignal) => void][] = [];
   private endListener: (id: number) => void;
-  private visibilityListener = () => this._setVisibility(document.hidden ? 'hidden' : 'visible');
+  private immersiveSuppressed = false;
+  private visibilityListener = () => this._setVisibility(document.hidden || this.immersiveSuppressed ? 'hidden' : 'visible');
   readonly _anchors = new Set<XRAnchor>();
   private inputWrappers = new Map<DeviceInput, XRInputSource>();
   private rawSources: DeviceInput[] = [];
@@ -177,6 +183,9 @@ export class XRSession extends XREventTarget {
     if (this.ended || value === this.visibility) return;
     this.visibility = value; this._emit(new XRSessionEvent('visibilitychange', {session: this}));
   }
+  _setImmersiveSuppressed(value: boolean) {
+    this.immersiveSuppressed = value; this.visibilityListener();
+  }
   async requestReferenceSpace(type: string) {
     this._assertLive();
     if (!['viewer', 'local', 'local-floor', 'bounded-floor', 'unbounded'].includes(type)) throw new TypeError('Invalid XRReferenceSpaceType.');
@@ -188,6 +197,7 @@ export class XRSession extends XREventTarget {
   }
   updateRenderState(init: Partial<XRRenderState>) {
     this._assertLive();
+    if (init.baseLayer !== undefined && init.layers !== undefined) unsupported('baseLayer and layers cannot both be supplied.');
     if (init.baseLayer && (!(init.baseLayer instanceof XRWebGLLayer) || init.baseLayer._session !== this)) invalidState('Layer belongs to a different session.');
     if (init.layers !== undefined && init.layers !== null) {
       this._require('layers');
@@ -197,7 +207,8 @@ export class XRSession extends XREventTarget {
     }
     if (init.inlineVerticalFieldOfView != null && this._mode !== 'inline') invalidState('Immersive sessions cannot set inlineVerticalFieldOfView.');
     const state = {...(this.pendingRenderState ?? this.renderState), ...init};
-    if (state.baseLayer && state.layers?.length) invalidState('baseLayer and layers are mutually exclusive.');
+    if (init.baseLayer !== undefined) state.layers = null;
+    if (init.layers !== undefined) state.baseLayer = null;
     if (state.inlineVerticalFieldOfView != null) state.inlineVerticalFieldOfView = Math.max(0.01, Math.min(3.13, state.inlineVerticalFieldOfView));
     if (![state.depthNear, state.depthFar].every(Number.isFinite)) throw new TypeError('Depth values must be finite.');
     this.pendingRenderState = new XRRenderState(state);

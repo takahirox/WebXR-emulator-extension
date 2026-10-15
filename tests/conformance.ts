@@ -38,6 +38,22 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay']}), 'NotSupportedError', 'required overlay missing root');
       await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['depth-sensing'], depthSensing: {usagePreference: ['gpu-optimized'], dataFormatPreference: ['float32']}}), 'NotSupportedError', 'GPU depth required');
       await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['depth-sensing'], depthSensing: {usagePreference: ['cpu-optimized'], dataFormatPreference: ['luminance-alpha']}}), 'NotSupportedError', 'unsupported depth format required');
+      for (const requirement of ['requiredFeatures', 'optionalFeatures'] as const) {
+        for (const depthSensing of [
+          {usagePreference: [], dataFormatPreference: []},
+          {usagePreference: ['cpu-optimized'], dataFormatPreference: []},
+          {usagePreference: [], dataFormatPreference: ['float32']},
+        ]) {
+          const depthSession = await xr.navigator.xr.requestSession(mode, {[requirement]: ['depth-sensing'], depthSensing});
+          try {
+            check(depthSession.enabledFeatures.includes('depth-sensing') && depthSession.depthUsage === 'cpu-optimized' && depthSession.depthDataFormat === 'float32', `${requirement}: empty depth preferences select supported defaults (${JSON.stringify(depthSensing)})`);
+          } finally { await depthSession.end(); }
+        }
+        if (requirement === 'optionalFeatures') {
+          const incompatible = await xr.navigator.xr.requestSession(mode, {optionalFeatures: ['depth-sensing'], depthSensing: {usagePreference: ['gpu-optimized'], dataFormatPreference: []}});
+          try { check(!incompatible.enabledFeatures.includes('depth-sensing'), 'optional incompatible depth is omitted with an empty format preference'); } finally { await incompatible.end(); }
+        }
+      }
     }
     await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: document.body}}), 'NotSupportedError', 'DOM overlay compositor unavailable');
     const inline = await xr.navigator.xr.requestSession('inline', {optionalFeatures: ['anchors', 'layers', 'hand-tracking', 'hit-test', 'dom-overlay']});
@@ -52,6 +68,29 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       check(Object.isFrozen(session.enabledFeatures) && features.every(feature => session.enabledFeatures.includes(feature)) && !session.enabledFeatures.includes('not-a-real-feature'), 'enabledFeatures reflects negotiated capabilities');
       check(session.environmentBlendMode === (mode === 'immersive-ar' ? 'alpha-blend' : 'opaque'), 'AR/VR environment blend mode');
       check(inline.visibilityState === 'hidden', 'inline hidden during immersive presentation');
+      const inlineCanvas = document.createElement('canvas');
+      inline.updateRenderState({baseLayer: new xr.XRWebGLLayer(inline, inlineCanvas.getContext('webgl')!)});
+      let inlineRendered = false;
+      inline.requestAnimationFrame(() => { inlineRendered = true; });
+      const inlineVisibility: string[] = [];
+      inline.addEventListener('visibilitychange', () => inlineVisibility.push(inline.visibilityState));
+      const hiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+      const setDocumentHidden = (hidden: boolean) => {
+        Object.defineProperty(document, 'hidden', {configurable: true, value: hidden});
+        document.dispatchEvent(new Event('visibilitychange'));
+      };
+      try {
+        for (const hidden of [true, false, true, false]) {
+          setDocumentHidden(hidden);
+          check(inline.visibilityState === 'hidden', 'document visibility cannot reveal a suppressed inline session');
+          check(session.visibilityState === (hidden ? 'hidden' : 'visible'), 'immersive session follows document visibility');
+        }
+        await new Promise<void>(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
+        check(!inlineRendered && inlineVisibility.length === 0, 'suppressed inline session retains queued frames without spurious visibility events');
+      } finally {
+        if (hiddenDescriptor) Object.defineProperty(document, 'hidden', hiddenDescriptor); else Reflect.deleteProperty(document, 'hidden');
+        document.dispatchEvent(new Event('visibilitychange'));
+      }
       const newInline = await xr.navigator.xr.requestSession('inline');
       check(newInline.visibilityState === 'hidden', 'new inline session hidden during immersive presentation'); await newInline.end();
       await rejects(() => xr.navigator.xr.requestSession(mode), 'InvalidStateError', 'duplicate immersive session');
@@ -68,7 +107,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       throws(() => new xr.XRRay({}, {z: 0}), 'TypeError', 'zero ray');
       const ray = new xr.XRRay({}, {x: 1, y: 0, z: 0});
       check(Math.abs(-ray.matrix[8] - 1) < 1e-6, 'ray matrix rotates negative Z to direction');
-      const gl = canvas.getContext('webgl2', {alpha: true, preserveDrawingBuffer: true, xrCompatible: true} as WebGLContextAttributes)!;
+      const gl = canvas.getContext('webgl2', {alpha: true, stencil: true, preserveDrawingBuffer: true, xrCompatible: true} as WebGLContextAttributes)!;
       check(!!gl, 'WebGL2 available');
       check(new xr.XRWebGLLayer(session, gl) instanceof xr.XRWebGLLayer, 'xrCompatible context creation flag');
       await gl.makeXRCompatible();
@@ -175,9 +214,12 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       const projection = binding.createProjectionLayer({depthFormat: gl.DEPTH_COMPONENT24});
       const quad = binding.createQuadLayer({space: reference, transform: new xr.XRRigidTransform({z: -1}), viewPixelWidth: 64, viewPixelHeight: 64, width: 1, height: 1, depthFormat: 0});
       throws(() => binding.createProjectionLayer({textureType: 'texture-array'}), 'NotSupportedError', 'unsupported layer texture array');
-      session.updateRenderState({baseLayer: null, layers: [projection, quad]});
+      throws(() => session.updateRenderState({baseLayer: legacy, layers: [projection]}), 'NotSupportedError', 'one update cannot supply both layer properties');
+      session.updateRenderState({layers: [projection, quad]});
+      check(session.renderState.baseLayer === legacy, 'layer transition is pending until the next frame');
       const fbo = gl.createFramebuffer();
       await nextFrame(frame => {
+        check(session.renderState.baseLayer === null && session.renderState.layers?.[0] === projection, 'composition layers clear the active legacy base layer');
         const views = frame.getViewerPose(reference)!.views;
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
         for (const view of views) {
@@ -195,6 +237,28 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       check(pixels.some((value, index) => index % 4 === 2 && value > 200), 'projection layer is actually composited into the output');
       check(pixels.some((value, index) => index % 4 === 0 && value > 200), 'quad layer is actually composited into the output');
+      session.updateRenderState({layers: [projection]});
+      const sampler = gl.createSampler()!;
+      gl.samplerParameteri(sampler, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
+      for (const cap of [gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE]) {
+        await nextFrame(frame => {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+          const image = binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+          gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          gl.stencilFunc(gl.NEVER, 0, 0xff); gl.sampleCoverage(0, false);
+          gl.bindSampler(0, sampler); gl.activeTexture(gl.TEXTURE1); gl.enable(cap);
+        });
+        const pixel = new Uint8Array(4);
+        gl.readPixels(1, 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+        check(pixel.join(',') === '0,0,255,255', `compositor draws blue despite application capability ${cap}`);
+        check(gl.isEnabled(cap) && gl.getParameter(gl.STENCIL_FUNC) === gl.NEVER && gl.getParameter(gl.SAMPLE_COVERAGE_VALUE) === 0 && gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE1, `compositor restores application capability and parameters ${cap}`);
+        gl.activeTexture(gl.TEXTURE0);
+        check(gl.getParameter(gl.SAMPLER_BINDING) === sampler, 'compositor restores texture-unit-zero sampler');
+        gl.disable(cap); gl.bindSampler(0, null);
+      }
+      gl.deleteSampler(sampler);
       await nextFrame(frame => {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null); const pixel = new Uint8Array(4);
         // Device clears the default framebuffer at start; render a layer in this frame
@@ -206,9 +270,19 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       });
       projection.destroy();
       await nextFrame(frame => throws(() => binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]), 'InvalidStateError', 'destroyed layer access'));
-      session.updateRenderState({layers: null, baseLayer: legacy});
-      await nextFrame(() => check(true, 'legacy rendering resumes after layers'));
+      session.updateRenderState({baseLayer: legacy});
+      session.updateRenderState({depthNear: 0.2});
+      await nextFrame(() => check(session.renderState.baseLayer === legacy && session.renderState.layers === null && session.renderState.depthNear === 0.2, 'legacy rendering resumes after layers and retains other pending state'));
+      // Repeated transitions before a frame must also use the latest pending state.
+      session.updateRenderState({layers: [quad]}); session.updateRenderState({baseLayer: legacy}); session.updateRenderState({layers: [quad]});
+      await nextFrame(() => check(session.renderState.baseLayer === null && session.renderState.layers?.[0] === quad, 'pending render-state transitions clear the alternate layer property'));
+      session.updateRenderState({baseLayer: legacy});
+      await nextFrame(() => check(session.renderState.layers === null, 'pending transition returns to legacy rendering'));
       gl.deleteFramebuffer(fbo);
+      await session.end();
+      check(String(inline.visibilityState) === 'visible' && inlineVisibility.join(',') === 'visible', 'ending immersive presentation restores inline visibility');
+      await new Promise<void>(resolve => inline.requestAnimationFrame(() => resolve()));
+      check(inlineRendered, 'queued inline frames resume after immersive presentation ends');
     } finally { if (!session.ended) await session.end(); if (!inline.ended) await inline.end(); canvas.remove(); overlay.remove(); }
     check(!overlay.hasAttribute('style') && session.domOverlayState === null, 'unsupported overlay leaves DOM unchanged');
     await rejects(() => session.requestReferenceSpace('viewer'), 'InvalidStateError', 'ended reference space request');
@@ -224,6 +298,21 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         const input = await next(() => controllers.inputSources[0]); const gamepad = input.gamepad!;
         check(input.hand === null && gamepad.mapping === 'xr-standard' && gamepad.axes.length === 4 && gamepad.axes[0] === 0 && gamepad.axes[1] === 0 && !gamepad.buttons[2].pressed, 'Quest controller mapping, placeholder axes/buttons and absent hand');
         check(input.profiles[0] === 'meta-quest-touch-plus', 'Quest Touch Plus profile');
+        const handlerError = new Error('Expected throwing XR onselectstart regression');
+        let starts = 0; let reported = 0;
+        const receiveError = (event: ErrorEvent) => { if (event.error === handlerError) { reported++; event.preventDefault(); } };
+        window.addEventListener('error', receiveError);
+        controllers.onselectstart = () => { starts++; throw handlerError; };
+        try {
+          window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: true}}));
+          await Promise.race([
+            (async () => { for (let count = 0; count < 3; count++) await next(() => check(gamepad.buttons[0].pressed, 'animation continues after throwing input handler')); })(),
+            new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('Throwing handler stopped XR rendering')), 3000)),
+          ]);
+          check(starts === 1 && reported === 1, 'throwing event property reports its error and commits held input state once');
+          window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: false}}));
+          await next(() => check(!gamepad.buttons[0].pressed, 'input release continues after throwing event property'));
+        } finally { controllers.onselectstart = null; window.removeEventListener('error', receiveError); }
         window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: true}}));
         await next(() => check(input.gamepad === gamepad && gamepad.buttons[0].pressed && gamepad.buttons[0].value === 1, 'gamepad identity and trigger press state across frames'));
         window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: false}}));

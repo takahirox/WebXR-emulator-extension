@@ -160,5 +160,47 @@
     "Broader WebIDL, permissions-policy and opaque-framebuffer semantics/validation",
     "Persistent anchors and additional composition-layer/texture paths are unsupported"
   ],
-  "requiredPostMergeVerification": []
+  "requiredPostMergeVerification": [],
+  "reviewFixes": {
+    "issue": 11,
+    "browser": "156.0.8078.4",
+    "commands": {
+      "npm ci": "passed",
+      "npm run build:firefox": "passed; includes npm run build and npm run typecheck",
+      "npm run test:browser": "passed",
+      "git diff --check": "passed"
+    },
+    "checks": [
+      "Projection pixels remain blue with application stencil NEVER, rasterizer discard, alpha-to-coverage or zero sample coverage; capability, parameter, active texture and sampler state are restored",
+      "Legacy and composition layers replace each other in active and pending render state without explicitly supplying both properties",
+      "Throwing onselectstart reports one error, preserves queued XR callbacks and commits a held press once",
+      "Required and optional depth sensing accept empty usage/format preferences independently and together; incompatible optional usage remains omitted",
+      "Document hide/show preserves immersive suppression of inline frames and visibility events; queued inline frames resume after immersive end"
+    ],
+    "apiConformance": [
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-vr",
+        "distinctAssertions": 100,
+        "status": "passed"
+      },
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-ar",
+        "distinctAssertions": 137,
+        "status": "passed"
+      },
+      {
+        "profile": "Generic Android Phone (ARCore)",
+        "mode": "immersive-ar",
+        "distinctAssertions": 112,
+        "status": "passed"
+      }
+    ],
+    "notRerun": [
+      "test:wpt",
+      "test:samples"
+    ],
+    "firefoxRuntime": "not executed; packaging passed"
+  }
 }

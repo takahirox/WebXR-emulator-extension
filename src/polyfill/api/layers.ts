@@ -191,8 +191,9 @@ export class XRWebGLBinding {
     this.preserve(() => {
       this.setupProgram(); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null); gl.useProgram(this.program); gl.bindVertexArray(this.vao);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.SCISSOR_TEST); gl.disable(gl.CULL_FACE); gl.colorMask(true, true, true, true);
+      for (const cap of [gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE]) gl.disable(cap);
       gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      gl.activeTexture(gl.TEXTURE0); gl.uniform1i(gl.getUniformLocation(this.program!, 'image'), 0);
+      gl.activeTexture(gl.TEXTURE0); gl.bindSampler(0, null); gl.uniform1i(gl.getUniformLocation(this.program!, 'image'), 0);
       const pose = frame.getViewerPose(this._session._viewer)!;
       for (const layer of layers) {
         if (layer._destroyed) continue;
@@ -237,10 +238,11 @@ export class XRWebGLBinding {
     for (const parameter of [gl.DRAW_FRAMEBUFFER_BINDING, gl.READ_FRAMEBUFFER_BINDING, gl.CURRENT_PROGRAM, gl.VERTEX_ARRAY_BINDING, gl.ACTIVE_TEXTURE,
       gl.VIEWPORT, gl.SCISSOR_BOX, gl.COLOR_WRITEMASK, gl.DEPTH_WRITEMASK, gl.COLOR_CLEAR_VALUE, gl.DEPTH_CLEAR_VALUE,
       gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB, gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA, gl.BLEND_EQUATION_RGB, gl.BLEND_EQUATION_ALPHA]) saved.set(parameter, gl.getParameter(parameter));
-    const enabled = [gl.BLEND, gl.DEPTH_TEST, gl.SCISSOR_TEST, gl.CULL_FACE].map(cap => [cap, gl.isEnabled(cap)] as const);
+    const enabled = [gl.BLEND, gl.DEPTH_TEST, gl.SCISSOR_TEST, gl.CULL_FACE, gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE].map(cap => [cap, gl.isEnabled(cap)] as const);
     gl.activeTexture(gl.TEXTURE0); const texture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
+    const sampler = gl.getParameter(gl.SAMPLER_BINDING) as WebGLSampler | null;
     try { action(); } finally {
-      gl.bindTexture(gl.TEXTURE_2D, texture); gl.activeTexture(saved.get(gl.ACTIVE_TEXTURE) as number);
+      gl.bindSampler(0, sampler); gl.bindTexture(gl.TEXTURE_2D, texture); gl.activeTexture(saved.get(gl.ACTIVE_TEXTURE) as number);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, saved.get(gl.DRAW_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null);
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, saved.get(gl.READ_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null);
       gl.useProgram(saved.get(gl.CURRENT_PROGRAM) as WebGLProgram | null); gl.bindVertexArray(saved.get(gl.VERTEX_ARRAY_BINDING) as WebGLVertexArrayObject | null);
