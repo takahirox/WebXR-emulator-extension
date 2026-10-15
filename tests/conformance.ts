@@ -348,6 +348,11 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, applicationTexture);
       const projection = binding.createProjectionLayer({depthFormat: gl.DEPTH_COMPONENT24});
       const quad = peerBinding.createQuadLayer({space: reference, transform: new xr.XRRigidTransform({z: -1}), viewPixelWidth: 64, viewPixelHeight: 64, width: 1, height: 1, depthFormat: 0});
+      for (const space of [null, undefined, {}, inlineSpace]) {
+        throws(() => { quad.space = space as Geometry.XRSpace; }, 'TypeError', 'invalid quad space assignment');
+        check(quad.space === reference, 'failed quad space assignment preserves the previous space');
+        throws(() => binding.createQuadLayer({space: space as Geometry.XRSpace, viewPixelWidth: 32, viewPixelHeight: 32}), 'TypeError', 'invalid quad creation space');
+      }
       check(projection.textureWidth > 0 && projection.textureHeight > 0 && quad.textureWidth === 64 && quad.textureHeight === 64, 'layer dimensions initialized before the first frame');
       check(gl.getError() === gl.NO_ERROR && gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) === unpackBuffer && gl.getParameter(gl.TEXTURE_BINDING_2D) === applicationTexture && gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE1, 'initial allocation preserves application unpack buffer and texture state');
       throws(() => binding.createProjectionLayer({textureType: 'texture-array'}), 'NotSupportedError', 'unsupported layer texture array');
@@ -378,6 +383,46 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       check(pixels.some((value, index) => index % 4 === 2 && value > 200), 'projection layer is actually composited into the output');
       check(pixels.some((value, index) => index % 4 === 0 && value > 200), 'quad layer is actually composited into the output');
+      // Culling must use each eye's view and ignore the application's winding/cull mode.
+      const stereoEnabled = !handheld && await nextFrame(frame => legacy.getViewport(frame.getViewerPose(viewer)!.views[1]).width > 0);
+      if (!handheld) window.dispatchEvent(new CustomEvent('webxr-stereo-effect', {detail: {enabled: true}}));
+      const offscreenSpace = viewer.getOffsetReferenceSpace(new xr.XRRigidTransform({x: 100}));
+      for (const culling of [false, true]) for (const facing of ['front', 'back', 'edge', 'offscreen']) {
+        if (handheld && facing === 'edge') continue;
+        quad.space = facing === 'offscreen' ? offscreenSpace : viewer;
+        check(quad.space === (facing === 'offscreen' ? offscreenSpace : viewer), 'valid quad space assignment is observable');
+        const angle = facing === 'back' ? Math.PI : facing === 'edge' ? Math.PI / 2 : 0;
+        quad.transform = new xr.XRRigidTransform({z: -1}, {y: Math.sin(angle / 2), w: Math.cos(angle / 2)});
+        const viewports = await nextFrame(frame => {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, null, 0);
+          const views = frame.getViewerPose(viewer)!.views;
+          for (const view of views) {
+            const image = binding.getViewSubImage(projection, view);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+            gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+          }
+          const image = binding.getSubImage(quad, frame);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+          gl.clearColor(1, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          gl.cullFace(gl.FRONT_AND_BACK); gl.frontFace(gl.CW);
+          if (culling) gl.enable(gl.CULL_FACE); else gl.disable(gl.CULL_FACE);
+          return views.map(view => ({eye: view.eye, viewport: legacy.getViewport(view)}));
+        });
+        check(gl.isEnabled(gl.CULL_FACE) === culling && gl.getParameter(gl.CULL_FACE_MODE) === gl.FRONT_AND_BACK && gl.getParameter(gl.FRONT_FACE) === gl.CW, 'compositor restores culling enable, mode and winding');
+        for (const {eye, viewport} of viewports) {
+          const output = new Uint8Array(viewport.width * viewport.height * 4);
+          gl.readPixels(viewport.x, viewport.y, viewport.width, viewport.height, gl.RGBA, gl.UNSIGNED_BYTE, output);
+          const visible = facing === 'front' || (facing === 'edge' && eye === 'right');
+          check(output.some((value, index) => index % 4 === 0 && value > 200) === visible, `${eye} quad ${facing} visibility (application culling=${culling})`);
+          check(output.some((value, index) => index % 4 === 2 && value > 200), 'projection remains visible regardless of quad culling');
+        }
+        check(gl.getError() === gl.NO_ERROR, 'quad face culling produces no GL errors');
+      }
+      gl.disable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.frontFace(gl.CCW);
+      if (!handheld) window.dispatchEvent(new CustomEvent('webxr-stereo-effect', {detail: {enabled: stereoEnabled}}));
+      quad.space = reference; quad.transform = new xr.XRRigidTransform({z: -1});
       // Depth defaults differ between projection and non-projection dictionaries.
       // Use public subimages and complete FBOs to verify texture allocation and metadata.
       for (const [label, options] of [
@@ -542,14 +587,49 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         check(frame.getViewerPose(reference)!.views.length === (handheld ? 1 : 2), 'layers preserve view configuration');
         void pixel;
       });
-      projection.destroy();
-      await nextFrame(frame => throws(() => binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]), 'InvalidStateError', 'destroyed layer access'));
+      const activeVictim = binding.createQuadLayer({space: viewer, viewPixelWidth: 32, viewPixelHeight: 32});
+      session.updateRenderState({layers: [projection, activeVictim, quad]});
+      await nextFrame(frame => {
+        const active = session.renderState.layers;
+        activeVictim.destroy(); activeVictim.destroy();
+        check(session.renderState.layers === active && active?.includes(activeVictim), 'destroy leaves active state intact until the next frame');
+        throws(() => binding.getSubImage(activeVictim, frame), 'InvalidStateError', 'destroyed quad access is rejected immediately');
+      });
+      await nextFrame(() => {
+        check(Object.isFrozen(session.renderState.layers) && session.renderState.layers?.length === 2 && session.renderState.layers[0] === projection && session.renderState.layers[1] === quad, 'active destruction removes only the destroyed layer in order');
+        session.updateRenderState({layers: [...session.renderState.layers!]});
+      });
+      const pendingVictim = binding.createProjectionLayer();
+      session.updateRenderState({layers: [quad, pendingVictim, projection], depthNear: 0.17});
+      pendingVictim.destroy(); pendingVictim.destroy();
+      session.updateRenderState({depthFar: 90});
+      await nextFrame(() => check(session.renderState.layers?.length === 2 && session.renderState.layers[0] === quad && session.renderState.layers[1] === projection && session.renderState.depthNear === 0.17 && session.renderState.depthFar === 90, 'pending-only destruction preserves layer order and other pending updates'));
+      const replacedVictim = binding.createQuadLayer({space: viewer, viewPixelWidth: 32, viewPixelHeight: 32});
+      session.updateRenderState({layers: [projection, replacedVictim]});
+      await nextFrame(() => {});
+      session.updateRenderState({baseLayer: legacy, depthNear: 0.18});
+      replacedVictim.destroy();
+      await nextFrame(() => check(session.renderState.baseLayer === legacy && session.renderState.layers === null && session.renderState.depthNear === 0.18, 'destroy preserves a pending switch to legacy rendering'));
+      session.updateRenderState({layers: [projection, quad]});
+      await nextFrame(() => {});
+      session.updateRenderState({layers: [projection], depthNear: 0.19});
+      quad.destroy();
+      await nextFrame(() => check(session.renderState.layers?.length === 1 && session.renderState.layers[0] === projection && session.renderState.depthNear === 0.19, 'destroy preserves pending layers that already exclude the destroyed layer'));
+      await nextFrame(frame => {
+        projection.destroy(); projection.destroy();
+        throws(() => binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]), 'InvalidStateError', 'destroyed layer access');
+      });
+      // An empty layer list suspends XR callbacks, so observe its application
+      // with the document's animation frames before restoring presentation.
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      check(Object.isFrozen(session.renderState.layers) && session.renderState.layers?.length === 0, 'destroying the last layer applies an empty frozen array');
       session.updateRenderState({baseLayer: legacy});
       session.updateRenderState({depthNear: 0.2});
       await nextFrame(() => check(session.renderState.baseLayer === legacy && session.renderState.layers === null && session.renderState.depthNear === 0.2, 'legacy rendering resumes after layers and retains other pending state'));
       // Repeated transitions before a frame must also use the latest pending state.
-      session.updateRenderState({layers: [quad]}); session.updateRenderState({baseLayer: legacy}); session.updateRenderState({layers: [quad]});
-      await nextFrame(() => check(session.renderState.baseLayer === null && session.renderState.layers?.[0] === quad, 'pending render-state transitions clear the alternate layer property'));
+      const remainingQuad = binding.createQuadLayer({space: viewer, viewPixelWidth: 32, viewPixelHeight: 32});
+      session.updateRenderState({layers: [remainingQuad]}); session.updateRenderState({baseLayer: legacy}); session.updateRenderState({layers: [remainingQuad]});
+      await nextFrame(() => check(session.renderState.baseLayer === null && session.renderState.layers?.[0] === remainingQuad, 'pending render-state transitions clear the alternate layer property'));
       session.updateRenderState({baseLayer: legacy});
       await nextFrame(() => check(session.renderState.layers === null, 'pending transition returns to legacy rendering'));
       gl.deleteFramebuffer(fbo);

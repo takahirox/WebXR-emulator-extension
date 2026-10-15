@@ -386,5 +386,50 @@
     ],
     "firefoxRuntime": "not executed; packaging passed",
     "issueStatus": "partial implementation; keep Issue #11 open"
+  },
+  "layerCullingSpaceDestructionReviewFixes": {
+    "issue": 11,
+    "browser": "156.0.8078.4",
+    "commands": {
+      "npm ci": "passed",
+      "npm run typecheck": "passed",
+      "npm run build": "passed via build:firefox",
+      "npm run build:firefox": "passed",
+      "npm run test:browser": "passed; initial regression run assumed stereo preview enabled in Quest VR, corrected by temporarily enabling stereo and restoring it afterward",
+      "git diff --check": "passed"
+    },
+    "checks": [
+      "Front-facing quad pixels appear and 180-degree back-facing quad pixels are absent on Quest VR/MR and Android AR, with application culling both enabled and disabled; cull mode and front winding are restored",
+      "A stereo edge-on quad is visible only to the eye on its front side; projection pixels remain visible in every culling case",
+      "Quad creation and space assignment reject null, undefined, non-space and foreign-session values with TypeError; failed assignments preserve the original space",
+      "Valid viewer and offset reference-space assignments affect composition, including moving the quad out of view",
+      "Destruction immediately rejects subimage access and removes active or pending-only layers on the next frame while preserving order, frozen arrays and other pending changes",
+      "Repeated destruction, copying the remaining layer list, pending switches to legacy rendering, pending lists already excluding the layer, and destroying the last layer are covered"
+    ],
+    "apiConformance": [
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-vr",
+        "distinctAssertions": 308,
+        "status": "passed"
+      },
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-ar",
+        "distinctAssertions": 354,
+        "status": "passed"
+      },
+      {
+        "profile": "Generic Android Phone (ARCore)",
+        "mode": "immersive-ar",
+        "distinctAssertions": 306,
+        "status": "passed"
+      }
+    ],
+    "notRerun": [
+      "test:wpt and test:samples: this revision targets Layers composition and lifecycle, covered by the unpacked-extension browser regressions"
+    ],
+    "firefoxRuntime": "not executed; packaging passed",
+    "issueStatus": "partial implementation; keep Issue #11 open"
   }
 }

@@ -1022,6 +1022,11 @@ function WebXRPolyfillInjection() {
       static getNativeFramebufferScaleFactor(session) { if (!sessionObjects.has(session))
           throw new TypeError('Expected XRSession.'); return session.ended ? 0 : 1; }
   };
+  function validateLayerSpace(session, space) {
+      if (!(space instanceof XRSpace) || space._session !== session)
+          throw new TypeError('Layer space must belong to the same session.');
+      return space;
+  }
   class XRLayer extends EventTarget {
   }
   class XRCompositionLayer extends XRLayer {
@@ -1060,6 +1065,7 @@ function WebXRPolyfillInjection() {
           const gl = this._binding._gl2();
           gl.deleteTexture(this._color);
           gl.deleteTexture(this._depth);
+          this._binding._session._removeLayer(this);
       }
       _allocate(width, height) {
           const gl = this._binding._gl2();
@@ -1101,10 +1107,12 @@ function WebXRPolyfillInjection() {
       }
   }
   class XRQuadLayer extends XRCompositionLayer {
+      get space() { return this.spaceValue; }
+      set space(value) { this.spaceValue = validateLayerSpace(this._binding._session, value); }
       constructor(binding, init) {
           var _a, _b, _c;
           super(binding, init);
-          this.space = init.space;
+          this.spaceValue = validateLayerSpace(binding._session, init.space);
           this.transform = (_a = init.transform) !== null && _a !== void 0 ? _a : new XRRigidTransform();
           this.width = (_b = init.width) !== null && _b !== void 0 ? _b : 1;
           this.height = (_c = init.height) !== null && _c !== void 0 ? _c : 1;
@@ -1188,11 +1196,9 @@ function WebXRPolyfillInjection() {
           init = { ...init, depthFormat: Number((_a = init.depthFormat) !== null && _a !== void 0 ? _a : 0) };
           this._session._require('layers');
           this.validate(init);
-          this._session._owns(init.space);
+          validateLayerSpace(this._session, init.space);
           if (init.layout && init.layout !== 'mono')
               unsupported('Only mono quad layers are implemented.');
-          if (!(init.space instanceof XRSpace))
-              throw new TypeError('Expected XRSpace.');
           for (const value of [init.viewPixelWidth, init.viewPixelHeight])
               if (value === undefined || !Number.isInteger(value) || value <= 0)
                   throw new TypeError('Quad pixel dimensions must be positive integers.');
@@ -1319,10 +1325,14 @@ function WebXRPolyfillInjection() {
                           let matrix = create$3();
                           let uv = [0, 1];
                           if (layer instanceof XRProjectionLayer) {
+                              gl.disable(gl.CULL_FACE);
                               if (view.eye !== 'none')
                                   uv = [view.eye === 'right' && !layer.forceMonoPresentation ? 0.5 : 0, 0.5];
                           }
                           else if (layer instanceof XRQuadLayer) {
+                              gl.enable(gl.CULL_FACE);
+                              gl.cullFace(gl.BACK);
+                              gl.frontFace(gl.CCW);
                               const world = frame._world(layer.space);
                               if (!world)
                                   continue;
@@ -1370,7 +1380,8 @@ function WebXRPolyfillInjection() {
           const saved = new Map();
           for (const parameter of [gl.DRAW_FRAMEBUFFER_BINDING, gl.READ_FRAMEBUFFER_BINDING, gl.CURRENT_PROGRAM, gl.VERTEX_ARRAY_BINDING, gl.ACTIVE_TEXTURE,
               gl.VIEWPORT, gl.SCISSOR_BOX, gl.COLOR_WRITEMASK, gl.DEPTH_WRITEMASK, gl.COLOR_CLEAR_VALUE, gl.DEPTH_CLEAR_VALUE,
-              gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB, gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA, gl.BLEND_EQUATION_RGB, gl.BLEND_EQUATION_ALPHA])
+              gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB, gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA, gl.BLEND_EQUATION_RGB, gl.BLEND_EQUATION_ALPHA,
+              gl.CULL_FACE_MODE, gl.FRONT_FACE])
               saved.set(parameter, gl.getParameter(parameter));
           const enabled = [gl.BLEND, gl.DEPTH_TEST, gl.SCISSOR_TEST, gl.CULL_FACE, gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE].map(cap => [cap, gl.isEnabled(cap)]);
           gl.activeTexture(gl.TEXTURE0);
@@ -1399,6 +1410,8 @@ function WebXRPolyfillInjection() {
               gl.clearDepth(saved.get(gl.DEPTH_CLEAR_VALUE));
               gl.blendFuncSeparate(saved.get(gl.BLEND_SRC_RGB), saved.get(gl.BLEND_DST_RGB), saved.get(gl.BLEND_SRC_ALPHA), saved.get(gl.BLEND_DST_ALPHA));
               gl.blendEquationSeparate(saved.get(gl.BLEND_EQUATION_RGB), saved.get(gl.BLEND_EQUATION_ALPHA));
+              gl.cullFace(saved.get(gl.CULL_FACE_MODE));
+              gl.frontFace(saved.get(gl.FRONT_FACE));
               for (const [cap, value] of enabled)
                   value ? gl.enable(cap) : gl.disable(cap);
           }
@@ -2122,6 +2135,13 @@ function WebXRPolyfillInjection() {
           if (![state.depthNear, state.depthFar].every(Number.isFinite))
               throw new TypeError('Depth values must be finite.');
           this.pendingRenderState = new XRRenderState(state);
+      }
+      _removeLayer(layer) {
+          var _a, _b;
+          const state = (_a = this.pendingRenderState) !== null && _a !== void 0 ? _a : this.renderState;
+          if (!((_b = state.layers) === null || _b === void 0 ? void 0 : _b.includes(layer)))
+              return;
+          this.pendingRenderState = new XRRenderState({ ...state, layers: state.layers.filter(entry => entry !== layer) });
       }
       requestAnimationFrame(callback) { if (typeof callback !== 'function')
           throw new TypeError('Expected callback.'); if (this.ended)

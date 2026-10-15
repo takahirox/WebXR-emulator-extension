@@ -219,6 +219,11 @@ export class XRSession extends XREventTarget {
     if (![state.depthNear, state.depthFar].every(Number.isFinite)) throw new TypeError('Depth values must be finite.');
     this.pendingRenderState = new XRRenderState(state);
   }
+  _removeLayer(layer: XRCompositionLayer) {
+    const state = this.pendingRenderState ?? this.renderState;
+    if (!state.layers?.includes(layer)) return;
+    this.pendingRenderState = new XRRenderState({...state, layers: state.layers.filter(entry => entry !== layer)});
+  }
   requestAnimationFrame(callback: Callback) { if (typeof callback !== 'function') throw new TypeError('Expected callback.'); if (this.ended) return 0; const id = ++this.nextCallback; this.callbacks.set(id, callback); return id; }
   cancelAnimationFrame(id: number) { this.callbacks.delete(id); this.currentCallbacks?.delete(id); }
   async end() {

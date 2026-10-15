@@ -34,6 +34,10 @@ interface LayerInit {
   viewPixelWidth?: number; viewPixelHeight?: number; layout?: string; isStatic?: boolean;
   mipLevels?: number; clearOnAccess?: boolean;
 }
+function validateLayerSpace(session: XRSession, space: XRSpace) {
+  if (!(space instanceof XRSpace) || space._session !== session) throw new TypeError('Layer space must belong to the same session.');
+  return space;
+}
 export class XRLayer extends EventTarget {}
 export class XRCompositionLayer extends XRLayer {
   readonly layout: string;
@@ -65,6 +69,7 @@ export class XRCompositionLayer extends XRLayer {
     if (this._destroyed) return;
     this._destroyed = true;
     const gl = this._binding._gl2(); gl.deleteTexture(this._color); gl.deleteTexture(this._depth);
+    this._binding._session._removeLayer(this);
   }
   _allocate(width: number, height: number) {
     const gl = this._binding._gl2();
@@ -95,11 +100,13 @@ export class XRProjectionLayer extends XRCompositionLayer {
   readonly deltaPose = null;
 }
 export class XRQuadLayer extends XRCompositionLayer {
-  space: XRSpace;
+  private spaceValue: XRSpace;
+  get space() { return this.spaceValue; }
+  set space(value: XRSpace) { this.spaceValue = validateLayerSpace(this._binding._session, value); }
   transform: XRRigidTransform;
   width: number; height: number;
   constructor(binding: XRWebGLBinding, init: LayerInit & {space: XRSpace}) {
-    super(binding, init); this.space = init.space; this.transform = init.transform ?? new XRRigidTransform();
+    super(binding, init); this.spaceValue = validateLayerSpace(binding._session, init.space); this.transform = init.transform ?? new XRRigidTransform();
     this.width = init.width ?? 1; this.height = init.height ?? 1;
   }
 }
@@ -157,9 +164,8 @@ export class XRWebGLBinding {
   createQuadLayer(init: LayerInit & {space: XRSpace}) {
     // XRLayerInit has a nullable depthFormat with no default depth texture.
     init = {...init, depthFormat: Number(init.depthFormat ?? 0)};
-    this._session._require('layers'); this.validate(init); this._session._owns(init.space);
+    this._session._require('layers'); this.validate(init); validateLayerSpace(this._session, init.space);
     if (init.layout && init.layout !== 'mono') unsupported('Only mono quad layers are implemented.');
-    if (!(init.space instanceof XRSpace)) throw new TypeError('Expected XRSpace.');
     for (const value of [init.viewPixelWidth, init.viewPixelHeight]) if (value === undefined || !Number.isInteger(value) || value <= 0) throw new TypeError('Quad pixel dimensions must be positive integers.');
     if (init.transform && !(init.transform instanceof XRRigidTransform)) throw new TypeError('Expected XRRigidTransform.');
     if ((init.width ?? 1) <= 0 || (init.height ?? 1) <= 0) throw new TypeError('Quad physical dimensions must be positive.');
@@ -240,8 +246,10 @@ export class XRWebGLBinding {
             gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
             let matrix = mat4.create(); let uv = [0, 1];
             if (layer instanceof XRProjectionLayer) {
+              gl.disable(gl.CULL_FACE);
               if (view.eye !== 'none') uv = [view.eye === 'right' && !layer.forceMonoPresentation ? 0.5 : 0, 0.5];
             } else if (layer instanceof XRQuadLayer) {
+              gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.frontFace(gl.CCW);
               const world = frame._world(layer.space); if (!world) continue;
               matrix = mat4.multiply(matrix, world, layer.transform.matrix);
               mat4.scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
@@ -275,7 +283,8 @@ export class XRWebGLBinding {
     const saved = new Map<number, unknown>();
     for (const parameter of [gl.DRAW_FRAMEBUFFER_BINDING, gl.READ_FRAMEBUFFER_BINDING, gl.CURRENT_PROGRAM, gl.VERTEX_ARRAY_BINDING, gl.ACTIVE_TEXTURE,
       gl.VIEWPORT, gl.SCISSOR_BOX, gl.COLOR_WRITEMASK, gl.DEPTH_WRITEMASK, gl.COLOR_CLEAR_VALUE, gl.DEPTH_CLEAR_VALUE,
-      gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB, gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA, gl.BLEND_EQUATION_RGB, gl.BLEND_EQUATION_ALPHA]) saved.set(parameter, gl.getParameter(parameter));
+      gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB, gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA, gl.BLEND_EQUATION_RGB, gl.BLEND_EQUATION_ALPHA,
+      gl.CULL_FACE_MODE, gl.FRONT_FACE]) saved.set(parameter, gl.getParameter(parameter));
     const enabled = [gl.BLEND, gl.DEPTH_TEST, gl.SCISSOR_TEST, gl.CULL_FACE, gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE].map(cap => [cap, gl.isEnabled(cap)] as const);
     gl.activeTexture(gl.TEXTURE0); const texture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
     const sampler = gl.getParameter(gl.SAMPLER_BINDING) as WebGLSampler | null;
@@ -290,6 +299,7 @@ export class XRWebGLBinding {
       const color = saved.get(gl.COLOR_CLEAR_VALUE) as Float32Array; gl.clearColor(color[0], color[1], color[2], color[3]); gl.clearDepth(saved.get(gl.DEPTH_CLEAR_VALUE) as number);
       gl.blendFuncSeparate(saved.get(gl.BLEND_SRC_RGB) as number, saved.get(gl.BLEND_DST_RGB) as number, saved.get(gl.BLEND_SRC_ALPHA) as number, saved.get(gl.BLEND_DST_ALPHA) as number);
       gl.blendEquationSeparate(saved.get(gl.BLEND_EQUATION_RGB) as number, saved.get(gl.BLEND_EQUATION_ALPHA) as number);
+      gl.cullFace(saved.get(gl.CULL_FACE_MODE) as number); gl.frontFace(saved.get(gl.FRONT_FACE) as number);
       for (const [cap, value] of enabled) value ? gl.enable(cap) : gl.disable(cap);
     }
   }
