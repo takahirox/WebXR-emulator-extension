@@ -161,6 +161,35 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       await gl.makeXRCompatible();
       const legacy = new xr.XRWebGLLayer(session, gl); session.updateRenderState({baseLayer: legacy});
       function nextFrame<T>(callback: (frame: Runtime.XRFrame) => T): Promise<T> { return new Promise((resolve, reject) => session.requestAnimationFrame((_time, frame) => { try { resolve(callback(frame)); } catch (error) { reject(error); } })); }
+      const applicationFramebuffer = gl.createFramebuffer();
+      try {
+        for (const [drawNone, discard] of [[false, false], [true, false], [false, true], [true, true]]) {
+          const label = `legacy clearing (draw NONE=${drawNone}, rasterizer discard=${discard})`;
+          await nextFrame(() => {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.drawBuffers([gl.BACK]); gl.disable(gl.RASTERIZER_DISCARD);
+            gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+            const pixel = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+            check(pixel.join(',') === '0,0,255,255', `${label}: starts with blue output`);
+            gl.drawBuffers([drawNone ? gl.NONE : gl.BACK]);
+            if (discard) gl.enable(gl.RASTERIZER_DISCARD);
+            // Draw buffers belong to the framebuffer: the compositor must save
+            // the default framebuffer's setting, not this application's FBO.
+            gl.bindFramebuffer(gl.FRAMEBUFFER, applicationFramebuffer);
+          });
+          await nextFrame(() => {
+            check(gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING) === applicationFramebuffer && gl.getParameter(gl.READ_FRAMEBUFFER_BINDING) === applicationFramebuffer, `${label}: restores application framebuffer bindings`);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            check(gl.getParameter(gl.DRAW_BUFFER0) === (drawNone ? gl.NONE : gl.BACK) && gl.isEnabled(gl.RASTERIZER_DISCARD) === discard, `${label}: restores default draw buffer and rasterizer discard`);
+            const pixel = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+            check(pixel.join(',') === '0,0,0,0', `${label}: clears previous frame to transparent black`);
+            check(gl.getError() === gl.NO_ERROR, `${label}: no GL errors`);
+          });
+        }
+      } finally {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.drawBuffers([gl.BACK]); gl.disable(gl.RASTERIZER_DISCARD);
+        gl.deleteFramebuffer(applicationFramebuffer);
+      }
       const depthEnabled = session.enabledFeatures.includes('depth-sensing');
       if (!depthEnabled) for (const property of ['depthUsage', 'depthDataFormat', 'depthType', 'depthActive'] as const) throws(() => session[property], 'InvalidStateError', `unconfigured ${property}`);
       for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) {

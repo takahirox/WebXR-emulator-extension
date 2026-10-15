@@ -282,8 +282,14 @@ export default class EmulatedXRDevice extends XRDevice {
       const currentClearDepth = context.getParameter(context.DEPTH_CLEAR_VALUE) as number;
       const currentClearStencil = context.getParameter(context.STENCIL_CLEAR_VALUE) as number;
       // Clear the emulated compositor output without altering application GL state.
-      const target = context instanceof WebGL2RenderingContext ? context.DRAW_FRAMEBUFFER : context.FRAMEBUFFER;
+      const gl2 = context instanceof WebGL2RenderingContext ? context : null;
+      const target = gl2 ? gl2.DRAW_FRAMEBUFFER : context.FRAMEBUFFER;
       context.bindFramebuffer(target, null); context.disable(context.SCISSOR_TEST);
+      // Draw-buffer state belongs to the framebuffer, so save it after binding
+      // the default output. Both states can otherwise suppress the clear.
+      const drawBuffer = gl2 ? gl2.getParameter(gl2.DRAW_BUFFER0) as number : null;
+      const rasterizerDiscard = gl2?.isEnabled(gl2.RASTERIZER_DISCARD);
+      if (gl2) { gl2.drawBuffers([gl2.BACK]); gl2.disable(gl2.RASTERIZER_DISCARD); }
       context.colorMask(true, true, true, true); context.depthMask(true); context.stencilMask(0xffffffff);
       context.clearColor(0, 0, 0, 0); context.clearDepth(1); context.clearStencil(0);
       context.clear(context.DEPTH_BUFFER_BIT | context.COLOR_BUFFER_BIT | context.STENCIL_BUFFER_BIT);
@@ -292,6 +298,10 @@ export default class EmulatedXRDevice extends XRDevice {
       context.colorMask(mask[0], mask[1], mask[2], mask[3]); context.depthMask(depthMask);
       context.stencilMaskSeparate(context.FRONT, stencilMask); context.stencilMaskSeparate(context.BACK, backStencilMask);
       if (scissor) context.enable(context.SCISSOR_TEST);
+      if (gl2) {
+        gl2.drawBuffers([drawBuffer!]);
+        if (rasterizerDiscard) gl2.enable(gl2.RASTERIZER_DISCARD);
+      }
       context.bindFramebuffer(target, framebuffer);
     }
 

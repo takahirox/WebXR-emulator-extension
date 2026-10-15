@@ -29821,9 +29821,16 @@ void main() {
               const currentClearColor = context.getParameter(context.COLOR_CLEAR_VALUE);
               const currentClearDepth = context.getParameter(context.DEPTH_CLEAR_VALUE);
               const currentClearStencil = context.getParameter(context.STENCIL_CLEAR_VALUE);
-              const target = context instanceof WebGL2RenderingContext ? context.DRAW_FRAMEBUFFER : context.FRAMEBUFFER;
+              const gl2 = context instanceof WebGL2RenderingContext ? context : null;
+              const target = gl2 ? gl2.DRAW_FRAMEBUFFER : context.FRAMEBUFFER;
               context.bindFramebuffer(target, null);
               context.disable(context.SCISSOR_TEST);
+              const drawBuffer = gl2 ? gl2.getParameter(gl2.DRAW_BUFFER0) : null;
+              const rasterizerDiscard = gl2 === null || gl2 === void 0 ? void 0 : gl2.isEnabled(gl2.RASTERIZER_DISCARD);
+              if (gl2) {
+                  gl2.drawBuffers([gl2.BACK]);
+                  gl2.disable(gl2.RASTERIZER_DISCARD);
+              }
               context.colorMask(true, true, true, true);
               context.depthMask(true);
               context.stencilMask(0xffffffff);
@@ -29840,6 +29847,11 @@ void main() {
               context.stencilMaskSeparate(context.BACK, backStencilMask);
               if (scissor)
                   context.enable(context.SCISSOR_TEST);
+              if (gl2) {
+                  gl2.drawBuffers([drawBuffer]);
+                  if (rasterizerDiscard)
+                      gl2.enable(gl2.RASTERIZER_DISCARD);
+              }
               context.bindFramebuffer(target, framebuffer);
           }
           if (session.immersive && !this.handheld) {
