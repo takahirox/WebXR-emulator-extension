@@ -1,5 +1,5 @@
 import {mat4, vec3} from 'gl-matrix';
-import {XRSpace, XRPose, XRRigidTransform, XRView, invalidState, unsupported} from './geometry';
+import {XRSpace, XRPose, XRRigidTransform, XRView, XRViewGeometry, invalidState, unsupported} from './geometry';
 import type {XRSession, XRFrame} from './runtime';
 
 /** Read-only WebIDL setlike view; callers cannot add/delete tracked anchors. */
@@ -75,11 +75,15 @@ export class XRLightEstimate {
     this.sphericalHarmonicsCoefficients = new Float32Array(basis.flatMap(value => [value * light, value * light, value * light]));
   }
 }
-export class XRDepthInformation {
+export class XRDepthInformation extends XRViewGeometry {
   readonly width = 32; readonly height = 32;
   readonly rawValueToMeters = 1;
   readonly normDepthBufferFromNormView = new XRRigidTransform();
-  constructor(readonly _frame: XRFrame, readonly view: XRView) {}
+  constructor(readonly _frame: XRFrame, readonly view: XRView) {
+    // The simulated depth sensor is aligned with this view, including its
+    // reference-space offset. Raycasting below still uses the world-space pose.
+    super(view.transform, view.projectionMatrix);
+  }
 }
 export class XRCPUDepthInformation extends XRDepthInformation {
   private samples: Float32Array;

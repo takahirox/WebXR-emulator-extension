@@ -297,5 +297,49 @@
       "status": "passed"
     },
     "firefoxRuntime": "not executed; packaging passed"
+  },
+  "depthGeometryLayerRetentionReviewFixes": {
+    "issue": 11,
+    "browser": "156.0.8078.4",
+    "commands": {
+      "npm ci": "passed",
+      "npm run typecheck": "passed",
+      "npm run build": "passed",
+      "npm run build:firefox": "passed",
+      "npm run test:browser": "passed on second run; first run timed out in the existing Android shutdown-from-added input test after the new regressions passed",
+      "git diff --check": "passed"
+    },
+    "checks": [
+      "Quest MR and Android AR depth results expose transform and projectionMatrix matching each associated eye/view, including translated and rotated offset reference spaces; normalized grid transforms remain identity and world-space depth samples stay unchanged",
+      "Projection and quad textures clear on initial subimage access for omitted, true and false clearOnAccess options across Quest VR/MR and Android AR",
+      "Repeated subimage access in one frame, including the second projection eye, preserves blue pixel writes",
+      "Two consecutive frames without application writes retain blue pixels for clearOnAccess=false and clear to transparent black for omitted/true options for both layer types",
+      "Resized retained projection textures initialize replacement storage on first access"
+    ],
+    "apiConformance": [
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-vr",
+        "distinctAssertions": 209,
+        "status": "passed"
+      },
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-ar",
+        "distinctAssertions": 255,
+        "status": "passed"
+      },
+      {
+        "profile": "Generic Android Phone (ARCore)",
+        "mode": "immersive-ar",
+        "distinctAssertions": 217,
+        "status": "passed"
+      }
+    ],
+    "notRerun": [
+      "test:wpt",
+      "test:samples"
+    ],
+    "firefoxRuntime": "not executed; packaging passed"
   }
 }

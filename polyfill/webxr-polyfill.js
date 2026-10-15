@@ -1039,8 +1039,11 @@ function WebXRPolyfillInjection() {
           this._width = 0;
           this._height = 0;
           this._destroyed = false;
+          this._needsClear = true;
+          this._lastClearFrame = null;
           this.redraw = true;
           this.layout = (_a = _init.layout) !== null && _a !== void 0 ? _a : 'mono';
+          this._clearOnAccess = _init.clearOnAccess === undefined || Boolean(_init.clearOnAccess);
           const gl = _binding._gl2();
           this._color = gl.createTexture();
           this._depth = _init.depthFormat === 0 ? null : gl.createTexture();
@@ -1065,6 +1068,7 @@ function WebXRPolyfillInjection() {
           this._width = width;
           this._height = height;
           this.redraw = true;
+          this._needsClear = true;
           const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
           const unpackBuffer = gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING);
           gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
@@ -1217,6 +1221,11 @@ function WebXRPolyfillInjection() {
           if (!((_a = this._session.renderState.layers) === null || _a === void 0 ? void 0 : _a.includes(layer)))
               invalidState('Layer is not in the active render state.');
           this.allocate(layer);
+          if (layer._needsClear || (layer._clearOnAccess && layer._lastClearFrame !== frame)) {
+              this.clear(layer);
+              layer._needsClear = false;
+              layer._lastClearFrame = frame;
+          }
       }
       allocate(layer) {
           var _a;
@@ -1251,6 +1260,11 @@ function WebXRPolyfillInjection() {
       getReflectionCubeMap(probe) { this.assert(); if (probe._session !== this._session)
           invalidState('Probe belongs to a different session.'); return null; }
       _prepare(layers) {
+          for (const layer of layers)
+              if (!layer._destroyed)
+                  this.allocate(layer);
+      }
+      clear(layer) {
           const gl = this._gl2();
           this.preserve(() => {
               var _a;
@@ -1262,14 +1276,9 @@ function WebXRPolyfillInjection() {
               gl.depthMask(true);
               gl.clearColor(0, 0, 0, 0);
               gl.clearDepth(1);
-              for (const layer of layers) {
-                  if (layer._destroyed)
-                      continue;
-                  this.allocate(layer);
-                  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, layer._color, 0);
-                  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, layer._depth, 0);
-                  gl.clear(gl.COLOR_BUFFER_BIT | (layer._depth ? gl.DEPTH_BUFFER_BIT : 0));
-              }
+              gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, layer._color, 0);
+              gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, layer._depth, 0);
+              gl.clear(gl.COLOR_BUFFER_BIT | (layer._depth ? gl.DEPTH_BUFFER_BIT : 0));
           });
       }
       _compose(frame, layers) {
@@ -1491,8 +1500,9 @@ function WebXRPolyfillInjection() {
           this.sphericalHarmonicsCoefficients = new Float32Array(basis.flatMap(value => [value * light, value * light, value * light]));
       }
   }
-  class XRDepthInformation {
+  class XRDepthInformation extends XRViewGeometry {
       constructor(_frame, view) {
+          super(view.transform, view.projectionMatrix);
           this._frame = _frame;
           this.view = view;
           this.width = 32;

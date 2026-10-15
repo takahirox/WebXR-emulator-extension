@@ -274,6 +274,27 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         check(!!hitResult && !!depth, 'room hit and depth available');
         throws(() => hitResult!.getPose(reference), 'InvalidStateError', 'inactive hit result pose');
         throws(() => depth!.getDepthInMeters(0.5, 0.5), 'InvalidStateError', 'inactive depth access');
+        const depthOffsetTransform = new xr.XRRigidTransform({x: 0.7, y: -0.4, z: 1}, {y: Math.sin(Math.PI / 8), w: Math.cos(Math.PI / 8)});
+        const depthOffset = reference.getOffsetReferenceSpace(depthOffsetTransform);
+        await nextFrame(frame => {
+          const originalViews = frame.getViewerPose(reference)!.views;
+          for (const space of [reference, depthOffset]) {
+            const offset = space === depthOffset;
+            for (const [index, view] of frame.getViewerPose(space)!.views.entries()) {
+              const info = frame.getDepthInformation(view)!;
+              check(info.transform instanceof xr.XRRigidTransform && info.transform.matrix.every((value, i) => Math.abs(value - view.transform.matrix[i]) < 1e-6), `depth transform matches ${view.eye} view (offset=${offset})`);
+              check(info.projectionMatrix instanceof Float32Array && info.projectionMatrix.every((value, i) => value === view.projectionMatrix[i]), `depth projection matches ${view.eye} view (offset=${offset})`);
+              check(info.normDepthBufferFromNormView.matrix.every((value, i) => value === (i % 5 === 0 ? 1 : 0)), 'aligned depth grid has an identity normalized transform');
+              if (offset) {
+                const expected = new three.Matrix4().fromArray(depthOffsetTransform.matrix).invert().multiply(new three.Matrix4().fromArray(originalViews[index].transform.matrix));
+                check(info.transform.matrix.every((value, i) => Math.abs(value - expected.elements[i]) < 1e-5), 'depth pose follows the inverse reference-space offset');
+                check(info.transform.matrix.some((value, i) => Math.abs(value - originalViews[index].transform.matrix[i]) > 0.1), 'depth pose reflects translated and rotated reference space');
+                const original = new Float32Array(frame.getDepthInformation(originalViews[index])!.data);
+                check(new Float32Array(info.data).every((value, i) => value === original[i]), 'reference-space offset preserves world-aligned depth samples');
+              }
+            }
+          }
+        });
         await nextFrame(frame => {
           const estimate = frame.getLightEstimate(probe)!;
           check(estimate.sphericalHarmonicsCoefficients.length === 27 && Math.abs(Math.hypot(estimate.primaryLightDirection.x, estimate.primaryLightDirection.y, estimate.primaryLightDirection.z) - 1) < 1e-6, 'virtual lighting estimate');
@@ -408,6 +429,48 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         });
       }
       gl.disable(gl.RASTERIZER_DISCARD);
+      // Both layer types must retain pixels when clearOnAccess is false, while
+      // omitted/true options clear only on the first access of each frame.
+      for (const clearOnAccess of [undefined, true, false]) {
+        const retainedProjection = binding.createProjectionLayer({clearOnAccess});
+        const retainedQuad = binding.createQuadLayer({space: reference, viewPixelWidth: 32, viewPixelHeight: 32, clearOnAccess});
+        session.updateRenderState({layers: [retainedProjection, retainedQuad]});
+        const readPixel = (image: Layers.XRWebGLSubImage) => {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, image.depthStencilTexture, 0);
+          check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE, 'clearOnAccess framebuffer is complete');
+          const pixel = new Uint8Array(4); gl.readPixels(image.viewport.x + 1, 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+          return pixel.join(',');
+        };
+        await nextFrame(frame => {
+          for (const layer of [retainedProjection, retainedQuad]) {
+            const image = () => layer instanceof xr.XRProjectionLayer ? binding.getViewSubImage(layer, frame.getViewerPose(reference)!.views[0]) : binding.getSubImage(layer, frame);
+            check(readPixel(image()) === '0,0,0,0', `${layer.constructor.name} initially clears (clearOnAccess=${clearOnAccess})`);
+            gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+            check(readPixel(image()) === '0,0,255,255', `${layer.constructor.name} repeated access preserves writes in the same frame`);
+            if (layer instanceof xr.XRProjectionLayer && !handheld) check(readPixel(binding.getViewSubImage(layer, frame.getViewerPose(reference)!.views[1])) === '0,0,255,255', 'second-eye access does not clear the projection texture again');
+          }
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        });
+        for (let count = 0; count < 2; count++) await nextFrame(frame => {
+          for (const layer of [retainedProjection, retainedQuad]) {
+            const image = layer instanceof xr.XRProjectionLayer ? binding.getViewSubImage(layer, frame.getViewerPose(reference)!.views[0]) : binding.getSubImage(layer, frame);
+            check(readPixel(image) === (clearOnAccess === false ? '0,0,255,255' : '0,0,0,0'), `${layer.constructor.name} consecutive frame ${count} honors clearOnAccess=${clearOnAccess}`);
+          }
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        });
+        if (clearOnAccess === false) {
+          await nextFrame(frame => {
+            canvas.width += 2;
+            check(readPixel(binding.getViewSubImage(retainedProjection, frame.getViewerPose(reference)!.views[0])) === '0,0,0,0', 'resized retained projection initializes new storage');
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          });
+          canvas.width -= 2;
+        }
+        retainedProjection.destroy(); retainedQuad.destroy();
+      }
+      session.updateRenderState({layers: [projection]});
       await nextFrame(frame => {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null); const pixel = new Uint8Array(4);
         // Device clears the default framebuffer at start; render a layer in this frame

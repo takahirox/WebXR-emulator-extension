@@ -32,7 +32,7 @@ interface LayerInit {
   colorFormat?: number; depthFormat?: number; textureType?: string; scaleFactor?: number;
   space?: XRSpace; transform?: XRRigidTransform; width?: number; height?: number;
   viewPixelWidth?: number; viewPixelHeight?: number; layout?: string; isStatic?: boolean;
-  mipLevels?: number;
+  mipLevels?: number; clearOnAccess?: boolean;
 }
 export class XRLayer extends EventTarget {}
 export class XRCompositionLayer extends XRLayer {
@@ -46,9 +46,13 @@ export class XRCompositionLayer extends XRLayer {
   readonly _color: WebGLTexture;
   readonly _depth: WebGLTexture | null;
   _width = 0; _height = 0; _destroyed = false;
+  readonly _clearOnAccess: boolean;
+  _needsClear = true;
+  _lastClearFrame: XRFrame | null = null;
   private redraw = true;
   constructor(readonly _binding: XRWebGLBinding, readonly _init: LayerInit) {
     super(); this.layout = _init.layout ?? 'mono';
+    this._clearOnAccess = _init.clearOnAccess === undefined || Boolean(_init.clearOnAccess);
     const gl = _binding._gl2(); this._color = gl.createTexture()!;
     this._depth = _init.depthFormat === 0 ? null : gl.createTexture();
   }
@@ -65,7 +69,7 @@ export class XRCompositionLayer extends XRLayer {
   _allocate(width: number, height: number) {
     const gl = this._binding._gl2();
     if (width === this._width && height === this._height) return;
-    this._width = width; this._height = height; this.redraw = true;
+    this._width = width; this._height = height; this.redraw = true; this._needsClear = true;
     const texture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
     const unpackBuffer = gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) as WebGLBuffer | null;
     gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
@@ -161,6 +165,9 @@ export class XRWebGLBinding {
     if (layer._binding !== this || frame.session !== this._session || layer._destroyed) invalidState('Layer/frame is not usable with this binding.');
     if (!this._session.renderState.layers?.includes(layer)) invalidState('Layer is not in the active render state.');
     this.allocate(layer);
+    if (layer._needsClear || (layer._clearOnAccess && layer._lastClearFrame !== frame)) {
+      this.clear(layer); layer._needsClear = false; layer._lastClearFrame = frame;
+    }
   }
   private allocate(layer: XRCompositionLayer) {
     const gl = this._gl2(); const scale = Math.min(1, layer._init.scaleFactor ?? 1);
@@ -188,16 +195,16 @@ export class XRWebGLBinding {
   getDepthInformation(view: XRView): never { this.assert(); view._frame._assertActive(true); return unsupported('GPU depth is not supported; request cpu-optimized depth.'); }
   getReflectionCubeMap(probe: XRLightProbe) { this.assert(); if (probe._session !== this._session) invalidState('Probe belongs to a different session.'); return null; }
   _prepare(layers: readonly XRCompositionLayer[]) {
+    for (const layer of layers) if (!layer._destroyed) this.allocate(layer);
+  }
+  private clear(layer: XRCompositionLayer) {
     const gl = this._gl2();
     this.preserve(() => {
       this.framebuffer ??= gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
       gl.disable(gl.RASTERIZER_DISCARD); gl.disable(gl.SCISSOR_TEST); gl.colorMask(true, true, true, true); gl.depthMask(true); gl.clearColor(0, 0, 0, 0); gl.clearDepth(1);
-      for (const layer of layers) {
-        if (layer._destroyed) continue; this.allocate(layer);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, layer._color, 0);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, layer._depth, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT | (layer._depth ? gl.DEPTH_BUFFER_BIT : 0));
-      }
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, layer._color, 0);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, layer._depth, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT | (layer._depth ? gl.DEPTH_BUFFER_BIT : 0));
     });
   }
   _compose(frame: XRFrame, layers: readonly XRCompositionLayer[]) {
