@@ -1,7 +1,9 @@
-import type * as Three from 'three';
-import type { TransformControls } from 'three/examples/jsm/controls/TransformControls';
+import * as THREE from 'three';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { Capabilities, DeviceDefinition, ControllerName } from '../types/contracts';
-const THREE = window.THREE;
 import ConfigurationManager from '../ConfigurationManager';
 import type { ExtensionMessage, RuntimeMessage } from '../types/contracts';
 import { sendRuntimeMessage } from '../extension/messaging';
@@ -62,7 +64,7 @@ const postMessage = (message: ExtensionMessage) => {
   sendRuntimeMessage({source: 'panel', message: {...message, tabId}});
 };
 
-const notifyPoseChange = (node: Three.Object3D) => {
+const notifyPoseChange = (node: THREE.Object3D) => {
   postMessage({
     action: 'webxr-pose',
     position: node.position.toArray([]), // @TODO: reuse array
@@ -70,7 +72,7 @@ const notifyPoseChange = (node: Three.Object3D) => {
   });
 };
 
-const notifyInputPoseChange = (key: string, node: Three.Object3D) => {
+const notifyInputPoseChange = (key: string, node: THREE.Object3D) => {
   postMessage({
     action: 'webxr-input-pose',
     objectName: OBJECT_NAME[key],
@@ -178,14 +180,14 @@ transformControls[DEVICE.HEADSET] = null;
 transformControls[DEVICE.RIGHT_CONTROLLER] = null;
 transformControls[DEVICE.LEFT_CONTROLLER] = null;
 
-const assetNodes: Record<string, Three.Object3D | null> = {};
+const assetNodes: Record<string, THREE.Object3D | null> = {};
 assetNodes[DEVICE.HEADSET] = null;
 assetNodes[DEVICE.RIGHT_CONTROLLER] = null;
 assetNodes[DEVICE.LEFT_CONTROLLER] = null;
 
 // @TODO: Currently the values are　groundless.
 //        Set more appropriate values.
-const defaultTransforms: Record<string, {position: Three.Vector3; rotation: Three.Euler}> = {};
+const defaultTransforms: Record<string, {position: THREE.Vector3; rotation: THREE.Euler}> = {};
 defaultTransforms[DEVICE.HEADSET] = {
   position: new THREE.Vector3(0, 1.6, 0),
   rotation: new THREE.Euler(0, 0, 0)
@@ -248,7 +250,8 @@ const render = () => {
   renderer.render(scene, camera);
 };
 
-const light = new THREE.DirectionalLight(0xffffff);
+// Retain legacy brightness with modern physically correct light intensities.
+const light = new THREE.DirectionalLight(0xffffff, Math.PI);
 light.position.set(-1, 1, -1);
 scene.add(light);
 
@@ -257,20 +260,21 @@ scene.add(gridHelper);
 
 // orbit controls for camera
 
-const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+const orbitControls = new OrbitControls(camera, renderer.domElement);
+orbitControls.screenSpacePanning = false; // Preserve the legacy ground-plane pan.
 orbitControls.addEventListener('change', render);
 orbitControls.target.set(0, 2, 0);
 orbitControls.update(); // seems like this line is necessary if I set non-zero as target
 
 // transform controls for device assets
 
-const createTransformControls = (target: Three.Object3D, onChange: () => void) => {
-  const controls = new THREE.TransformControls(camera, renderer.domElement);
+const createTransformControls = (target: THREE.Object3D, onChange: () => void) => {
+  const controls = new TransformControls(camera, renderer.domElement);
   controls.setSpace('local');
   controls.attach(target);
   controls.setSize(1.5);
   controls.enabled = false;
-  controls.visible = false;
+  controls.getHelper().visible = false;
 
   controls.addEventListener('mouseDown', () => {
     orbitControls.enabled = false;
@@ -297,7 +301,7 @@ const setupTransformControlsMode = (controls: TransformControls, capabilities: C
       controls.setMode('rotate');
     }
     if (controls.getMode() === 'rotate' && !capabilities.hasRotation) {
-      controls.visible = false;
+      controls.getHelper().visible = false;
       controls.enabled = false;
     }
   }
@@ -306,7 +310,7 @@ const setupTransformControlsMode = (controls: TransformControls, capabilities: C
 // device assets
 
 const loadHeadsetAsset = () => {
-  new THREE.OBJLoader().load(ASSET_PATH[DEVICE.HEADSET], headset => {
+  new OBJLoader().load(ASSET_PATH[DEVICE.HEADSET], headset => {
     const parent = new THREE.Object3D();
     parent.position.copy(defaultTransforms[DEVICE.HEADSET].position);
     parent.rotation.copy(defaultTransforms[DEVICE.HEADSET].rotation);
@@ -321,7 +325,7 @@ const loadHeadsetAsset = () => {
     };
 
     const controls = createTransformControls(parent, onChange);
-    scene.add(controls);
+    scene.add(controls.getHelper());
     transformControls[DEVICE.HEADSET] = controls;
     onChange();
     render();
@@ -329,20 +333,20 @@ const loadHeadsetAsset = () => {
 };
 
 const loadControllersAsset = (loadRight: boolean, loadLeft: boolean) => {
-  new THREE.GLTFLoader().load(ASSET_PATH[DEVICE.CONTROLLER], gltf => {
+  new GLTFLoader().load(ASSET_PATH[DEVICE.CONTROLLER], gltf => {
     const baseController = gltf.scene;
     baseController.scale.multiplyScalar(6);
 
-    const recursivelyClone = (node: Three.Object3D) => {
-      const cloneWithMaterial = (object: Three.Object3D) => {
-        const clonedObject = object.clone() as Three.Object3D & {material?: Three.Material};
+    const recursivelyClone = (node: THREE.Object3D) => {
+      const cloneWithMaterial = (object: THREE.Object3D) => {
+        const clonedObject = object.clone(false) as THREE.Object3D & {material?: THREE.Material};
         // @TODO: support material array?
         if (clonedObject.material) {
           clonedObject.material = clonedObject.material.clone();
         }
         return clonedObject;
       };
-      const traverse = (object: Three.Object3D, parent?: Three.Object3D): Three.Object3D => {
+      const traverse = (object: THREE.Object3D, parent?: THREE.Object3D): THREE.Object3D => {
         const clonedObject = cloneWithMaterial(object);
         if (parent) {
           parent.add(clonedObject);
@@ -384,7 +388,7 @@ const loadControllersAsset = (loadRight: boolean, loadLeft: boolean) => {
         'rightControllerCheckbox' : 'leftControllerCheckbox';
 
       const controls = createTransformControls(parent, onChange);
-      scene.add(controls);
+      scene.add(controls.getHelper());
       transformControls[key] = controls;
       onChange();
     };
@@ -409,13 +413,7 @@ const updateAssetNodes = (deviceDefinition: DeviceDefinition) => {
                          modes.includes('immersive-vr') ? IMMERSIVE_MODE.VR :
                          IMMERSIVE_MODE.NONE;
 
-  // Workaround for a bug in Three.js r110 that
-  // default material can be shared across GLTFLoader.
-  // So even if we load gltf asset with a new GLTFLoader instance
-  // it can return the same default material instance then
-  // controller material color won't be reset.
-  // To resolve the issue, explicilty reseting the color here.
-  // @TODO: Remove this workaround if the issue is fixed in Three.js side.
+  // Reset input feedback before replacing device assets.
   if (assetNodes[DEVICE.RIGHT_CONTROLLER]) {
     states.buttonPressed[DEVICE.RIGHT_CONTROLLER][BUTTON.SELECT] = false;
     states.buttonPressed[DEVICE.RIGHT_CONTROLLER][BUTTON.SQUEEZE] = false;
@@ -442,6 +440,8 @@ const updateAssetNodes = (deviceDefinition: DeviceDefinition) => {
     }
 
     controls!.detach();
+    scene.remove(controls!.getHelper());
+    controls!.dispose();
 
     assetNodes[key] = null;
     transformControls[key] = null;
@@ -528,7 +528,7 @@ const updateControllerColor = (key: string) => {
   const node = assetNodes[key];
   const pressed = states.buttonPressed[key][BUTTON.SELECT] || states.buttonPressed[key][BUTTON.SQUEEZE];
   node!.traverse(child => {
-    const object = child as Three.Object3D & {material?: Three.Material & {emissive?: Three.Color}};
+    const object = child as THREE.Object3D & {material?: THREE.Material & {emissive?: THREE.Color}};
     if (!object.material) {
       return;
     }
@@ -590,7 +590,7 @@ const getNearestIntersectedObjectKey = (event: MouseEvent): string | null => {
   }
   const intersect = intersects[0];
   let target: string | null = null;
-  const check = (object: Three.Object3D) => {
+  const check = (object: THREE.Object3D) => {
     for (const key in assetNodes) {
       const node = assetNodes[key];
       if (!node) {
@@ -607,7 +607,10 @@ const getNearestIntersectedObjectKey = (event: MouseEvent): string | null => {
 };
 
 renderer.domElement.addEventListener('mousedown', event => {
-  intersectKey = getNearestIntersectedObjectKey(event);
+  // Modern controls use pointer events, before compatibility mouse events.
+  // A quick gizmo drag must not also count as a model click/mode switch.
+  intersectKey = Object.values(transformControls).some(controls => controls?.dragging)
+    ? null : getNearestIntersectedObjectKey(event);
   mousedownTime = performance.now();
 }, false);
 
@@ -627,7 +630,7 @@ renderer.domElement.addEventListener('mouseup', event => {
 
 // event handlers
 
-const updateDevicePropertyContent = (positionId: string, rotationId: string, position: Three.Vector3, rotation: Three.Euler) => {
+const updateDevicePropertyContent = (positionId: string, rotationId: string, position: THREE.Vector3, rotation: THREE.Euler) => {
   document.getElementById(positionId)!.textContent =
     position.x.toFixed(2) + ' ' + position.y.toFixed(2) + ' ' + position.z.toFixed(2);
   document.getElementById(rotationId)!.textContent =
@@ -702,13 +705,13 @@ const toggleControlMode = (key: string) => {
   // Translate -> Rotate -> Disable -> Translate -> ...
   if (!controls.enabled) {
     controls.enabled = true;
-    controls.visible = true;
+    controls.getHelper().visible = true;
     controls.setMode('translate');
   } else if (controls.getMode() === 'translate') {
     controls.setMode('rotate');
   } else {
     controls.enabled = false;
-    controls.visible = false;
+    controls.getHelper().visible = false;
   }
   setupTransformControlsMode(controls,
     deviceCapabilities[key === DEVICE.HEADSET ? key : DEVICE.CONTROLLER]);

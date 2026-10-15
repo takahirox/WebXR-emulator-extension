@@ -35,8 +35,8 @@ export interface SmokeState {
   ended: boolean;
   errors: string[];
 }
-export interface SmokeWindow extends Window {
-  navigator: Navigator & {xr: {requestSession(mode: SessionMode, options: {requiredFeatures: string[]}): Promise<Session>}};
+export interface SmokeWindow {
+  navigator: Omit<Navigator, 'xr'> & {xr: {requestSession(mode: SessionMode, options: {requiredFeatures: string[]}): Promise<Session>}};
   XRWebGLLayer: new (session: Session, context: WebGLRenderingContext) => object;
   XRRigidTransform: new (position?: DOMPointInit) => {matrix: Float32Array};
   XRRay: new (transform?: {matrix: Float32Array}) => {origin: DOMPointReadOnly; direction: DOMPointReadOnly};
@@ -45,6 +45,7 @@ export interface SmokeWindow extends Window {
     start(mode: SessionMode): Promise<void>;
     stop(): Promise<void>;
     cancelHitTests(): void;
+    setTextureMode(mode: 'default' | 'transparent' | 'pattern'): void;
   };
 }
 

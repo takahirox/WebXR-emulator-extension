@@ -1,3 +1,5 @@
+import { readTabletPixels } from './ar-pixels';
+import { installThreeProbe } from './three-probe';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -19,7 +21,8 @@ const server = createServer((request, response) => {
     response.setHeader('Content-Type', 'application/javascript');
     response.end(fixture);
   } else if (request.url === '/' || request.url === '/frame' || request.url === '/csp') {
-    if (request.url === '/csp') response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; img-src 'self' blob: data:; frame-src 'self' http://localhost:*; style-src 'self' 'unsafe-inline'; object-src 'none'");
+    // Embedded AR images may use blob URLs, but must not need blob connections.
+    if (request.url === '/csp') response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' blob: data:; frame-src 'self' http://localhost:*; style-src 'self' 'unsafe-inline'; object-src 'none'");
     response.setHeader('Content-Type', 'text/html');
     response.end('<!doctype html><html><head><script src="/fixture.js"></script></head><body>WebXR regression sample</body></html>');
   } else { response.statusCode = 204; response.end(); }
@@ -35,6 +38,7 @@ const context = await chromium.launchPersistentContext(profile, {
   headless: false, ignoreDefaultArgs: ['--disable-extensions'],
   args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`, '--auto-open-devtools-for-tabs', '--enable-unsafe-swiftshader'],
 }).catch(async error => { server.close(); await rm(profile, {recursive: true, force: true}); throw error; });
+await context.addInitScript(installThreeProbe);
 const attached: Awaited<ReturnType<typeof attachTarget>>[] = [];
 try {
   context.setDefaultTimeout(20000);
@@ -42,8 +46,9 @@ try {
   await mkdir(path.join(root, 'test-results'), {recursive: true});
   const page = await context.newPage();
   const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
-  page.on('console', message => { if (message.type() === 'error') console.error(message.text()); });
+  page.on('console', message => { if (message.type() === 'error') { consoleErrors.push(message.text()); console.error(message.text()); } });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   assert(worker.url().endsWith('/dist/extension/background.js'), 'MV3 service worker installed');
   const extensionOrigin = worker.url().slice(0, worker.url().indexOf('/', 'chrome-extension://'.length));
@@ -109,7 +114,22 @@ try {
     checkbox.dispatchEvent(new Event('change'));
   });
   await eventually(() => panel.evaluate(async () => JSON.parse((await new Promise<Record<string, unknown>>(resolve => chrome.storage.local.get('webxr-extension', result => resolve(result))))['webxr-extension'] as string) as {deviceKey: string; stereoEffect: boolean}), value => value.deviceKey === 'HTC Vive' && value.stereoEffect === false, 'configuration persistence');
+  // OOPIF extension frames do not consistently run Page init scripts. Pause
+  // before the local panel bundle to install the test-only observation hook.
+  await panel.command('Runtime.enable', {});
+  await panel.command('Log.enable', {});
+  await panel.command('Debugger.enable', {});
+  const {breakpointId} = await panel.command<{breakpointId: string}>('Debugger.setBreakpointByUrl', {
+    url: `${extensionOrigin}/dist/app/panel.js`, lineNumber: 0,
+  });
+  const paused = panel.nextEvent<{callFrames: {callFrameId: string}[]}>('Debugger.paused');
   await panel.evaluate(() => { location.reload(); });
+  const pause = await paused;
+  await panel.command('Debugger.evaluateOnCallFrame', {callFrameId: pause.callFrames[0].callFrameId,
+    expression: `(${installThreeProbe.toString()})()`});
+  await panel.command('Debugger.removeBreakpoint', {breakpointId});
+  await panel.command('Debugger.resume', {});
+  await panel.command('Debugger.disable', {});
   await eventually(() => panel.evaluate(() => ({device: (document.querySelector('#deviceSelect') as HTMLSelectElement | null)?.value, stereo: (document.querySelector('#stereoCheckbox') as HTMLInputElement | null)?.checked, pose: document.querySelector('#rightControllerPosition')?.textContent})), value => value.device === 'HTC Vive' && value.stereo === false && !!value.pose, 'restored panel configuration');
   console.log('Checking VR controls');
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-vr'));
@@ -125,51 +145,60 @@ try {
   await stopWorker();
   await panel.evaluate(() => { (document.querySelector('#resetPoseButton') as HTMLButtonElement).click(); });
   await page.waitForFunction(() => Math.abs((window as unknown as SmokeWindow).smoke.state.viewerPosition[1]) < 0.01 && Math.abs((window as unknown as SmokeWindow).smoke.state.inputPositions.right?.[0] - 0.5) < 0.01);
-  // Observe one real render to use the actual camera/scene for deterministic gizmo input.
-  await panel.evaluate(() => {
-    const probeWindow = window as unknown as import('./browser-types').PanelProbeWindow;
-    const original = window.THREE.Scene.prototype.onBeforeRender;
-    window.THREE.Scene.prototype.onBeforeRender = new Proxy(original, {
-      apply(render, scene: import('three').Scene, args: Parameters<typeof original>) {
-        probeWindow.panelProbe = {renderer: args[0], scene: args[1], camera: args[2]};
-        window.THREE.Scene.prototype.onBeforeRender = render;
-        return Reflect.apply(render, scene, args);
-      },
-    });
-    window.dispatchEvent(new Event('resize'));
-  });
   await eventually(() => panel.evaluate(() => !!(window as unknown as import('./browser-types').PanelProbeWindow).panelProbe), Boolean, 'panel camera capture');
+  const {backendNodeId} = await devtools.command<{backendNodeId: number}>('DOM.getFrameOwner', {frameId: panelInfo!.targetId});
+  const {model} = await devtools.command<{model: {content: number[]; width: number; height: number}}>('DOM.getBoxModel', {backendNodeId});
+  await panel.evaluate(() => {
+    const {renderer, scene, camera} = (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!;
+    camera.position.set(-6, 4, 8);
+    camera.lookAt(0, 1.6, -0.5);
+    renderer.render(scene, camera);
+  });
   for (const position of [[0, 1.6, 0], [0.5, 1.5, -1]]) {
-    await panel.evaluate((position: number[]) => {
+    const localPoints = await panel.evaluate((position: number[]) => {
       const {renderer, scene, camera} = (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!;
-      const center = new window.THREE.Vector3().fromArray(position);
+      const center = camera.position.clone().fromArray(position);
       for (const child of scene.children) {
-        if (!(child instanceof window.THREE.TransformControls)) continue;
-        const selected = !!child.object && child.object.position.distanceTo(center) < 0.001;
-        child.enabled = selected;
-        child.visible = selected;
-        if (selected) child.setMode('translate');
+        const controls = (child as import('three').Object3D & {controls?: import('three/addons/controls/TransformControls.js').TransformControls}).controls;
+        if (!controls || controls.getHelper() !== child) continue;
+        const selected = !!controls.object && controls.object.position.distanceTo(center) < 0.001;
+        controls.enabled = selected;
+        controls.getHelper().visible = selected;
+        if (selected) { controls.setMode('translate'); controls.setSize(0.65); }
       }
       renderer.render(scene, camera);
       const canvas = renderer.domElement;
       const rect = canvas.getBoundingClientRect();
-      const scale = center.distanceTo(camera.position) * 1.5 / 7 * (Math.sign(camera.position.x - center.x) || 1);
-      const start = center.clone().add(new window.THREE.Vector3(scale * 0.8, 0, 0)).project(camera);
-      const end = center.clone().add(new window.THREE.Vector3(scale * 1.1, 0, 0)).project(camera);
-      for (const [type, point] of [
-        ['mousemove', start], ['mousedown', start], ['mousemove', end], ['mouseup', end],
-      ] as const) {
-        canvas.dispatchEvent(new MouseEvent(type, {
-          bubbles: true, button: 0, buttons: type === 'mouseup' ? 0 : 1,
-          clientX: rect.left + (point.x + 1) * rect.width / 2,
-          clientY: rect.top + (1 - point.y) * rect.height / 2,
-        }));
-      }
+      const scale = center.distanceTo(camera.position) * 1.9 * Math.tan(Math.PI * 45 / 360) * 0.65 / 4;
+      const start = center.clone().add(center.clone().set(scale * 0.6, 0, 0)).project(camera);
+      const end = center.clone().add(center.clone().set(scale * 0.9, 0, 0)).project(camera);
+      return [start, end].map(point => ({
+        x: rect.left + (point.x + 1) * rect.width / 2,
+        y: rect.top + (1 - point.y) * rect.height / 2,
+      }));
     }, position);
+    const points = localPoints.map(point => ({x: point.x + model.content[0], y: point.y + model.content[1]}));
+    // Real pointer input supplies active pointer capture, as modern controls require.
+    await devtools.command('Input.dispatchMouseEvent', {type: 'mouseMoved', ...points[0]});
+    await devtools.command('Input.dispatchMouseEvent', {type: 'mousePressed', ...points[0], button: 'left', buttons: 1, clickCount: 1});
+    await devtools.command('Input.dispatchMouseEvent', {type: 'mouseMoved', ...points[1], button: 'left', buttons: 1});
+    await devtools.command('Input.dispatchMouseEvent', {type: 'mouseReleased', ...points[1], button: 'left', clickCount: 1});
+    assert.equal(await panel.evaluate(() => (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!.scene.children.filter(child => (child as import('three').Object3D & {controls?: {enabled: boolean}}).controls?.enabled).length), 1, 'a quick gizmo drag must not enable another model control');
   }
-  const panelScreenshot = await devtools.command<{data: string}>('Page.captureScreenshot', {format: 'png'});
+  const orbit = await panel.evaluate(() => {
+    const {renderer, camera} = (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!;
+    const rect = renderer.domElement.getBoundingClientRect();
+    return {before: camera.quaternion.toArray(), x: rect.left + rect.width * 0.1, y: rect.top + rect.height * 0.1};
+  });
+  await devtools.command('Input.dispatchMouseEvent', {type: 'mouseMoved', x: orbit.x + model.content[0], y: orbit.y + model.content[1]});
+  await devtools.command('Input.dispatchMouseEvent', {type: 'mousePressed', x: orbit.x + model.content[0], y: orbit.y + model.content[1], button: 'left', buttons: 1, clickCount: 1});
+  await devtools.command('Input.dispatchMouseEvent', {type: 'mouseMoved', x: orbit.x + model.content[0] + 20, y: orbit.y + model.content[1] + 10, button: 'left', buttons: 1});
+  await devtools.command('Input.dispatchMouseEvent', {type: 'mouseReleased', x: orbit.x + model.content[0] + 20, y: orbit.y + model.content[1] + 10, button: 'left', clickCount: 1});
+  assert.notDeepEqual(await panel.evaluate(() => (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!.camera.quaternion.toArray()), orbit.before, 'OrbitControls rotates the panel camera');
+  const panelScreenshot = await devtools.command<{data: string}>('Page.captureScreenshot', {format: 'png',
+    clip: {x: model.content[0], y: model.content[1], width: model.width, height: model.height, scale: 1}});
   await writeFile(path.join(root, 'test-results/panel.png'), Buffer.from(panelScreenshot.data, 'base64'));
-  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.viewerPosition[0] < -0.01 && (window as unknown as SmokeWindow).smoke.state.inputPositions.right?.[0] < 0.49);
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.viewerPosition[0] > 0.01 && (window as unknown as SmokeWindow).smoke.state.inputPositions.right?.[0] > 0.51);
   await panel.evaluate(() => { (document.querySelector('#rightSelectButton') as HTMLButtonElement).click(); (document.querySelector('#leftSqueezeButton') as HTMLButtonElement).click(); });
   await page.waitForFunction(() => {
     const events = (window as unknown as SmokeWindow).smoke.state.events;
@@ -236,6 +265,25 @@ try {
   console.log('Checking AR room and hit tests');
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-ar'));
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0 && (window as unknown as SmokeWindow).smoke.state.hitPosition?.every(Number.isFinite));
+  const roomTextures = await page.evaluate(() => {
+    const textures = new Map<string, {loaded: boolean; flipY?: boolean; colorSpace?: string}>();
+    (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!.scene.traverse(object => {
+      const mesh = object as import('three').Mesh;
+      if (!mesh.isMesh) return;
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        if (material.name !== 'sky' && material.name !== 'wall') continue;
+        const map = (material as import('three').MeshStandardMaterial).map;
+        const image = map?.image as HTMLImageElement | ImageBitmap | undefined;
+        textures.set(material.name, {loaded: !!image && image.width > 0 && image.height > 0,
+          flipY: map?.flipY, colorSpace: map?.colorSpace});
+      }
+    });
+    return Object.fromEntries(textures);
+  });
+  assert.deepEqual(Object.keys(roomTextures).sort(), ['sky', 'wall'], 'both textured room materials loaded');
+  for (const [name, texture] of Object.entries(roomTextures)) {
+    assert.deepEqual(texture, {loaded: true, flipY: false, colorSpace: 'srgb'}, `${name} texture loads under connect-src self with glTF orientation and color space`);
+  }
   assert.equal(await page.locator('canvas').count(), 1, 'AR renderer uses the application canvas as a texture');
   const canvasBox = await page.locator('canvas').boundingBox();
   assert(canvasBox);
@@ -246,6 +294,31 @@ try {
   await page.mouse.up({button: 'right'});
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.events.selectend > 1);
   await page.screenshot({path: path.join(root, 'test-results/ar.png')});
+  console.log('Checking AR screen color, orientation, and alpha compositing');
+  async function textureMode(mode: 'transparent' | 'pattern') {
+    const frame = await page.evaluate(mode => {
+      const smoke = (window as unknown as SmokeWindow).smoke;
+      smoke.setTextureMode(mode);
+      return smoke.state.frames;
+    }, mode);
+    await page.waitForFunction(frame => (window as unknown as SmokeWindow).smoke.state.frames > frame + 3, frame);
+  }
+  await textureMode('transparent');
+  const roomPixels = await page.evaluate(readTabletPixels);
+  await textureMode('pattern');
+  const compositePixels = await page.evaluate(readTabletPixels);
+  assert.equal(roomPixels.glError, 0, 'room WebGL error');
+  assert.equal(compositePixels.glError, 0, 'compositor WebGL error');
+  const near = (actual: number[], expected: number[], label: string) => expected.forEach((value, i) =>
+    assert(Math.abs(actual[i] - value) <= 4, `${label} channel ${i}: ${actual[i]} vs ${value}`));
+  near(compositePixels.pixels[0], [64, 128, 191, 255], 'opaque top patch');
+  near(compositePixels.pixels[1], [191, 64, 32, 255], 'opaque bottom patch');
+  near(compositePixels.pixels[3], roomPixels.pixels[3], 'transparent patch preserves room');
+  const decode = (v: number) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  const encode = (v: number) => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+  const mixed = [0.2, 0.6, 0.8].map((v, i) => encode((decode(v) + decode(roomPixels.pixels[2][i] / 255)) / 2));
+  near(compositePixels.pixels[2], [...mixed, 255], 'half alpha blends in linear light');
+  await page.screenshot({path: path.join(root, 'test-results/ar-texture.png')});
   await page.mouse.move(canvasBox.x + canvasBox.width * 0.1, canvasBox.y + canvasBox.height * 0.1);
   await page.mouse.down();
   await page.mouse.move(canvasBox.x + canvasBox.width * 0.1 + 40, canvasBox.y + canvasBox.height * 0.1 + 15, {steps: 8});
@@ -270,7 +343,9 @@ try {
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0);
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.stop());
   assert.deepEqual(pageErrors, []);
-  console.log(JSON.stringify({browser: await context.browser()!.version(), passed: ['MV3 service worker and popup', 'worker shutdown/recovery in both directions', 'same-origin and cross-origin frames, frame removal, tab isolation', 'malformed page message rejection', 'synchronous injection with restrictive script CSP', 'real DevTools panel and assets', 'device and stereo persistence after panel reload', 'bidirectional pose messages, reset, and headset/controller gizmo drags', 'VR select/squeeze press and release', 'panel exit immersive', 'AR virtual room hit testing, transient touch/select, and cancellation', 'AR mouse camera movement', 'XRRay rigid transform', 'page reload startup'], vrEvents: vr.events, arHitCounts, arFrames: ar.frames}, null, 2));
+  assert.deepEqual(panel.errors, [], 'no panel runtime or WebGL errors');
+  assert.deepEqual(consoleErrors, [], 'no page shader, WebGL, or loader errors');
+  console.log(JSON.stringify({browser: await context.browser()!.version(), passed: ['MV3 service worker and popup', 'worker shutdown/recovery in both directions', 'same-origin and cross-origin frames, frame removal, tab isolation', 'malformed page message rejection', 'synchronous injection with restrictive script CSP', 'real DevTools panel and assets', 'device and stereo persistence after panel reload', 'bidirectional pose messages, reset, and headset/controller gizmo drags', 'OrbitControls pointer drag', 'VR select/squeeze press and release', 'panel exit immersive', 'AR virtual room hit testing, transient touch/select, and cancellation', 'AR mouse camera movement', 'AR screen sRGB, orientation, and transparent/half-alpha/opaque texture pixels', 'XRRay rigid transform', 'page reload startup'], vrEvents: vr.events, roomPixels, compositePixels, arHitCounts, arFrames: ar.frames}, null, 2));
 } finally {
   for (const target of attached.reverse()) await target.detach().catch(() => {});
   await context.close();

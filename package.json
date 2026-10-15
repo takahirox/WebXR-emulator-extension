@@ -14,6 +14,7 @@
     "@rollup/plugin-replace": "^6.0.0",
     "@types/chrome": "^0.1.0",
     "@types/node": "^24.0.0",
+    "@types/three": "0.186.0",
     "@types/webvr-api": "^0.0.41",
     "playwright": "^1.64.0",
     "rollup": "^4.0.0",
@@ -23,7 +24,7 @@
   },
   "dependencies": {
     "gl-matrix": "^3.4.4",
-    "three": "0.111.0",
+    "three": "0.186.1",
     "webxr-polyfill": "git+https://github.com/immersive-web/webxr-polyfill.git"
   },
   "type": "module"
