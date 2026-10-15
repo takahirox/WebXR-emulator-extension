@@ -1,5 +1,5 @@
-import type XRFrame from 'webxr-polyfill/src/api/XRFrame';
-import type XRInputSource from 'webxr-polyfill/src/api/XRInputSource';
+import type {XRFrame} from './runtime';
+import type {XRInputSource} from './runtime';
 import type XRHitTestResult from './XRHitTestResult';
 
 export const PRIVATE = Symbol('@@webxr-polyfill/XRTransientInputHitTestResult');

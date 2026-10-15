@@ -38,7 +38,12 @@
       ],
       "formFactor": "headset",
       "features": [
-        "hit-test"
+        "hit-test",
+        "anchors",
+        "layers",
+        "depth-sensing",
+        "light-estimation",
+        "hand-tracking"
       ]
     },
     "Generic Android Phone (ARCore)": {
@@ -49,7 +54,11 @@
         "immersive-ar"
       ],
       "features": [
-        "hit-test"
+        "hit-test",
+        "anchors",
+        "layers",
+        "depth-sensing",
+        "light-estimation"
       ],
       "headset": {
         "hasPosition": true,

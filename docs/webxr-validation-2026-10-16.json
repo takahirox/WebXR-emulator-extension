@@ -1,0 +1,164 @@
+{
+  "date": "2026-10-16",
+  "issue": 11,
+  "completion": "partial; keep Issue #11 open",
+  "browser": "156.0.8078.4",
+  "commands": {
+    "npm ci": "passed",
+    "npm run typecheck": "passed",
+    "npm run build": "passed",
+    "npm run build:firefox": "passed",
+    "npm run test:browser": "passed",
+    "npm run test:wpt": "passed",
+    "npm run test:samples": "passed",
+    "git diff --check": "passed"
+  },
+  "apiConformance": [
+    {
+      "profile": "Meta Quest 3",
+      "mode": "immersive-vr",
+      "distinctAssertions": 78,
+      "status": "passed"
+    },
+    {
+      "profile": "Meta Quest 3",
+      "mode": "immersive-ar",
+      "distinctAssertions": 108,
+      "status": "passed"
+    },
+    {
+      "profile": "Generic Android Phone (ARCore)",
+      "mode": "immersive-ar",
+      "distinctAssertions": 86,
+      "status": "passed"
+    }
+  ],
+  "regression": {
+    "status": "passed",
+    "fixture": "tests/browser-smoke.ts",
+    "checks": [
+      "real unpacked MV3 extension and DevTools panel",
+      "startup user activation rejection",
+      "synchronous MAIN-world injection under CSP",
+      "worker restart recovery both directions",
+      "same-origin and cross-origin routing, frame removal and tab isolation",
+      "Quest VR/MR and phone AR selection, persistence and active-session switching",
+      "stereo/mono view and pose, DPR2 and resize",
+      "panel movement, select/squeeze state transitions and ordered events",
+      "transient screen addition/select/removal ordering",
+      "virtual room hit tests and surface normals",
+      "sRGB and alpha composition pixels",
+      "projection and quad texture composition pixels",
+      "XR-compatible WebGL context initialization"
+    ]
+  },
+  "wpt": {
+    "revision": "e1859580b5fcf74940a18d2f783296b4961035e3",
+    "browser": "156.0.8078.4",
+    "results": [
+      {
+        "file": "xrRigidTransform_constructor.https.html",
+        "status": 0,
+        "tests": [
+          {
+            "name": "XRRigidTransform constructor works",
+            "status": 0,
+            "message": null
+          }
+        ]
+      },
+      {
+        "file": "xrRigidTransform_inverse.https.html",
+        "status": 0,
+        "tests": [
+          {
+            "name": "XRRigidTransform inverse works",
+            "status": 0,
+            "message": null
+          }
+        ]
+      },
+      {
+        "file": "xrRigidTransform_matrix.https.html",
+        "status": 0,
+        "tests": [
+          {
+            "name": "XRRigidTransform matrix works",
+            "status": 0,
+            "message": null
+          }
+        ]
+      },
+      {
+        "file": "xrRigidTransform_sameObject.https.html",
+        "status": 0,
+        "tests": [
+          {
+            "name": "XRRigidTransform position and orientation meet [SameObject] requirements",
+            "status": 0,
+            "message": null
+          }
+        ]
+      },
+      {
+        "file": "navigator_xr_sameObject.https.html",
+        "status": 0,
+        "tests": [
+          {
+            "name": "Navigator.xr meets [SameObject] requirement",
+            "status": 0,
+            "message": null
+          }
+        ]
+      }
+    ],
+    "harness": "tests/wpt.ts; unchanged assertions, JSON reporter and emulator inline-session setup in place of native fake-device setup",
+    "unexecuted": "All remaining WPT files, including IDL, native device mocks, permissions policy and opaque framebuffer cases."
+  },
+  "samples": {
+    "browser": "156.0.8078.4",
+    "results": [
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/immersive-vr-session.html",
+        "deviceKey": "Meta Quest 3",
+        "questMode": "immersive-vr",
+        "probe": {
+          "frames": 126,
+          "hits": 0
+        },
+        "errors": []
+      },
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/hit-test.html",
+        "deviceKey": "Meta Quest 3",
+        "questMode": "immersive-ar",
+        "probe": {
+          "frames": 126,
+          "hits": 2
+        },
+        "errors": []
+      },
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/hit-test.html",
+        "deviceKey": "Generic Android Phone (ARCore)",
+        "questMode": "immersive-ar",
+        "probe": {
+          "frames": 126,
+          "hits": 2
+        },
+        "errors": []
+      }
+    ]
+  },
+  "firefox": {
+    "packaging": "passed",
+    "runtime": "not executed"
+  },
+  "physicalDevices": "not tested; optional",
+  "remaining": [
+    "DOM overlay compositor geometry and interaction; dom-overlay is rejected rather than advertised",
+    "Broader WebIDL, permissions-policy and opaque-framebuffer semantics/validation",
+    "Persistent anchors and additional composition-layer/texture paths are unsupported"
+  ],
+  "requiredPostMergeVerification": []
+}

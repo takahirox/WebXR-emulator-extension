@@ -6,7 +6,9 @@
     "build": "npm run typecheck && tsc -p tsconfig.emit.json && tsx build.ts",
     "typecheck": "tsc --noEmit",
     "test:browser": "tsx tests/browser-smoke.ts",
-    "build:firefox": "npm run build && tsx build-firefox.ts"
+    "build:firefox": "npm run build && tsx build-firefox.ts",
+    "test:wpt": "tsx tests/wpt.ts",
+    "test:samples": "tsx tests/samples.ts"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",
@@ -15,7 +17,6 @@
     "@types/chrome": "^0.1.0",
     "@types/node": "^24.0.0",
     "@types/three": "0.186.0",
-    "@types/webvr-api": "^0.0.41",
     "playwright": "^1.64.0",
     "rollup": "^4.0.0",
     "rollup-plugin-cleanup": "^3.2.1",
@@ -24,8 +25,7 @@
   },
   "dependencies": {
     "gl-matrix": "^3.4.4",
-    "three": "0.186.1",
-    "webxr-polyfill": "git+https://github.com/immersive-web/webxr-polyfill.git"
+    "three": "0.186.1"
   },
   "type": "module"
 }

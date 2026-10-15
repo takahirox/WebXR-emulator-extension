@@ -1,17 +1,20 @@
 export const PRIVATE = Symbol('@@webxr-polyfill/XRHitTestSource');
 
 import XRRay from './XRRay';
-import type XRSession from 'webxr-polyfill/src/api/XRSession';
+import type {XRSession} from './runtime';
 import type { HitTestOptions, HitTestState } from '../../types/polyfill';
 
 export default class XRHitTestSource {
   [PRIVATE]: HitTestState;
 
   constructor(session: XRSession, options: HitTestOptions) {
-    // @TODO: Support options.entityTypes and options.offsetRay
-    if (options.entityTypes && options.entityTypes.length > 0) {
-      throw new Error('XRHitTestSource does not support entityTypes option yet.');
+    const types = options.entityTypes ?? ['plane'];
+    for (const type of types) {
+      if (!['plane', 'point', 'mesh'].includes(type)) throw new TypeError('Invalid hit-test entity type.');
+      if (type === 'point') throw new DOMException('The virtual room has no point cloud.', 'NotSupportedError');
     }
+    if (types.length === 0) throw new DOMException('At least one entity type is required.', 'NotSupportedError');
+    if (options.offsetRay !== undefined && !(options.offsetRay instanceof XRRay)) throw new TypeError('Expected XRRay.');
     this[PRIVATE] = {
       session,
       space: options.space,
@@ -21,12 +24,17 @@ export default class XRHitTestSource {
   }
 
   cancel() {
-    // @TODO: Throw InvalidStateError if active is already false
-    this[PRIVATE].active = false;
+    if (!this._active) throw new DOMException('Source is inactive.', 'InvalidStateError');
+    this._deactivate();
   }
 
   get _space() {
     return this[PRIVATE].space;
+  }
+
+  _deactivate() {
+    this[PRIVATE].active = false;
+    this._session._hitSources.delete(this);
   }
 
   get _session() {

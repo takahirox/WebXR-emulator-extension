@@ -9,7 +9,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": false,
-    "types": ["chrome", "node", "webvr-api"]
+    "types": ["chrome", "node"]
   },
   "include": ["src/**/*.ts", "build.ts", "build-firefox.ts", "tests/**/*.ts"]
 }
