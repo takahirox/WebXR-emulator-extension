@@ -23,6 +23,8 @@ interface Session {
 }
 export interface SmokeState {
   synchronousXR: boolean;
+  synchronousGlobals: boolean;
+  overridesNativeXR: boolean;
   frames: number;
   viewerPosition: number[];
   inputPositions: Record<string, number[]>;

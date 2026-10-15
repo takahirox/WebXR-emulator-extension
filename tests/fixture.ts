@@ -3,6 +3,8 @@
   const appWindow = window as unknown as import('./browser-types').SmokeWindow;
   const state: import('./browser-types').SmokeState = {
     synchronousXR: !!appWindow.navigator.xr,
+    synchronousGlobals: ['XRSystem', 'XRSession', 'XRFrame', 'XRRay', 'XRRigidTransform'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'),
+    overridesNativeXR: !!appWindow.navigator.xr && !/\[native code\]/.test(appWindow.navigator.xr.requestSession.toString()),
     frames: 0, viewerPosition: [], inputPositions: {}, events: {},
     hits: 0, hitPosition: null, transientHits: 0, ended: true, errors: [],
   };

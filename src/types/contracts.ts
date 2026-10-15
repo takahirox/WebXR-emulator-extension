@@ -45,3 +45,51 @@ export function dispatchCustomEvent<K extends keyof EmulatorEvents>(type: K, det
     detail: typeof cloneInto !== 'undefined' ? cloneInto(detail, window) : detail,
   }));
 }
+
+export interface RuntimeMessage {
+  source: 'panel' | 'content' | 'background';
+  message: ExtensionMessage;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+function isVector(value: unknown, length: number): boolean {
+  return (Array.isArray(value) || ArrayBuffer.isView(value)) &&
+    Array.from(value as ArrayLike<unknown>).length === length &&
+    Array.from(value as ArrayLike<unknown>).every(v => typeof v === 'number' && Number.isFinite(v));
+}
+function isPose(value: Record<string, unknown>): boolean {
+  return isVector(value.position, 3) && isVector(value.quaternion, 4);
+}
+function isController(value: unknown): boolean {
+  return value === 'rightController' || value === 'leftController';
+}
+
+// MAIN-world events are page-controlled. Only emulation data may cross into
+// extension pages; a page cannot request privileged APIs, URLs, or another tab.
+export function isDeviceMessage(value: unknown): value is ExtensionMessage {
+  if (!isRecord(value)) return false;
+  switch (value.action) {
+    case 'webxr-startup':
+    case 'device-enter-immersive':
+    case 'device-leave-immersive': return true;
+    case 'device-pose': return isPose(value);
+    case 'device-input-pose': return isPose(value) && isController(value.objectName);
+    default: return false;
+  }
+}
+export function isPanelMessage(value: unknown): value is ExtensionMessage {
+  if (!isRecord(value)) return false;
+  switch (value.action) {
+    case 'webxr-device': return isRecord(value.deviceDefinition);
+    case 'webxr-pose': return isPose(value);
+    case 'webxr-input-pose': return isPose(value) && isController(value.objectName);
+    case 'webxr-input-button': return isController(value.objectName) &&
+      typeof value.pressed === 'boolean' && Number.isInteger(value.buttonIndex) &&
+      (value.buttonIndex as number) >= 0;
+    case 'webxr-stereo-effect': return typeof value.enabled === 'boolean';
+    case 'webxr-exit-immersive': return true;
+    default: return false;
+  }
+}

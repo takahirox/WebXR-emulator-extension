@@ -93,10 +93,18 @@
         }
     }
 
+    function sendRuntimeMessage(envelope) {
+        chrome.runtime.sendMessage(envelope, () => {
+            void chrome.runtime.lastError;
+        });
+    }
+
     const THREE = window.THREE;
-    const port = chrome.runtime.connect({ name: 'panel' });
     const tabId = chrome.devtools.inspectedWindow.tabId;
-    port.onMessage.addListener((message) => {
+    chrome.runtime.onMessage.addListener((envelope) => {
+        if ((envelope === null || envelope === void 0 ? void 0 : envelope.source) !== 'background' || envelope.message.tabId !== tabId)
+            return;
+        const message = envelope.message;
         switch (message.action) {
             case 'webxr-startup':
                 notifyPoses();
@@ -137,8 +145,7 @@
         }
     });
     const postMessage = (message) => {
-        message.tabId = tabId;
-        port.postMessage(message);
+        sendRuntimeMessage({ source: 'panel', message: { ...message, tabId } });
     };
     const notifyPoseChange = (node) => {
         postMessage({

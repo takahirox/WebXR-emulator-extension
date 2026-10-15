@@ -8,6 +8,7 @@ import type { TransformControls } from 'three/examples/jsm/controls/TransformCon
 declare global {
   function cloneInto<T>(value: T, target: Window): T;
   function WebXRPolyfillInjection(): void;
+  const CustomWebXRPolyfill: typeof import('../polyfill/CustomWebXRPolyfill').default;
   interface Window { THREE: typeof Three & { GLTFLoader: typeof GLTFLoader; OBJLoader: typeof OBJLoader; OrbitControls: typeof OrbitControls; TransformControls: typeof TransformControls }; }
   interface WindowEventMap extends CustomEvents {}
   interface WebGLRenderingContext { makeXRCompatible(): Promise<void> }

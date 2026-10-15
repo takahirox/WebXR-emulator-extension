@@ -11,5 +11,5 @@
     "skipLibCheck": false,
     "types": ["chrome", "node", "webvr-api"]
   },
-  "include": ["src/**/*.ts", "build.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "build.ts", "build-firefox.ts", "tests/**/*.ts"]
 }

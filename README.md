@@ -23,7 +23,7 @@ WebXR emulator extension is a browser extension which helps your WebXR content c
 
 ## Browsers
 
-This extension is built on top of [WebExtensions API](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions). It works on Firefox, Chrome, and other browsers supporting the API.
+The development build uses Manifest V3 on current desktop Chrome/Chromium (minimum Chrome 111 for manifest-declared MAIN-world scripts). Firefox 128 or newer uses a separate MV3 package with an event page; see the installation instructions below and [compatibility/validation notes](docs/manifest-v3.md). Other Chromium browsers are not individually verified. Mobile browsers are outside the supported desktop emulation scope.
 
 ## How to use
 
@@ -109,15 +109,18 @@ Use the [Issue template](.github/ISSUE_TEMPLATE/issue.md) and [PR template](.git
 
 ### How to install the newest version
 
-If you want to develop or debug this extension or if you want to use the under development (not released yet) version, download this repository, run the build below, and install the extension into your browser as developer mode. ([Firefox](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Temporary_Installation_in_Firefox), [Chrome](https://developer.chrome.com/extensions/getstarted))
+Download this repository and run the build below. In Chrome/Chromium, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the repository root containing `manifest.json`. Reload any existing WebXR pages, then open DevTools → **WebXR**. The toolbar popup explains where to find the controls. Enable **Allow access to file URLs** in the extension's details if you use local `file:` pages; ordinary browser restrictions on file pages still apply.
+
+For Firefox 128+, run `npm run build:firefox`, open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and select `build/firefox/manifest.json`. Grant the extension access to the sites you want to emulate. This package uses the same scripts and assets with a Firefox MV3 event-page manifest. Temporary installations last until Firefox exits; rerun the build and reload the extension and page after changes. Store releases linked above may lag the development build.
 
 ### How to build the extension and polyfill
 
-Use Node.js 22 or newer and npm. All maintained source and build tooling is TypeScript. The build emits the injected `polyfill/webxr-polyfill.js` bundle and classic browser scripts in `dist/extension/` and `dist/app/`; the manifest and HTML already reference those outputs. Build before loading the repository root as an unpacked extension.
+Use Node.js 22 or newer and npm. All maintained source and build tooling is TypeScript. The build emits the `polyfill/webxr-polyfill.js` bundle, its synchronous MAIN-world initializer, and classic browser scripts in `dist/extension/` and `dist/app/`; the manifest and HTML already reference those outputs. Build before loading the repository root as an unpacked extension.
 
 ```sh
 $ git clone https://github.com/takahirox/WebXR-emulator-extension.git
 $ cd WebXR-emulator-extension
+$ git checkout dev
 $ npm install
 $ npm run typecheck
 $ npm run build
@@ -127,20 +130,23 @@ Run `npm run build` after editing TypeScript, then reload the extension and insp
 
 `npm run typecheck` checks every maintained source, build script, and test with strict TypeScript settings. The unmodified third-party JavaScript in `src/app/three/` and generated output are not TypeScript sources. Three.js r111 remains the polyfill dependency; the panel's existing vendored Three.js/controls/loaders remain unchanged. Narrow dependency declarations and lifecycle assumptions are documented in [TypeScript development notes](docs/typescript-migration.md).
 
-The extension still uses Manifest V2. Use a desktop browser that can load it; current Chrome releases may reject it (see the [Chrome migration timeline](https://developer.chrome.com/docs/extensions/develop/migrate/mv2-deprecation-timeline)). This migration does not change the manifest version.
+Chrome uses a service worker and two manifest-declared `document_start` content scripts: the polyfill runs in the page's MAIN world and configuration/extension messaging runs in the isolated world. HTTP, HTTPS, and permitted file pages and their matching frames receive WebXR before their first page script. Broad site access is needed for this synchronous startup; injection after a toolbar click would be too late. No remote code, inline script insertion, or unsafe evaluation is used. Configuration is still applied asynchronously from extension storage. See [MV3 architecture and security decisions](docs/manifest-v3.md).
 
 ### Browser regression checks
 
-`npm run test:browser` loads the actual unpacked extension in a fresh, temporary desktop Chromium profile, opens its real DevTools panel, and checks configuration persistence, synchronous injection, VR pose messages and select/squeeze, AR room rendering, persistent/transient hit testing, and mouse input. It serves a local TypeScript regression sample and deletes the profile afterward; no personal browser profile is used.
+`npm run test:browser` loads the actual unpacked extension in a fresh, temporary desktop Chromium profile, opens its real DevTools panel, and checks configuration persistence, synchronous injection under a restrictive script CSP, service-worker shutdown/recovery, matching same-origin and cross-origin frames, tab isolation, VR pose messages and select/squeeze, AR room rendering, persistent/transient hit testing, and mouse input. It serves a local TypeScript regression sample and deletes the profile afterward; no personal browser profile is used.
 
-Set `WEBXR_CHROMIUM_EXECUTABLE` to a Chromium executable that supports Manifest V2 (validated with Chromium **131.0.6778.33**). The current Playwright browser download may be too new for this manifest. For the validated historical test binary, `PLAYWRIGHT_BROWSERS_PATH="$PWD/test-results/browsers" npx --package=playwright@1.49.1 playwright install chromium` installs build 1148 in a dedicated local cache; point the environment variable at that installation's desktop executable, not its headless shell. Test dependencies use current Playwright to drive that binary.
+Install the current Playwright desktop Chromium with `npx playwright install chromium`, then run `npm run test:browser`. To test a specific current stable build, set `WEBXR_CHROMIUM_EXECUTABLE` to a desktop Chromium / Chrome for Testing executable (not its headless shell). The MV3 acceptance run used stable **Chrome for Testing 155.0.8059.79**. No MV2 compatibility flags are used. Branded Chrome/Edge no longer accept the automation sideloading flags; use Chrome for Testing or Playwright Chromium for automation and Load unpacked in Chrome's UI for manual installation.
 
 ```sh
 $ npm run build
-$ WEBXR_CHROMIUM_EXECUTABLE=/absolute/path/to/Chromium npm run test:browser
+$ npx playwright install chromium
+$ npm run test:browser
+# Optional stable browser override:
+$ WEBXR_CHROMIUM_EXECUTABLE=/absolute/path/to/Chrome-for-Testing npm run test:browser
 ```
 
-The check requires a desktop display and WebGL (software rendering is enabled for this test profile). It writes local screenshots to ignored `test-results/`. See [recorded validation](docs/typescript-migration.md#validation) for results and limitations.
+The check requires a desktop display and WebGL (software rendering is enabled for this test profile). It writes local screenshots to ignored `test-results/`. See [recorded MV3 validation](docs/manifest-v3.md#validation) for steps, results, and limitations.
 
 ## Note
 
