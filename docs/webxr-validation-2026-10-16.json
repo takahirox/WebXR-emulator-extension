@@ -341,5 +341,50 @@
       "test:samples"
     ],
     "firefoxRuntime": "not executed; packaging passed"
+  },
+  "layerInitializationMetadataOwnershipReviewFixes": {
+    "issue": 11,
+    "browser": "156.0.8078.4",
+    "commands": {
+      "npm ci": "passed",
+      "npm run typecheck": "passed",
+      "npm run build": "passed",
+      "npm run build:firefox": "passed",
+      "npm run test:browser": "passed after adapting the new Three.js depth:false regression to its separate client-side DepthTexture error; the initial run stopped at that error",
+      "git diff --check": "passed"
+    },
+    "checks": [
+      "Projection and quad subimages cover omitted, undefined, null, zero, DEPTH_COMPONENT and DEPTH_COMPONENT24 depth formats, verifying allocation, color/depth dimensions, imageIndex=0, motionVectorTexture=null and framebuffer completeness without GL errors",
+      "Three.js with depth disabled creates a usable no-depth XR projection layer with and without the layers feature; its subsequent unconditional DepthTexture construction still fails with a null format in Three.js 0.186.1, so successful no-depth Three.js rendering is not claimed",
+      "Three.js with depth enabled still renders through projection layers with and without the layers feature",
+      "Two bindings sharing one session and WebGL context submit projection and quad layers together, access each other's subimages and composite visible output pixels",
+      "Cross-context layer submission and subimage access remain rejected"
+    ],
+    "apiConformance": [
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-vr",
+        "distinctAssertions": 278,
+        "status": "passed"
+      },
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-ar",
+        "distinctAssertions": 324,
+        "status": "passed"
+      },
+      {
+        "profile": "Generic Android Phone (ARCore)",
+        "mode": "immersive-ar",
+        "distinctAssertions": 286,
+        "status": "passed"
+      }
+    ],
+    "notRerun": [
+      "test:wpt",
+      "test:samples"
+    ],
+    "firefoxRuntime": "not executed; packaging passed",
+    "issueStatus": "partial implementation; keep Issue #11 open"
   }
 }

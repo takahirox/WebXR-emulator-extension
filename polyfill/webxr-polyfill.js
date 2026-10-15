@@ -1122,7 +1122,10 @@ function WebXRPolyfillInjection() {
           this.depthStencilTexture = depthStencilTexture;
           this.colorTextureWidth = colorTextureWidth;
           this.colorTextureHeight = colorTextureHeight;
-          this.imageIndex = undefined;
+          this.imageIndex = 0;
+          this.motionVectorTexture = null;
+          this.depthStencilTextureWidth = depthStencilTexture ? colorTextureWidth : null;
+          this.depthStencilTextureHeight = depthStencilTexture ? colorTextureHeight : null;
       }
   }
   let XRWebGLBinding$1 = class XRWebGLBinding {
@@ -1164,7 +1167,7 @@ function WebXRPolyfillInjection() {
               unsupported('Only 2D textures are implemented.');
           if (init.colorFormat !== undefined && ![gl.RGBA, gl.RGBA8].includes(init.colorFormat))
               unsupported('Only RGBA8 color textures are implemented.');
-          if (init.depthFormat !== undefined && ![0, gl.DEPTH_COMPONENT, gl.DEPTH_COMPONENT24].includes(init.depthFormat))
+          if (init.depthFormat != null && ![0, gl.DEPTH_COMPONENT, gl.DEPTH_COMPONENT24].includes(init.depthFormat))
               unsupported('Only DEPTH_COMPONENT24 depth textures are implemented.');
           if (init.mipLevels !== undefined && init.mipLevels !== 1)
               unsupported('Mipmapped layers are not implemented.');
@@ -1172,6 +1175,7 @@ function WebXRPolyfillInjection() {
               unsupported('Static layers are not implemented.');
       }
       createProjectionLayer(init = {}) {
+          init = { ...init, depthFormat: init.depthFormat === undefined ? 0x1902 : Number(init.depthFormat) };
           this.validate(init);
           if (init.scaleFactor !== undefined && (!Number.isFinite(init.scaleFactor) || init.scaleFactor <= 0))
               throw new TypeError('scaleFactor must be positive.');
@@ -1180,7 +1184,8 @@ function WebXRPolyfillInjection() {
           return layer;
       }
       createQuadLayer(init) {
-          var _a, _b;
+          var _a, _b, _c;
+          init = { ...init, depthFormat: Number((_a = init.depthFormat) !== null && _a !== void 0 ? _a : 0) };
           this._session._require('layers');
           this.validate(init);
           this._session._owns(init.space);
@@ -1193,7 +1198,7 @@ function WebXRPolyfillInjection() {
                   throw new TypeError('Quad pixel dimensions must be positive integers.');
           if (init.transform && !(init.transform instanceof XRRigidTransform))
               throw new TypeError('Expected XRRigidTransform.');
-          if (((_a = init.width) !== null && _a !== void 0 ? _a : 1) <= 0 || ((_b = init.height) !== null && _b !== void 0 ? _b : 1) <= 0)
+          if (((_b = init.width) !== null && _b !== void 0 ? _b : 1) <= 0 || ((_c = init.height) !== null && _c !== void 0 ? _c : 1) <= 0)
               throw new TypeError('Quad physical dimensions must be positive.');
           const layer = new XRQuadLayer(this, init);
           this.initialize(layer);
@@ -1216,7 +1221,7 @@ function WebXRPolyfillInjection() {
           var _a;
           this.assert();
           frame._assertActive(true);
-          if (layer._binding !== this || frame.session !== this._session || layer._destroyed)
+          if (layer._binding._session !== this._session || layer._binding._context !== this._context || frame.session !== this._session || layer._destroyed)
               invalidState('Layer/frame is not usable with this binding.');
           if (!((_a = this._session.renderState.layers) === null || _a === void 0 ? void 0 : _a.includes(layer)))
               invalidState('Layer is not in the active render state.');
@@ -2102,8 +2107,8 @@ function WebXRPolyfillInjection() {
               for (const layer of init.layers)
                   if (!(layer instanceof XRCompositionLayer) || layer._binding._session !== this || layer._destroyed)
                       invalidState('Invalid composition layer.');
-              if (init.layers.some(layer => layer._binding !== init.layers[0]._binding))
-                  unsupported('All layers must share one binding/context.');
+              if (init.layers.some(layer => layer._binding._context !== init.layers[0]._binding._context))
+                  unsupported('All layers must share one WebGL context.');
           }
           if (init.inlineVerticalFieldOfView != null && this._mode !== 'inline')
               invalidState('Immersive sessions cannot set inlineVerticalFieldOfView.');

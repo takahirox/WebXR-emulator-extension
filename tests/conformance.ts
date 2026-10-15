@@ -31,17 +31,35 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     // Exercise the installed Three.js client, including its projection-layer path
     // for sessions that did not request the layers feature.
     const threeUrl = '/three.module.js'; const three = await import(threeUrl) as typeof import('three');
-    for (const withLayers of [false, true]) {
+    for (const depth of [true, false]) for (const withLayers of [false, true]) {
       const client = await xr.navigator.xr.requestSession(mode, {requiredFeatures: ['local-floor', ...(withLayers ? ['layers'] : [])]});
-      const renderer = new three.WebGLRenderer({antialias: false, preserveDrawingBuffer: true});
+      const renderer = new three.WebGLRenderer({antialias: false, preserveDrawingBuffer: true, depth});
       renderer.setSize(640, 480); renderer.xr.enabled = true; document.body.append(renderer.domElement);
       const geometry = new three.BoxGeometry(0.5, 0.5, 0.5); const material = new three.MeshBasicMaterial({color: 0xff0000});
       const mesh = new three.Mesh(geometry, material); const scene = new three.Scene(); scene.add(mesh); scene.background = new three.Color(0x0000ff);
       try {
-        await renderer.xr.setSession(client as unknown as XRSession);
+        try { await renderer.xr.setSession(client as unknown as XRSession); }
+        catch (error) {
+          // Three.js 0.186.1 unconditionally constructs its own DepthTexture
+          // with a null format when depth is disabled, after creating the XR
+          // layer. Verify that our initialization succeeded before that error.
+          if (depth || !(error instanceof Error) || !error.message.startsWith('THREE.DepthTexture:')) throw error;
+          const layer = renderer.xr.getBaseLayer() as unknown as Layers.XRProjectionLayer;
+          const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
+          const space = await client.requestReferenceSpace('local-floor');
+          check(layer instanceof xr.XRProjectionLayer && layer.textureWidth > 0 && layer.textureHeight > 0, `Three.js creates a usable no-depth XR layer before its DepthTexture error (layers=${withLayers})`);
+          await new Promise<void>((resolve, reject) => client.requestAnimationFrame((_time, frame) => {
+            try {
+              const image = binding.getViewSubImage(layer, frame.getViewerPose(space)!.views[0]);
+              check(image.depthStencilTexture === null && image.depthStencilTextureWidth === null && image.depthStencilTextureHeight === null, `Three.js null depth format produces no XR depth attachment (layers=${withLayers})`);
+              resolve();
+            } catch (error) { reject(error); }
+          }));
+          continue;
+        }
         const layer = renderer.xr.getBaseLayer() as unknown as Layers.XRProjectionLayer;
         const size = renderer.getDrawingBufferSize(new three.Vector2());
-        check(layer instanceof xr.XRProjectionLayer && layer.textureWidth > 0 && layer.textureHeight > 0 && size.x === layer.textureWidth && size.y === layer.textureHeight, `Three.js initializes usable projection dimensions (layers=${withLayers})`);
+        check(layer instanceof xr.XRProjectionLayer && layer.textureWidth > 0 && layer.textureHeight > 0 && size.x === layer.textureWidth && size.y === layer.textureHeight, `Three.js initializes usable projection dimensions (layers=${withLayers}, depth=${depth})`);
         if (!withLayers) {
           check(!client.enabledFeatures.includes('layers'), 'projection rendering does not implicitly enable layers');
           const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
@@ -60,9 +78,12 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
               mesh.position.set(0, 0, -2).applyMatrix4(new three.Matrix4().fromArray(pose.transform.matrix));
               renderer.render(scene, new three.PerspectiveCamera());
               const target = renderer.getRenderTarget()!;
-              check(target.width > 0 && target.height > 0, `Three.js render target remains usable (layers=${withLayers})`);
+              check(target.width > 0 && target.height > 0, `Three.js render target remains usable (layers=${withLayers}, depth=${depth})`);
               const gl = renderer.getContext();
-              check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE, `Three.js color and depth attachments have matching dimensions (layers=${withLayers})`);
+              check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE, `Three.js framebuffer is complete (layers=${withLayers}, depth=${depth})`);
+              const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
+              const image = binding.getViewSubImage(layer, pose.views[0] as unknown as Geometry.XRView);
+              check((image.depthStencilTexture !== null) === depth, `Three.js projection depth follows renderer options (layers=${withLayers}, depth=${depth})`);
               if (++frames === 3) { renderer.setAnimationLoop(null); clearTimeout(timeout); resolve(); }
             } catch (error) { renderer.setAnimationLoop(null); clearTimeout(timeout); reject(error); }
           });
@@ -72,8 +93,8 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
         const red = pixels.filter((v, i) => i % 4 === 0 && v > 200).length; const blue = pixels.filter((v, i) => i % 4 === 2 && v > 200).length;
         // Three.js deliberately clears the background to transparent for AR.
-        check(red > 0 && (mode === 'immersive-ar' || blue > 0), `Three.js mesh reaches the presentation canvas with the mode's background (layers=${withLayers})`);
-        check(gl.getError() === gl.NO_ERROR, `Three.js projection rendering has no GL errors (layers=${withLayers})`);
+        check(red > 0 && (mode === 'immersive-ar' || blue > 0), `Three.js mesh reaches the presentation canvas with the mode's background (layers=${withLayers}, depth=${depth})`);
+        check(gl.getError() === gl.NO_ERROR, `Three.js projection rendering has no GL errors (layers=${withLayers}, depth=${depth})`);
       } finally { renderer.setAnimationLoop(null); if (!client.ended) await client.end(); renderer.dispose(); geometry.dispose(); material.dispose(); renderer.domElement.remove(); }
     }
     check(['XRSystem', 'XRSession', 'XRFrame', 'XRSpace', 'XRReferenceSpace', 'XRRigidTransform', 'XRWebGLLayer', 'XRWebGLBinding', 'XRAnchor', 'XRHand', 'XRJointPose', 'XRCPUDepthInformation', 'XRLightProbe'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'), 'public constructors installed');
@@ -321,11 +342,12 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       }
       // Exercise real texture allocation, subimages and the compositor, then return to legacy.
       const binding = new xr.XRWebGLBinding(session, gl);
+      const peerBinding = new xr.XRWebGLBinding(session, gl);
       const unpackBuffer = gl.createBuffer(); const applicationTexture = gl.createTexture();
       gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, unpackBuffer); gl.bufferData(gl.PIXEL_UNPACK_BUFFER, 16, gl.STATIC_DRAW);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, applicationTexture);
       const projection = binding.createProjectionLayer({depthFormat: gl.DEPTH_COMPONENT24});
-      const quad = binding.createQuadLayer({space: reference, transform: new xr.XRRigidTransform({z: -1}), viewPixelWidth: 64, viewPixelHeight: 64, width: 1, height: 1, depthFormat: 0});
+      const quad = peerBinding.createQuadLayer({space: reference, transform: new xr.XRRigidTransform({z: -1}), viewPixelWidth: 64, viewPixelHeight: 64, width: 1, height: 1, depthFormat: 0});
       check(projection.textureWidth > 0 && projection.textureHeight > 0 && quad.textureWidth === 64 && quad.textureHeight === 64, 'layer dimensions initialized before the first frame');
       check(gl.getError() === gl.NO_ERROR && gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) === unpackBuffer && gl.getParameter(gl.TEXTURE_BINDING_2D) === applicationTexture && gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE1, 'initial allocation preserves application unpack buffer and texture state');
       throws(() => binding.createProjectionLayer({textureType: 'texture-array'}), 'NotSupportedError', 'unsupported layer texture array');
@@ -339,7 +361,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         const views = frame.getViewerPose(reference)!.views;
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
         for (const view of views) {
-          const image = binding.getViewSubImage(projection, view);
+          const image = peerBinding.getViewSubImage(projection, view);
           check(gl.isTexture(image.colorTexture) && image.viewport.width > 0, 'projection subimage texture and viewport');
           gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
           gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, image.depthStencilTexture, 0);
@@ -356,6 +378,46 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       check(pixels.some((value, index) => index % 4 === 2 && value > 200), 'projection layer is actually composited into the output');
       check(pixels.some((value, index) => index % 4 === 0 && value > 200), 'quad layer is actually composited into the output');
+      // Depth defaults differ between projection and non-projection dictionaries.
+      // Use public subimages and complete FBOs to verify texture allocation and metadata.
+      for (const [label, options] of [
+        ['omitted', {}], ['undefined', {depthFormat: undefined}], ['null', {depthFormat: null}],
+        ['zero', {depthFormat: 0}], ['depth-component', {depthFormat: gl.DEPTH_COMPONENT}],
+        ['depth-component24', {depthFormat: gl.DEPTH_COMPONENT24}],
+      ] as const) {
+        const testProjection = binding.createProjectionLayer(options);
+        const testQuad = peerBinding.createQuadLayer({space: reference, viewPixelWidth: 32, viewPixelHeight: 16, ...options});
+        session.updateRenderState({layers: [testProjection, testQuad]});
+        await nextFrame(frame => {
+          for (const layer of [testProjection, testQuad]) {
+            const projection = layer instanceof xr.XRProjectionLayer;
+            const hasDepth = label.startsWith('depth-') || (projection && ['omitted', 'undefined'].includes(label));
+            const image = projection ? peerBinding.getViewSubImage(layer, frame.getViewerPose(reference)!.views[0]) : binding.getSubImage(layer as Layers.XRQuadLayer, frame);
+            const prefix = `${layer.constructor.name} depthFormat=${label}`;
+            check(image.imageIndex === 0 && image.motionVectorTexture === null, `${prefix}: 2D image index and absent motion vectors`);
+            check(image.colorTextureWidth === layer.textureWidth && image.colorTextureHeight === layer.textureHeight, `${prefix}: color dimensions`);
+            check(hasDepth ? gl.isTexture(image.depthStencilTexture) : image.depthStencilTexture === null, `${prefix}: depth allocation`);
+            check(image.depthStencilTextureWidth === (hasDepth ? layer.textureWidth : null) && image.depthStencilTextureHeight === (hasDepth ? layer.textureHeight : null), `${prefix}: depth dimensions or null`);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, image.depthStencilTexture, 0);
+            check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE && gl.getError() === gl.NO_ERROR, `${prefix}: framebuffer complete without GL errors`);
+          }
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        });
+        testProjection.destroy(); testQuad.destroy();
+      }
+      const foreignCanvas = document.createElement('canvas'); const foreignGL = foreignCanvas.getContext('webgl2')!;
+      await foreignGL.makeXRCompatible();
+      const foreignBinding = new xr.XRWebGLBinding(session, foreignGL);
+      const foreignProjection = foreignBinding.createProjectionLayer();
+      throws(() => session.updateRenderState({layers: [projection, foreignProjection]}), 'NotSupportedError', 'cross-context layer submission remains unsupported');
+      session.updateRenderState({layers: [projection, quad]});
+      await nextFrame(frame => {
+        throws(() => foreignBinding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]), 'InvalidStateError', 'cross-context projection access rejected');
+        throws(() => foreignBinding.getSubImage(quad, frame), 'InvalidStateError', 'cross-context quad access rejected');
+      });
+      foreignProjection.destroy();
       await nextFrame(frame => {
         // Resize during the callback so MR's frame-start sizing cannot undo it
         // before getViewSubImage exercises reallocation.

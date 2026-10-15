@@ -29,7 +29,7 @@ export class XRWebGLLayer implements BaseLayer {
 
 type GL = WebGL2RenderingContext;
 interface LayerInit {
-  colorFormat?: number; depthFormat?: number; textureType?: string; scaleFactor?: number;
+  colorFormat?: number; depthFormat?: number | null; textureType?: string; scaleFactor?: number;
   space?: XRSpace; transform?: XRRigidTransform; width?: number; height?: number;
   viewPixelWidth?: number; viewPixelHeight?: number; layout?: string; isStatic?: boolean;
   mipLevels?: number; clearOnAccess?: boolean;
@@ -105,9 +105,16 @@ export class XRQuadLayer extends XRCompositionLayer {
 }
 export class XRSubImage { constructor(readonly viewport: XRViewport) {} }
 export class XRWebGLSubImage extends XRSubImage {
-  readonly imageIndex = undefined;
+  readonly imageIndex = 0;
+  readonly motionVectorTexture = null;
+  readonly depthStencilTextureWidth: number | null;
+  readonly depthStencilTextureHeight: number | null;
   constructor(viewport: XRViewport, readonly colorTexture: WebGLTexture, readonly depthStencilTexture: WebGLTexture | null,
-    readonly colorTextureWidth: number, readonly colorTextureHeight: number) { super(viewport); }
+    readonly colorTextureWidth: number, readonly colorTextureHeight: number) {
+    super(viewport);
+    this.depthStencilTextureWidth = depthStencilTexture ? colorTextureWidth : null;
+    this.depthStencilTextureHeight = depthStencilTexture ? colorTextureHeight : null;
+  }
 }
 
 export class XRWebGLBinding {
@@ -134,17 +141,22 @@ export class XRWebGLBinding {
     if (init.textureType && !['texture', 'texture-array'].includes(init.textureType)) throw new TypeError('Invalid XRTextureType.');
     if (init.textureType === 'texture-array') unsupported('Only 2D textures are implemented.');
     if (init.colorFormat !== undefined && !([gl.RGBA, gl.RGBA8] as number[]).includes(init.colorFormat)) unsupported('Only RGBA8 color textures are implemented.');
-    if (init.depthFormat !== undefined && ![0, gl.DEPTH_COMPONENT, gl.DEPTH_COMPONENT24].includes(init.depthFormat)) unsupported('Only DEPTH_COMPONENT24 depth textures are implemented.');
+    if (init.depthFormat != null && ![0, gl.DEPTH_COMPONENT, gl.DEPTH_COMPONENT24].includes(init.depthFormat)) unsupported('Only DEPTH_COMPONENT24 depth textures are implemented.');
     if (init.mipLevels !== undefined && init.mipLevels !== 1) unsupported('Mipmapped layers are not implemented.');
     if (init.isStatic) unsupported('Static layers are not implemented.');
   }
   createProjectionLayer(init: LayerInit = {}) {
+    // XRProjectionLayerInit defaults to DEPTH_COMPONENT; its non-nullable
+    // GLenum converts an explicit null to zero (no depth), as Three.js uses.
+    init = {...init, depthFormat: init.depthFormat === undefined ? 0x1902 : Number(init.depthFormat)};
     this.validate(init);
     if (init.scaleFactor !== undefined && (!Number.isFinite(init.scaleFactor) || init.scaleFactor <= 0)) throw new TypeError('scaleFactor must be positive.');
     const layer = new XRProjectionLayer(this, {...init, layout: this._session._device.handheld ? 'mono' : 'stereo-left-right'});
     this.initialize(layer); return layer;
   }
   createQuadLayer(init: LayerInit & {space: XRSpace}) {
+    // XRLayerInit has a nullable depthFormat with no default depth texture.
+    init = {...init, depthFormat: Number(init.depthFormat ?? 0)};
     this._session._require('layers'); this.validate(init); this._session._owns(init.space);
     if (init.layout && init.layout !== 'mono') unsupported('Only mono quad layers are implemented.');
     if (!(init.space instanceof XRSpace)) throw new TypeError('Expected XRSpace.');
@@ -162,7 +174,7 @@ export class XRWebGLBinding {
   createCubeLayer(): never { return unsupported('Cube layers are not implemented.'); }
   private check(layer: XRCompositionLayer, frame: XRFrame) {
     this.assert(); frame._assertActive(true);
-    if (layer._binding !== this || frame.session !== this._session || layer._destroyed) invalidState('Layer/frame is not usable with this binding.');
+    if (layer._binding._session !== this._session || layer._binding._context !== this._context || frame.session !== this._session || layer._destroyed) invalidState('Layer/frame is not usable with this binding.');
     if (!this._session.renderState.layers?.includes(layer)) invalidState('Layer is not in the active render state.');
     this.allocate(layer);
     if (layer._needsClear || (layer._clearOnAccess && layer._lastClearFrame !== frame)) {

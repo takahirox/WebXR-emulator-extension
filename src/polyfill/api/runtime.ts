@@ -209,7 +209,7 @@ export class XRSession extends XREventTarget {
       if (!this.enabledFeatures.includes('layers') && (init.layers.length > 1 || init.layers.some(layer => !(layer instanceof XRProjectionLayer)))) unsupported('Only a single projection layer is supported without the layers feature.');
       if (new Set(init.layers).size !== init.layers.length) throw new TypeError('Duplicate composition layers.');
       for (const layer of init.layers) if (!(layer instanceof XRCompositionLayer) || layer._binding._session !== this || layer._destroyed) invalidState('Invalid composition layer.');
-      if (init.layers.some(layer => layer._binding !== init.layers![0]._binding)) unsupported('All layers must share one binding/context.');
+      if (init.layers.some(layer => layer._binding._context !== init.layers![0]._binding._context)) unsupported('All layers must share one WebGL context.');
     }
     if (init.inlineVerticalFieldOfView != null && this._mode !== 'inline') invalidState('Immersive sessions cannot set inlineVerticalFieldOfView.');
     const state = {...(this.pendingRenderState ?? this.renderState), ...init};
