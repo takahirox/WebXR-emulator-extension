@@ -15,6 +15,7 @@ import {
   Scene,
   SRGBColorSpace,
   SphereGeometry,
+  TextureLoader,
   Vector2,
   Vector3
 } from 'three';
@@ -365,7 +366,16 @@ export default class ARScene {
   }
 
   loadVirtualRoomAsset(buffer: ArrayBuffer) {
-    new GLTFLoader().parse(buffer, '', gltf => {
+    const loader = new GLTFLoader();
+    loader.register(parser => {
+      // ImageBitmapLoader fetches embedded blob URLs under connect-src. Use
+      // image elements so the room retains its existing img-src CSP contract.
+      parser.textureLoader = new TextureLoader(parser.options.manager)
+        .setCrossOrigin(parser.options.crossOrigin)
+        .setRequestHeader(parser.options.requestHeader);
+      return {name: 'WEBXR_emulator_image_textures'};
+    });
+    loader.parse(buffer, '', gltf => {
       this.scene.add(gltf.scene);
       this.room = gltf.scene;
     }, error => {

@@ -21,7 +21,8 @@ const server = createServer((request, response) => {
     response.setHeader('Content-Type', 'application/javascript');
     response.end(fixture);
   } else if (request.url === '/' || request.url === '/frame' || request.url === '/csp') {
-    if (request.url === '/csp') response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; connect-src 'self' blob:; img-src 'self' blob: data:; frame-src 'self' http://localhost:*; style-src 'self' 'unsafe-inline'; object-src 'none'");
+    // Embedded AR images may use blob URLs, but must not need blob connections.
+    if (request.url === '/csp') response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' blob: data:; frame-src 'self' http://localhost:*; style-src 'self' 'unsafe-inline'; object-src 'none'");
     response.setHeader('Content-Type', 'text/html');
     response.end('<!doctype html><html><head><script src="/fixture.js"></script></head><body>WebXR regression sample</body></html>');
   } else { response.statusCode = 204; response.end(); }
@@ -264,6 +265,25 @@ try {
   console.log('Checking AR room and hit tests');
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-ar'));
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0 && (window as unknown as SmokeWindow).smoke.state.hitPosition?.every(Number.isFinite));
+  const roomTextures = await page.evaluate(() => {
+    const textures = new Map<string, {loaded: boolean; flipY?: boolean; colorSpace?: string}>();
+    (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!.scene.traverse(object => {
+      const mesh = object as import('three').Mesh;
+      if (!mesh.isMesh) return;
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        if (material.name !== 'sky' && material.name !== 'wall') continue;
+        const map = (material as import('three').MeshStandardMaterial).map;
+        const image = map?.image as HTMLImageElement | ImageBitmap | undefined;
+        textures.set(material.name, {loaded: !!image && image.width > 0 && image.height > 0,
+          flipY: map?.flipY, colorSpace: map?.colorSpace});
+      }
+    });
+    return Object.fromEntries(textures);
+  });
+  assert.deepEqual(Object.keys(roomTextures).sort(), ['sky', 'wall'], 'both textured room materials loaded');
+  for (const [name, texture] of Object.entries(roomTextures)) {
+    assert.deepEqual(texture, {loaded: true, flipY: false, colorSpace: 'srgb'}, `${name} texture loads under connect-src self with glTF orientation and color space`);
+  }
   assert.equal(await page.locator('canvas').count(), 1, 'AR renderer uses the application canvas as a texture');
   const canvasBox = await page.locator('canvas').boundingBox();
   assert(canvasBox);

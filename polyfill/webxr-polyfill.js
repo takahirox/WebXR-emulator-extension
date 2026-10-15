@@ -34098,7 +34098,14 @@ void main() {
                         return raycaster.intersectObjects(targets, true);
                     }
                     loadVirtualRoomAsset(buffer) {
-                        new GLTFLoader().parse(buffer, '', gltf => {
+                        const loader = new GLTFLoader();
+                        loader.register(parser => {
+                            parser.textureLoader = new TextureLoader(parser.options.manager)
+                                .setCrossOrigin(parser.options.crossOrigin)
+                                .setRequestHeader(parser.options.requestHeader);
+                            return { name: 'WEBXR_emulator_image_textures' };
+                        });
+                        loader.parse(buffer, '', gltf => {
                             this.scene.add(gltf.scene);
                             this.room = gltf.scene;
                         }, error => {
