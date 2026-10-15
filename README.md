@@ -8,7 +8,7 @@ WebXR emulator extension is a browser extension which helps your WebXR content c
 
 ## Features
 
-- [WebXR API polyfill](https://github.com/immersive-web/webxr-polyfill)
+- Maintained TypeScript WebXR emulation with [versioned API inventory and conformance tests](docs/webxr-conformance.md)
 - Two development profiles: Meta Quest 3 and Generic Android Phone (ARCore)
 - Both VR and AR support
 - Graphical device emulator control with [Three.js](https://threejs.org/)
@@ -17,9 +17,9 @@ WebXR emulator extension is a browser extension which helps your WebXR content c
 
 ## Status
 
-- Based on [WebXR device API draft issued on 10 October 2019](https://www.w3.org/TR/webxr/)
-- No device specific emulation yet
-- Supports only trigger and squeeze buttons, not other buttons
+- Standards work targets the [9 June 2026 WebXR Device API draft](https://www.w3.org/TR/2026/CRD-webxr-20260609/) and pinned module drafts. See the [capability matrix, test evidence and remaining scope](docs/webxr-conformance.md); full standards conformance is not claimed.
+- Quest VR/MR and Android AR simulate a virtual environment. No camera, physical tracking, or environmental sensor access is provided.
+- The panel controls controller trigger/squeeze and pose; requesting hand tracking produces reproducible joint skeletons controlled by those same inputs.
 
 ## Browsers
 
@@ -52,7 +52,7 @@ The device picker exposes exactly two profiles. **Meta Quest 3** is the default.
 | Meta Quest 3 | 6DoF headset and two tracked 6DoF controllers with select/squeeze; VR or MR in one profile |
 | Generic Android Phone (ARCore) | 6DoF handheld AR camera, virtual phone screen, transient touch input, and virtual-room hit tests |
 
-These profiles represent development targets, not physical-device fidelity or a claim of complete Quest 3/ARCore API support. They preserve the existing emulated APIs; hand tracking, anchors, and depth sensing are not implemented.
+These profiles represent development targets, not physical-device fidelity or a claim of complete Quest 3/ARCore API support. Quest sessions can request simulated hand tracking. AR/MR sessions can request hit tests, session anchors, CPU depth and virtual lighting; immersive sessions can use WebGL2 projection and quad layers. Feature availability and unsupported combinations are listed in the [versioned inventory](docs/webxr-conformance.md).
 
 ### Quest mode
 
@@ -139,6 +139,8 @@ Chrome uses a service worker and two manifest-declared `document_start` content 
 ### Browser regression checks
 
 `npm run test:browser` loads the actual unpacked extension in a fresh, temporary desktop Chromium profile, opens its real DevTools panel, and checks legacy profile migration, Quest VR/MR selection and persistence, session switching/restart, stereo and monoscopic views, configuration persistence, synchronous injection under a restrictive script CSP, service-worker shutdown/recovery, matching same-origin and cross-origin frames, tab isolation, VR pose messages and select/squeeze, AR room rendering, persistent/transient hit testing, and mouse input. It serves a local TypeScript regression sample and deletes the profile afterward; no personal browser profile is used.
+
+`test:browser` also runs focused API conformance cases for Quest VR, Quest MR, and Android AR. `npm run test:wpt` runs five pinned upstream WPT files with the documented emulator harness, and `npm run test:samples` checks published Immersive Web samples. See [standards validation and limitations](docs/webxr-conformance.md) for exact coverage.
 
 Install the current Playwright desktop Chromium with `npx playwright install chromium`, then run `npm run test:browser`. To test a specific current stable build, set `WEBXR_CHROMIUM_EXECUTABLE` to a desktop Chromium / Chrome for Testing executable (not its headless shell). The original MV3 acceptance run used stable **Chrome for Testing 155.0.8059.79**; the two-profile regression passed on Playwright desktop **Chromium 156.0.8078.4**. No MV2 compatibility flags are used. Branded Chrome/Edge no longer accept the automation sideloading flags; use Chrome for Testing or Playwright Chromium for automation and Load unpacked in Chrome's UI for manual installation.
 

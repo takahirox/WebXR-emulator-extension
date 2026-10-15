@@ -1,5 +1,5 @@
 export const PRIVATE = Symbol('@@webxr-polyfill/XRRay');
-import XRRigidTransform from 'webxr-polyfill/src/api/XRRigidTransform';
+import {XRRigidTransform} from './geometry';
 import {
   vec3,
   vec4,
@@ -43,6 +43,9 @@ export default class XRRay {
       }
     }
 
+    if (![...Object.values(_origin), ...Object.values(_direction)].every(Number.isFinite)) throw new TypeError('Ray components must be finite.');
+    if (_origin.w !== 1 || _direction.w !== 0 || !Math.hypot(_direction.x, _direction.y, _direction.z)) throw new TypeError('Invalid ray origin or direction.');
+
     // Normalize direction
     const length = Math.sqrt(_direction.x * _direction.x +
       _direction.y * _direction.y + _direction.z * _direction.z) || 1;
@@ -81,7 +84,7 @@ export default class XRRay {
       this[PRIVATE].direction.y,
       this[PRIVATE].direction.z
     );
-    const axis = vec3.cross(vec3.create(), direction, z);
+    const axis = vec3.cross(vec3.create(), z, direction);
     const cosAngle = vec3.dot(direction, z);
     const rotation = mat4.create();
     if (cosAngle > -1 && cosAngle < 1) {

@@ -5,9 +5,11 @@
     synchronousXR: !!appWindow.navigator.xr,
     synchronousGlobals: ['XRSystem', 'XRSession', 'XRFrame', 'XRRay', 'XRRigidTransform'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'),
     overridesNativeXR: !!appWindow.navigator.xr && !/\[native code\]/.test(appWindow.navigator.xr.requestSession.toString()),
-    frames: 0, views: [], framebuffer: {width: 0, height: 0}, inputModes: [], viewerPosition: [], inputPositions: {}, events: {},
+    frames: 0, views: [], framebuffer: {width: 0, height: 0}, inputModes: [], viewerPosition: [], inputPositions: {}, events: {}, eventOrder: [],
     hits: 0, hitPosition: null, transientHits: 0, ended: true, errors: [],
   };
+  // This classic script runs without a gesture, unlike Playwright evaluate calls.
+  void appWindow.navigator.xr.requestSession('immersive-vr', {requiredFeatures: []}).then(session => session.end(), error => { state.startupSessionError = (error as Error).name; });
   const canvas = document.createElement('canvas');
   canvas.width = 640;
   canvas.height = 480;
@@ -22,6 +24,7 @@
       hitSource = undefined; transientSource = undefined;
       session = await appWindow.navigator.xr.requestSession(mode, {requiredFeatures: mode === 'immersive-ar' ? ['hit-test'] : []});
       state.ended = false;
+      state.eventOrder = [];
       state.frames = 0; state.views = []; state.inputModes = [];
       state.hits = 0;
       state.transientHits = 0;
@@ -38,8 +41,9 @@
         transientSource = await session.requestHitTestSourceForTransientInput({profile: 'generic-touchscreen'});
       }
       for (const type of ['selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend']) {
-        session.addEventListener(type, () => { state.events[type] = (state.events[type] || 0) + 1; });
+        session.addEventListener(type, () => { state.eventOrder.push(type); state.events[type] = (state.events[type] || 0) + 1; });
       }
+      session.addEventListener('inputsourceschange', ((event: Event & {added: unknown[]; removed: unknown[]}) => { if (event.added.length) state.eventOrder.push('added'); if (event.removed.length) state.eventOrder.push('removed'); }) as () => void);
       session.addEventListener('end', () => { state.ended = true; });
       const frame: Parameters<typeof activeSession.requestAnimationFrame>[0] = (time, xrFrame) => {
         try {
@@ -91,6 +95,6 @@
       activeSession.requestAnimationFrame(frame);
     },
     async stop() { await session?.end(); hitSource = undefined; transientSource = undefined; },
-    cancelHitTests() { hitSource?.cancel(); transientSource?.cancel(); },
+    cancelHitTests() { hitSource?.cancel(); transientSource?.cancel(); hitSource = undefined; transientSource = undefined; state.hits = 0; state.transientHits = 0; },
   };
 })();

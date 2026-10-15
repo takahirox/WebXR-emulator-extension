@@ -1,7 +1,7 @@
-import type XRFrame from 'webxr-polyfill/src/api/XRFrame';
+import type {XRFrame} from './runtime';
 export const PRIVATE = Symbol('@@webxr-polyfill/XRHitTestResult');
-import type XRRigidTransform from 'webxr-polyfill/src/api/XRRigidTransform';
-import XRSpace from 'webxr-polyfill/src/api/XRSpace';
+import {XRSpace, XRRigidTransform} from './geometry';
+
 import {
   mat4
 } from 'gl-matrix';
@@ -16,9 +16,14 @@ export default class XRHitTestResult {
     };
   }
 
+  async createAnchor() {
+    const {frame, transform} = this[PRIVATE];
+    const space = new XRSpace(frame.session, () => mat4.clone(transform.matrix));
+    return frame.createAnchor(new XRRigidTransform(), space);
+  }
+
   getPose(baseSpace: XRSpace) {
-    const space = new XRSpace();
-    space._baseMatrix = mat4.copy(mat4.create(), this[PRIVATE].transform.matrix);
+    const space = new XRSpace(this[PRIVATE].frame.session, () => mat4.clone(this[PRIVATE].transform.matrix));
     return this[PRIVATE].frame.getPose(space, baseSpace);
   }
 }

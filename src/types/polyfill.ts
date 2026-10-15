@@ -1,12 +1,12 @@
-import type XRSpace from 'webxr-polyfill/src/api/XRSpace';
-import type XRSession from 'webxr-polyfill/src/api/XRSession';
+import type {XRSpace} from '../polyfill/api/geometry';
+import type {XRSession} from '../polyfill/api/runtime';
 import type XRRay from '../polyfill/api/XRRay';
 
 export type PolyfillGlobal = Window & typeof globalThis;
-export interface SessionOptions { requiredFeatures?: string[]; optionalFeatures?: string[]; domOverlay?: {root: HTMLElement} }
+export interface SessionOptions { requiredFeatures?: string[]; optionalFeatures?: string[]; domOverlay?: {root: Element}; depthSensing?: {usagePreference: string[]; dataFormatPreference: string[]; depthTypeRequest?: string[]} }
 export interface HitTestOptions { space: XRSpace; offsetRay?: XRRay; entityTypes?: string[] }
 export interface TransientHitTestOptions { profile: string; offsetRay?: XRRay; entityTypes?: string[] }
-export interface BaseLayer { context: (WebGLRenderingContext | WebGL2RenderingContext) & {canvas: HTMLCanvasElement} }
+export interface BaseLayer { context: (WebGLRenderingContext | WebGL2RenderingContext) }
 export interface RenderState { depthNear: number; depthFar: number; inlineVerticalFieldOfView: number }
 export interface Viewport { x: number; y: number; width: number; height: number }
 export interface HitTestState { session: XRSession; space: XRSpace; offsetRay: XRRay; active: boolean }

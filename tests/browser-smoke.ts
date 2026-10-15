@@ -1,3 +1,4 @@
+import {runConformance} from './conformance';
 import ConfigurationManager from '../src/ConfigurationManager';
 import type { DeviceDefinitions } from '../src/types/contracts';
 import { readTabletPixels } from './ar-pixels';
@@ -31,8 +32,13 @@ const root = process.cwd();
 const fixture = ts.transpileModule(await readFile(path.join(root, 'tests/fixture.ts'), 'utf8'), {
   compilerOptions: {target: ts.ScriptTarget.ES2018, module: ts.ModuleKind.None},
 }).outputText;
+const threeModules = new Map<string, string>(await Promise.all(['three.module.js', 'three.core.js'].map(async name =>
+  [`/${name}`, await readFile(path.join(root, 'node_modules/three/build', name), 'utf8')] as const)));
 const server = createServer((request, response) => {
-  if (request.url === '/fixture.js') {
+  if (threeModules.has(request.url!)) {
+    response.setHeader('Content-Type', 'application/javascript');
+    response.end(threeModules.get(request.url!));
+  } else if (request.url === '/fixture.js') {
     response.setHeader('Content-Type', 'application/javascript');
     response.end(fixture);
   } else if (request.url === '/' || request.url === '/frame' || request.url === '/csp') {
@@ -76,6 +82,7 @@ try {
   assert.equal(await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state.synchronousGlobals), true, 'XR globals must exist in the first script');
   assert.equal(await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state.overridesNativeXR), true, 'the first script sees the emulator instead of native WebXR');
   assert.equal(await page.evaluate(() => !!(window as unknown as {chrome?: {runtime?: {id?: string}}}).chrome?.runtime?.id), false);
+  assert.equal(await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state.startupSessionError), 'SecurityError', 'immersive startup without user activation is rejected');
   const cdp = await context.newCDPSession(page);
   const workerVersions = new Map<string, {versionId: string; scriptURL: string; runningStatus: string}>();
   cdp.on('ServiceWorker.workerVersionUpdated', ({versions}) => {
@@ -155,6 +162,8 @@ try {
     try { await (window as unknown as SmokeWindow).navigator.xr.requestSession('immersive-ar', {requiredFeatures: []}); }
     catch (error) { return (error as DOMException).name; }
   }), 'NotSupportedError');
+  console.log('Checking Quest VR API conformance');
+  const conformance = [await runConformance(page, 'immersive-vr', false)];
   console.log('Checking inline and VR controls');
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('inline'));
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.views[0]?.eye === 'none');
@@ -433,6 +442,8 @@ try {
   assert.deepEqual(await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state.inputModes), ['screen']);
   await page.mouse.up({button: 'right'});
   await page.waitForFunction(before => (window as unknown as SmokeWindow).smoke.state.events.selectend > (before.selectend || 0), phoneEventsBeforeTouch);
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.eventOrder.includes('removed'));
+  assert.deepEqual(await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state.eventOrder), ['added', 'selectstart', 'select', 'selectend', 'removed']);
   await page.screenshot({path: path.join(root, 'test-results/ar.png')});
   console.log('Checking AR screen color, orientation, and alpha compositing');
   async function textureMode(mode: 'transparent' | 'pattern') {
@@ -515,6 +526,16 @@ try {
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-ar'));
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0);
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.stop());
+  console.log('Checking Quest MR API conformance');
+  conformance.push(await runConformance(page, 'immersive-ar', false));
+  await panel.evaluate(() => {
+    const device = document.querySelector('#deviceSelect') as HTMLSelectElement;
+    device.value = 'Generic Android Phone (ARCore)'; device.dispatchEvent(new Event('change'));
+  });
+  await eventually(() => panel.evaluate(() => (document.querySelector('#deviceSelect') as HTMLSelectElement).value), value => value === 'Generic Android Phone (ARCore)', 'phone conformance profile');
+  console.log('Checking Android AR API conformance');
+  conformance.push(await runConformance(page, 'immersive-ar', true));
+  await writeFile(path.join(root, 'test-results/webxr-conformance.json'), JSON.stringify({browser: await context.browser()!.version(), conformance}, null, 2));
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(panel.errors, [], 'no panel runtime or WebGL errors');
   assert.deepEqual(consoleErrors, [], 'no page shader, WebGL, or loader errors');
