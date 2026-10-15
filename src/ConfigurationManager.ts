@@ -1,11 +1,12 @@
 // @TODO: write json format comment
 
-import type { DeviceDefinitions } from './types/contracts';
+import type { DeviceDefinitions, ImmersiveMode } from './types/contracts';
 
 export default class ConfigurationManager {
   private _deviceDefinitions: DeviceDefinitions;
   private _deviceKey: string;
   private _stereoEffect: boolean;
+  private _questMode: ImmersiveMode = 'immersive-vr';
   private _storageKey: string;
 
   constructor(deviceDefinitions: DeviceDefinitions) {
@@ -33,7 +34,21 @@ export default class ConfigurationManager {
 
   get deviceDefinition() {
     // @TODO: throw error if deviceKey isn't valid?
-    return this._deviceDefinitions.devices[this.deviceKey];
+    return {...this._deviceDefinitions.devices[this.deviceKey], emulationMode: this.emulationMode};
+  }
+
+  get questMode() { return this._questMode; }
+
+  get emulationMode(): ImmersiveMode {
+    return this._deviceDefinitions.devices[this.deviceKey].formFactor === 'handheld'
+      ? 'immersive-ar' : this.questMode;
+  }
+
+  updateQuestMode(mode: ImmersiveMode) {
+    if (mode !== 'immersive-vr' && mode !== 'immersive-ar') return false;
+    if (mode === this._questMode) return false;
+    this._questMode = mode;
+    return true;
   }
 
   get stereoEffect() {
@@ -59,18 +74,23 @@ export default class ConfigurationManager {
   serialize() {
     return JSON.stringify({
       deviceKey: this.deviceKey,
-      stereoEffect: this.stereoEffect
+      stereoEffect: this.stereoEffect,
+      questMode: this.questMode
     });
   }
 
   deserialize(str: string) {
     if (!str) { str = '{}'; }
-    const json = JSON.parse(str) as { deviceKey?: string; stereoEffect?: boolean };
+    let json: { deviceKey?: string; stereoEffect?: boolean; questMode?: ImmersiveMode };
+    try { json = JSON.parse(str) || {}; } catch { json = {}; }
+    // Preserve the old handheld selection; removed headsets and unknown IDs use Quest.
+    if (json.deviceKey === 'Samsung Galaxy S8+ (AR)') json.deviceKey = 'Generic Android Phone (ARCore)';
     const deviceKey = this._validDeviceKey(json.deviceKey)
       ? json.deviceKey : this.defaultDeviceKey;
-    const stereoEffect = json.stereoEffect !== undefined
+    const stereoEffect = typeof json.stereoEffect === 'boolean'
       ? json.stereoEffect : this.defaultStereoEffect;
 
+    this.updateQuestMode(json.questMode === 'immersive-ar' ? 'immersive-ar' : 'immersive-vr');
     this.updateDeviceKey(deviceKey);
     this.updateStereoEffect(stereoEffect);
   }
@@ -118,6 +138,6 @@ export default class ConfigurationManager {
   // private methods
 
   _validDeviceKey(key: string | undefined): key is string {
-    return key !== undefined && this._deviceDefinitions.devices[key] !== undefined;
+    return key !== undefined && Object.prototype.hasOwnProperty.call(this._deviceDefinitions.devices, key);
   }
 }

@@ -3,6 +3,7 @@
 
     class ConfigurationManager {
         constructor(deviceDefinitions) {
+            this._questMode = 'immersive-vr';
             this._deviceDefinitions = deviceDefinitions;
             this._deviceKey = this.defaultDeviceKey;
             this._stereoEffect = this.defaultStereoEffect;
@@ -21,7 +22,20 @@
             return this._deviceKey;
         }
         get deviceDefinition() {
-            return this._deviceDefinitions.devices[this.deviceKey];
+            return { ...this._deviceDefinitions.devices[this.deviceKey], emulationMode: this.emulationMode };
+        }
+        get questMode() { return this._questMode; }
+        get emulationMode() {
+            return this._deviceDefinitions.devices[this.deviceKey].formFactor === 'handheld'
+                ? 'immersive-ar' : this.questMode;
+        }
+        updateQuestMode(mode) {
+            if (mode !== 'immersive-vr' && mode !== 'immersive-ar')
+                return false;
+            if (mode === this._questMode)
+                return false;
+            this._questMode = mode;
+            return true;
         }
         get stereoEffect() {
             return this._stereoEffect;
@@ -38,18 +52,28 @@
         serialize() {
             return JSON.stringify({
                 deviceKey: this.deviceKey,
-                stereoEffect: this.stereoEffect
+                stereoEffect: this.stereoEffect,
+                questMode: this.questMode
             });
         }
         deserialize(str) {
             if (!str) {
                 str = '{}';
             }
-            const json = JSON.parse(str);
+            let json;
+            try {
+                json = JSON.parse(str) || {};
+            }
+            catch (_a) {
+                json = {};
+            }
+            if (json.deviceKey === 'Samsung Galaxy S8+ (AR)')
+                json.deviceKey = 'Generic Android Phone (ARCore)';
             const deviceKey = this._validDeviceKey(json.deviceKey)
                 ? json.deviceKey : this.defaultDeviceKey;
-            const stereoEffect = json.stereoEffect !== undefined
+            const stereoEffect = typeof json.stereoEffect === 'boolean'
                 ? json.stereoEffect : this.defaultStereoEffect;
+            this.updateQuestMode(json.questMode === 'immersive-ar' ? 'immersive-ar' : 'immersive-vr');
             this.updateDeviceKey(deviceKey);
             this.updateStereoEffect(stereoEffect);
         }
@@ -89,7 +113,7 @@
             });
         }
         _validDeviceKey(key) {
-            return key !== undefined && this._deviceDefinitions.devices[key] !== undefined;
+            return key !== undefined && Object.prototype.hasOwnProperty.call(this._deviceDefinitions.devices, key);
         }
     }
 

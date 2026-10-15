@@ -1,3 +1,5 @@
+import ConfigurationManager from '../src/ConfigurationManager';
+import type { DeviceDefinitions } from '../src/types/contracts';
 import { readTabletPixels } from './ar-pixels';
 import { installThreeProbe } from './three-probe';
 import assert from 'node:assert/strict';
@@ -10,6 +12,19 @@ import ts from 'typescript';
 import { attachTarget, getTargets } from './cdp-target';
 import type { SmokeWindow } from './browser-types';
 
+const definitions = JSON.parse(await readFile(new URL('../src/devices.json', import.meta.url), 'utf8')) as DeviceDefinitions;
+assert.deepEqual(Object.keys(definitions.devices), ['Meta Quest 3', 'Generic Android Phone (ARCore)']);
+const configuration = new ConfigurationManager(definitions);
+for (const deviceKey of ['None', 'HTC Vive', 'Oculus Quest', 'Oculus Quest 2', 'unknown', 'toString']) {
+  configuration.deserialize(JSON.stringify({deviceKey}));
+  assert.equal(configuration.deviceKey, 'Meta Quest 3');
+  assert.equal(configuration.emulationMode, 'immersive-vr');
+}
+configuration.deserialize(JSON.stringify({deviceKey: 'Samsung Galaxy S8+ (AR)', stereoEffect: false}));
+assert.equal(configuration.deviceKey, 'Generic Android Phone (ARCore)');
+assert.equal(configuration.emulationMode, 'immersive-ar');
+configuration.deserialize('invalid JSON');
+assert.equal(configuration.deviceKey, 'Meta Quest 3');
 const executablePath = process.env.WEBXR_CHROMIUM_EXECUTABLE;
 // Defaults to the current Playwright desktop Chromium (npx playwright install chromium).
 const root = process.cwd();
@@ -103,17 +118,18 @@ try {
   const panel = await attachTarget(cdp, panelInfo!.targetId);
   attached.push(panel);
   await eventually(() => panel.evaluate(() => document.querySelector('#rightControllerPosition')?.textContent), value => !!value, 'loaded controller assets');
-  assert.equal(await panel.evaluate(() => (document.querySelector('#deviceSelect') as HTMLSelectElement).value), 'Oculus Quest');
+  assert.equal(await panel.evaluate(() => (document.querySelector('#deviceSelect') as HTMLSelectElement).value), 'Meta Quest 3');
+  assert.deepEqual(await panel.evaluate(() => Array.from((document.querySelector('#deviceSelect') as HTMLSelectElement).options, option => option.text)), ['Meta Quest 3', 'Generic Android Phone (ARCore)']);
   assert.equal(await panel.evaluate(() => document.querySelectorAll('canvas').length), 1);
   await panel.evaluate(() => {
     const select = document.querySelector('#deviceSelect') as HTMLSelectElement;
-    select.value = 'HTC Vive';
+    select.value = 'Meta Quest 3';
     select.dispatchEvent(new Event('change'));
     const checkbox = document.querySelector('#stereoCheckbox') as HTMLInputElement;
     checkbox.checked = false;
     checkbox.dispatchEvent(new Event('change'));
   });
-  await eventually(() => panel.evaluate(async () => JSON.parse((await new Promise<Record<string, unknown>>(resolve => chrome.storage.local.get('webxr-extension', result => resolve(result))))['webxr-extension'] as string) as {deviceKey: string; stereoEffect: boolean}), value => value.deviceKey === 'HTC Vive' && value.stereoEffect === false, 'configuration persistence');
+  await eventually(() => panel.evaluate(async () => JSON.parse((await new Promise<Record<string, unknown>>(resolve => chrome.storage.local.get('webxr-extension', result => resolve(result))))['webxr-extension'] as string) as {deviceKey: string; stereoEffect: boolean}), value => value.deviceKey === 'Meta Quest 3' && value.stereoEffect === false, 'configuration persistence');
   // OOPIF extension frames do not consistently run Page init scripts. Pause
   // before the local panel bundle to install the test-only observation hook.
   await panel.command('Runtime.enable', {});
@@ -130,10 +146,23 @@ try {
   await panel.command('Debugger.removeBreakpoint', {breakpointId});
   await panel.command('Debugger.resume', {});
   await panel.command('Debugger.disable', {});
-  await eventually(() => panel.evaluate(() => ({device: (document.querySelector('#deviceSelect') as HTMLSelectElement | null)?.value, stereo: (document.querySelector('#stereoCheckbox') as HTMLInputElement | null)?.checked, pose: document.querySelector('#rightControllerPosition')?.textContent})), value => value.device === 'HTC Vive' && value.stereo === false && !!value.pose, 'restored panel configuration');
-  console.log('Checking VR controls');
+  await eventually(() => panel.evaluate(() => ({device: (document.querySelector('#deviceSelect') as HTMLSelectElement | null)?.value, stereo: (document.querySelector('#stereoCheckbox') as HTMLInputElement | null)?.checked, pose: document.querySelector('#rightControllerPosition')?.textContent})), value => value.device === 'Meta Quest 3' && value.stereo === false && !!value.pose, 'restored panel configuration');
+  async function supportedModes() {
+    return page.evaluate(() => Promise.all((['inline', 'immersive-vr', 'immersive-ar'] as const).map(mode => (window as unknown as SmokeWindow).navigator.xr.isSessionSupported(mode))));
+  }
+  assert.deepEqual(await supportedModes(), [true, true, false]);
+  assert.equal(await page.evaluate(async () => {
+    try { await (window as unknown as SmokeWindow).navigator.xr.requestSession('immersive-ar', {requiredFeatures: []}); }
+    catch (error) { return (error as DOMException).name; }
+  }), 'NotSupportedError');
+  console.log('Checking inline and VR controls');
+  await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('inline'));
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.views[0]?.eye === 'none');
+  await page.evaluate(() => (window as unknown as SmokeWindow).smoke.stop());
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-vr'));
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.frames > 2);
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.views.length === 2);
+  assert.deepEqual(await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state.views.map(view => view.eye)), ['left', 'right']);
   console.log('Checking content-to-panel recovery after worker shutdown');
   await stopWorker();
   await page.evaluate(() => {
@@ -255,16 +284,91 @@ try {
   });
   await page.waitForTimeout(100);
   assert.equal(await panel.evaluate(() => document.querySelector('#headsetPosition')?.textContent), '0.25 1.70 0.00', 'reject malformed page pose');
+  console.log('Checking Quest VR/MR switching and persistence');
+  // Switch while presenting.
+  await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-vr'));
+  await panel.evaluate(() => {
+    const mode = document.querySelector('#questModeSelect') as HTMLSelectElement;
+    mode.value = 'immersive-ar'; mode.dispatchEvent(new Event('change'));
+    const stereo = document.querySelector('#stereoCheckbox') as HTMLInputElement;
+    stereo.checked = true; stereo.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.ended);
+  await eventually(() => panel.evaluate(async () => JSON.parse((await chrome.storage.local.get('webxr-extension'))['webxr-extension'] as string).questMode), mode => mode === 'immersive-ar', 'MR mode persisted');
+  await panel.evaluate(() => { location.reload(); });
+  await eventually(() => panel.evaluate(() => (document.querySelector('#questModeSelect') as HTMLSelectElement | null)?.value), mode => mode === 'immersive-ar', 'MR selection restored in panel');
+  await page.reload();
+  await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-ar'));
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0 && (window as unknown as SmokeWindow).smoke.state.views.length === 2);
+  assert.deepEqual(await supportedModes(), [true, false, true]);
+  const mr = await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state);
+  assert.deepEqual(mr.inputModes, ['tracked-pointer', 'tracked-pointer']);
+  assert(mr.views[1].x > mr.views[0].x, 'MR has separate eye poses');
+  assert(mr.views.every(view => view.projection > 0 && view.viewport.width > 0), 'MR projections and viewports are usable');
+  assert(mr.views[1].viewport.x > 0, 'MR uses stereo viewports');
+  await page.screenshot({path: path.join(root, 'test-results/quest-mr.png')});
+  await panel.evaluate(() => { (document.querySelector('#resetPoseButton') as HTMLButtonElement).click(); });
+  await page.waitForFunction(() => Math.abs((window as unknown as SmokeWindow).smoke.state.inputPositions.right?.[0] - 0.5) < 0.01);
+  await textureMode('transparent');
+  const mrRoomPixels = await page.evaluate(readTabletPixels);
+  await textureMode('pattern');
+  const mrCompositePixels = await page.evaluate(readTabletPixels);
+  assert.equal(mrRoomPixels.glError, 0);
+  assert.equal(mrCompositePixels.glError, 0);
+  for (const [actual, expected] of [[mrCompositePixels.pixels[0], [64, 128, 191, 255]], [mrCompositePixels.pixels[1], [191, 64, 32, 255]], [mrCompositePixels.pixels[3], mrRoomPixels.pixels[3]]]) {
+    expected.forEach((value, i) => assert(Math.abs(actual[i] - value) <= 4, 'MR compositor preserves app orientation, color and transparent room pixels'));
+  }
+  assert(mrRoomPixels.pixels.every(pixel => pixel.slice(0, 3).some(channel => channel > 0)), 'MR room renders in both eyes');
+  await page.screenshot({path: path.join(root, 'test-results/quest-mr-texture.png')});
+  await panel.evaluate(() => {
+    const stereo = document.querySelector('#stereoCheckbox') as HTMLInputElement;
+    stereo.checked = false; stereo.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.views[1]?.viewport.width === 0);
+  await panel.evaluate(() => {
+    const stereo = document.querySelector('#stereoCheckbox') as HTMLInputElement;
+    stereo.checked = true; stereo.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.views[1]?.viewport.x > 0);
+  const mrPanelScreenshot = await devtools.command<{data: string}>('Page.captureScreenshot', {format: 'png', clip: {x: model.content[0], y: model.content[1], width: model.width, height: model.height, scale: 1}});
+  await writeFile(path.join(root, 'test-results/panel-mr.png'), Buffer.from(mrPanelScreenshot.data, 'base64'));
+  const beforeMR = {...mr.events};
+  await panel.evaluate(() => { (document.querySelector('#rightSelectButton') as HTMLButtonElement).click(); (document.querySelector('#leftSqueezeButton') as HTMLButtonElement).click(); });
+  await page.waitForFunction(before => {
+    const events = (window as unknown as SmokeWindow).smoke.state.events;
+    return events.selectstart > (before.selectstart || 0) && events.squeezestart > (before.squeezestart || 0);
+  }, beforeMR);
+  await panel.evaluate(() => { (document.querySelector('#rightSelectButton') as HTMLButtonElement).click(); (document.querySelector('#leftSqueezeButton') as HTMLButtonElement).click(); });
+  await page.waitForFunction(before => {
+    const events = (window as unknown as SmokeWindow).smoke.state.events;
+    return events.selectend > (before.selectend || 0) && events.squeezeend > (before.squeezeend || 0);
+  }, beforeMR);
+  await panel.evaluate(() => {
+    const mode = document.querySelector('#questModeSelect') as HTMLSelectElement;
+    mode.value = 'immersive-vr'; mode.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.ended);
+  await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-vr'));
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.views.length === 2 && (window as unknown as SmokeWindow).smoke.state.inputModes.length === 2);
+  await page.screenshot({path: path.join(root, 'test-results/quest-vr.png')});
   // Closed frames must not prevent delivery to the remaining top-level document.
   await panel.evaluate(() => {
     const select = document.querySelector('#deviceSelect') as HTMLSelectElement;
-    select.value = 'Samsung Galaxy S8+ (AR)';
+    select.value = 'Generic Android Phone (ARCore)';
     select.dispatchEvent(new Event('change'));
   });
   await page.waitForTimeout(200);
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.ended);
+  await page.evaluate(() => (window as unknown as SmokeWindow).smoke.setTextureMode('default'));
   console.log('Checking AR room and hit tests');
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-ar'));
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0 && (window as unknown as SmokeWindow).smoke.state.hitPosition?.every(Number.isFinite));
+  assert.deepEqual(await supportedModes(), [true, false, true]);
+  assert.deepEqual(await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state.views.map(view => view.eye)), ['none']);
+  assert.equal(await panel.evaluate(() => document.querySelector('#leftControllerTitle')?.textContent), 'Phone');
+  assert.equal(await panel.evaluate(() => getComputedStyle(document.querySelector('#rightSelectButton')!).display), 'none');
+  const phonePanelScreenshot = await devtools.command<{data: string}>('Page.captureScreenshot', {format: 'png', clip: {x: model.content[0], y: model.content[1], width: model.width, height: model.height, scale: 1}});
+  await writeFile(path.join(root, 'test-results/panel-phone.png'), Buffer.from(phonePanelScreenshot.data, 'base64'));
   const roomTextures = await page.evaluate(() => {
     const textures = new Map<string, {loaded: boolean; flipY?: boolean; colorSpace?: string}>();
     (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!.scene.traverse(object => {
@@ -287,12 +391,14 @@ try {
   assert.equal(await page.locator('canvas').count(), 1, 'AR renderer uses the application canvas as a texture');
   const canvasBox = await page.locator('canvas').boundingBox();
   assert(canvasBox);
+  const phoneEventsBeforeTouch = await page.evaluate(() => ({...(window as unknown as SmokeWindow).smoke.state.events}));
   await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
   await page.mouse.down({button: 'right'});
-  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.transientHits > 0 && (window as unknown as SmokeWindow).smoke.state.events.selectstart > 1);
+  await page.waitForFunction(before => (window as unknown as SmokeWindow).smoke.state.transientHits > 0 && (window as unknown as SmokeWindow).smoke.state.events.selectstart > (before.selectstart || 0), phoneEventsBeforeTouch);
   const arHitCounts = await page.evaluate(() => ({persistent: (window as unknown as SmokeWindow).smoke.state.hits, transient: (window as unknown as SmokeWindow).smoke.state.transientHits}));
+  assert.deepEqual(await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state.inputModes), ['screen']);
   await page.mouse.up({button: 'right'});
-  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.events.selectend > 1);
+  await page.waitForFunction(before => (window as unknown as SmokeWindow).smoke.state.events.selectend > (before.selectend || 0), phoneEventsBeforeTouch);
   await page.screenshot({path: path.join(root, 'test-results/ar.png')});
   console.log('Checking AR screen color, orientation, and alpha compositing');
   async function textureMode(mode: 'transparent' | 'pattern') {
@@ -324,6 +430,19 @@ try {
   await page.mouse.move(canvasBox.x + canvasBox.width * 0.1 + 40, canvasBox.y + canvasBox.height * 0.1 + 15, {steps: 8});
   await page.mouse.up();
   await eventually(() => panel.evaluate(() => document.querySelector('#headsetRotation')?.textContent), value => !!value && value !== '0.00 0.00 0.00', 'AR mouse camera controls and pose notification');
+  // Exercise the actual phone transform control and its pose notification.
+  await page.evaluate(() => {
+    const {scene} = (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!;
+    scene.traverse(object => {
+      const controls = (object as import('three').Object3D & {controls?: import('three/addons/controls/TransformControls.js').TransformControls}).controls;
+      if (!controls?.object || controls.getHelper() !== object) return;
+      controls.object.position.set(0.025, 1.63, -0.2);
+      controls.object.rotation.y = 0.1;
+      controls.dispatchEvent({type: 'change'});
+    });
+  });
+  await page.waitForFunction(() => Math.abs((window as unknown as SmokeWindow).smoke.state.viewerPosition[0] - 0.025) < 0.001);
+  await eventually(() => panel.evaluate(() => document.querySelector('#leftControllerPosition')?.textContent), value => value === '0.03 1.63 -0.20', 'phone 6DoF transform notification');
   const ray = await page.evaluate(() => {
     const xrWindow = window as unknown as SmokeWindow;
     const ray = new xrWindow.XRRay(new xrWindow.XRRigidTransform({x: 1, y: 2, z: 3}));
@@ -341,11 +460,31 @@ try {
   // The selected AR device must also be restored in the reloaded document.
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-ar'));
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0);
+  // Replace an active phone presentation with Quest MR, exercising renderer disposal.
+  await panel.evaluate(() => {
+    const device = document.querySelector('#deviceSelect') as HTMLSelectElement;
+    device.value = 'Meta Quest 3'; device.dispatchEvent(new Event('change'));
+    const mode = document.querySelector('#questModeSelect') as HTMLSelectElement;
+    mode.value = 'immersive-ar'; mode.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.ended);
+  await eventually(supportedModes, modes => modes[2] && !modes[1], 'Quest MR after phone presentation');
+  await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-ar'));
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0 && (window as unknown as SmokeWindow).smoke.state.views.length === 2);
+  assert.deepEqual(await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state.inputModes), ['tracked-pointer', 'tracked-pointer']);
+  await page.evaluate(() => (window as unknown as SmokeWindow).smoke.stop());
+  // Ending before the app supplies a base layer must also release presentation.
+  await page.evaluate(async () => {
+    const session = await (window as unknown as SmokeWindow).navigator.xr.requestSession('immersive-ar', {requiredFeatures: []});
+    await session.end();
+  });
+  await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-ar'));
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0);
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.stop());
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(panel.errors, [], 'no panel runtime or WebGL errors');
   assert.deepEqual(consoleErrors, [], 'no page shader, WebGL, or loader errors');
-  console.log(JSON.stringify({browser: await context.browser()!.version(), passed: ['MV3 service worker and popup', 'worker shutdown/recovery in both directions', 'same-origin and cross-origin frames, frame removal, tab isolation', 'malformed page message rejection', 'synchronous injection with restrictive script CSP', 'real DevTools panel and assets', 'device and stereo persistence after panel reload', 'bidirectional pose messages, reset, and headset/controller gizmo drags', 'OrbitControls pointer drag', 'VR select/squeeze press and release', 'panel exit immersive', 'AR virtual room hit testing, transient touch/select, and cancellation', 'AR mouse camera movement', 'AR screen sRGB, orientation, and transparent/half-alpha/opaque texture pixels', 'XRRay rigid transform', 'page reload startup'], vrEvents: vr.events, roomPixels, compositePixels, arHitCounts, arFrames: ar.frames}, null, 2));
+  console.log(JSON.stringify({browser: await context.browser()!.version(), passed: ['MV3 service worker and popup', 'worker shutdown/recovery in both directions', 'same-origin and cross-origin frames, frame removal, tab isolation', 'malformed page message rejection', 'synchronous injection with restrictive script CSP', 'real DevTools panel and assets', 'profile migration, device/stereo persistence after panel reload', 'Quest VR/MR switching, stereo views, tracked input, mode persistence and session restart', 'inline and monoscopic phone views', 'bidirectional pose messages, reset, and headset/controller gizmo drags', 'OrbitControls pointer drag', 'VR select/squeeze press and release', 'panel exit immersive', 'AR virtual room hit testing, transient touch/select, and cancellation', 'AR mouse camera movement', 'AR screen sRGB, orientation, and transparent/half-alpha/opaque texture pixels', 'XRRay rigid transform', 'page reload startup'], vrEvents: vr.events, roomPixels, compositePixels, arHitCounts, arFrames: ar.frames}, null, 2));
 } finally {
   for (const target of attached.reverse()) await target.detach().catch(() => {});
   await context.close();
