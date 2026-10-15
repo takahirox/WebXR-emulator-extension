@@ -34068,22 +34068,21 @@ void main() {
                                 const height = renderer.domElement.height;
                                 if (renderTarget.width !== width || renderTarget.height !== height)
                                     renderTarget.setSize(width, height);
-                                renderer.setRenderTarget(renderTarget);
                                 const eyes = this.stereoEffectEnabled ? [-0.02, 0.02] : [0];
                                 const eyeCamera = tabletCamera;
                                 eyeCamera.fov = 90;
                                 eyeCamera.aspect = width / eyes.length / height;
                                 eyeCamera.updateProjectionMatrix();
-                                renderer.setScissorTest(true);
+                                renderTarget.scissorTest = true;
                                 for (let i = 0; i < eyes.length; i++) {
                                     eyeCamera.position.copy(camera.position);
                                     eyeCamera.quaternion.copy(camera.quaternion);
                                     eyeCamera.translateX(eyes[i]);
-                                    renderer.setViewport(i * width / eyes.length, 0, width / eyes.length, height);
-                                    renderer.setScissor(i * width / eyes.length, 0, width / eyes.length, height);
+                                    renderTarget.viewport.set(i * width / eyes.length, 0, width / eyes.length, height);
+                                    renderTarget.scissor.copy(renderTarget.viewport);
+                                    renderer.setRenderTarget(renderTarget);
                                     renderer.render(scene, eyeCamera);
                                 }
-                                renderer.setScissorTest(false);
                                 renderer.setRenderTarget(null);
                                 renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
                                 renderer.render(compositeScene, compositeCamera);
@@ -34112,6 +34111,7 @@ void main() {
                         const onResize = () => {
                             const width = window.innerWidth;
                             const height = window.innerHeight;
+                            renderer.setPixelRatio(window.devicePixelRatio);
                             renderer.setSize(width, height);
                             camera.aspect = width / height;
                             camera.updateProjectionMatrix();
@@ -34281,8 +34281,8 @@ void main() {
                             this._appendBaseLayerCanvasToDiv(sessionId);
                             if (session.ar) {
                                 const canvas = session.baseLayer.context.canvas;
-                                canvas.width = this.handheld ? this.resolution.width : window.innerWidth;
-                                canvas.height = this.handheld ? this.resolution.height : window.innerHeight;
+                                canvas.width = this.handheld ? this.resolution.width : this.arScene.renderer.domElement.width;
+                                canvas.height = this.handheld ? this.resolution.height : this.arScene.renderer.domElement.height;
                                 this.arScene.setCanvas(canvas);
                                 if (canvas.parentElement) {
                                     canvas.parentElement.removeChild(canvas);
@@ -34379,6 +34379,14 @@ void main() {
                         const session = this.sessions.get(sessionId);
                         const context = session.baseLayer.context;
                         const canvas = context.canvas;
+                        if (session.ar && !this.handheld && this.arScene) {
+                            const display = this.arScene.renderer.domElement;
+                            if (canvas.width !== display.width || canvas.height !== display.height) {
+                                canvas.width = display.width;
+                                canvas.height = display.height;
+                                this.arScene.setCanvas(canvas);
+                            }
+                        }
                         const near = renderState.depthNear;
                         const far = renderState.depthFar;
                         const width = canvas.width;

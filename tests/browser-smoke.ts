@@ -297,6 +297,7 @@ try {
   await eventually(() => panel.evaluate(async () => JSON.parse((await chrome.storage.local.get('webxr-extension'))['webxr-extension'] as string).questMode), mode => mode === 'immersive-ar', 'MR mode persisted');
   await panel.evaluate(() => { location.reload(); });
   await eventually(() => panel.evaluate(() => (document.querySelector('#questModeSelect') as HTMLSelectElement | null)?.value), mode => mode === 'immersive-ar', 'MR selection restored in panel');
+  await cdp.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 720, deviceScaleFactor: 2, mobile: false});
   await page.reload();
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.start('immersive-ar'));
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits > 0 && (window as unknown as SmokeWindow).smoke.state.views.length === 2);
@@ -306,6 +307,39 @@ try {
   assert(mr.views[1].x > mr.views[0].x, 'MR has separate eye poses');
   assert(mr.views.every(view => view.projection > 0 && view.viewport.width > 0), 'MR projections and viewports are usable');
   assert(mr.views[1].viewport.x > 0, 'MR uses stereo viewports');
+  async function assertMRAlignment(width: number, height: number, dpr: number) {
+    const sample = await eventually(() => page.evaluate(() => ({
+      state: (window as unknown as SmokeWindow).smoke.state,
+      room: (window as unknown as import('./browser-types').PanelProbeWindow).roomViews || [],
+    })), sample => sample.room.length === 2 && sample.room.every(eye => eye.width === width * dpr && eye.height === height * dpr)
+      && sample.state.framebuffer.width === width * dpr && sample.state.framebuffer.height === height * dpr,
+    `MR room and application buffers at ${width}x${height}, DPR ${dpr}`);
+    for (let i = 0; i < 2; i++) {
+      const room = sample.room[i];
+      const app = sample.state.views[i];
+      const expected = [i * width * dpr / 2, 0, width * dpr / 2, height * dpr];
+      assert.deepEqual(room.viewport, expected, 'room eye stays inside its physical render target');
+      assert.deepEqual(room.scissor, expected, 'room eye scissor matches its viewport');
+      assert.equal(room.scissorTest, true, 'room eyes have separate scissor regions');
+      assert.deepEqual([app.viewport.x, app.viewport.y, app.viewport.width, app.viewport.height], expected,
+        'application and room eye viewports align');
+      assert(Math.abs(room.projection - app.projection) < 0.00001, 'room and application eye projections align');
+      assert(Math.abs(app.projection - 2 * height / width) < 0.00001, 'eye projection follows the display aspect');
+    }
+    assert.equal(sample.state.ended, false, 'resize preserves the active MR session');
+  }
+  console.log('Checking MR eye alignment at DPR 2 and active-session resizing');
+  await assertMRAlignment(1280, 720, 2);
+  // Capture through CDP so Playwright does not restore its default viewport metrics.
+  const mrDPR2Screenshot = await cdp.send('Page.captureScreenshot', {format: 'png'});
+  await writeFile(path.join(root, 'test-results/quest-mr-dpr2.png'), Buffer.from(mrDPR2Screenshot.data, 'base64'));
+  // Resize the same active session from a wide display to a square display.
+  await cdp.send('Emulation.setDeviceMetricsOverride', {width: 900, height: 900, deviceScaleFactor: 2, mobile: false});
+  await assertMRAlignment(900, 900, 2);
+  const mrResizedScreenshot = await cdp.send('Page.captureScreenshot', {format: 'png'});
+  await writeFile(path.join(root, 'test-results/quest-mr-resized.png'), Buffer.from(mrResizedScreenshot.data, 'base64'));
+  await cdp.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 720, deviceScaleFactor: 1, mobile: false});
+  await assertMRAlignment(1280, 720, 1);
   await page.screenshot({path: path.join(root, 'test-results/quest-mr.png')});
   await panel.evaluate(() => { (document.querySelector('#resetPoseButton') as HTMLButtonElement).click(); });
   await page.waitForFunction(() => Math.abs((window as unknown as SmokeWindow).smoke.state.inputPositions.right?.[0] - 0.5) < 0.01);

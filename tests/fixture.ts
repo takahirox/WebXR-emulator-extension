@@ -5,7 +5,7 @@
     synchronousXR: !!appWindow.navigator.xr,
     synchronousGlobals: ['XRSystem', 'XRSession', 'XRFrame', 'XRRay', 'XRRigidTransform'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'),
     overridesNativeXR: !!appWindow.navigator.xr && !/\[native code\]/.test(appWindow.navigator.xr.requestSession.toString()),
-    frames: 0, views: [], inputModes: [], viewerPosition: [], inputPositions: {}, events: {},
+    frames: 0, views: [], framebuffer: {width: 0, height: 0}, inputModes: [], viewerPosition: [], inputPositions: {}, events: {},
     hits: 0, hitPosition: null, transientHits: 0, ended: true, errors: [],
   };
   const canvas = document.createElement('canvas');
@@ -44,10 +44,14 @@
       const frame: Parameters<typeof activeSession.requestAnimationFrame>[0] = (time, xrFrame) => {
         try {
           state.frames++;
+          state.framebuffer = {width: gl.drawingBufferWidth, height: gl.drawingBufferHeight};
           const pose = xrFrame.getViewerPose(reference);
           if (pose) state.viewerPosition = Array.from(pose.transform.matrix).slice(12, 15);
-          state.views = pose?.views.map(view => ({eye: view.eye, x: view.transform.matrix[12], projection: view.projectionMatrix[0],
-            viewport: {x: layer.getViewport(view).x, width: layer.getViewport(view).width}})) || [];
+          state.views = pose?.views.map(view => {
+            const viewport = layer.getViewport(view);
+            return {eye: view.eye, x: view.transform.matrix[12], projection: view.projectionMatrix[0],
+              viewport: {x: viewport.x, y: viewport.y, width: viewport.width, height: viewport.height}};
+          }) || [];
           state.inputModes = Array.from(activeSession.inputSources, input => input.targetRayMode);
           state.inputPositions = {};
           for (const input of activeSession.inputSources) {

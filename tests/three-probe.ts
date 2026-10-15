@@ -10,6 +10,17 @@ export function installThreeProbe() {
     // installing a production window.THREE global or importing a second copy.
     scene.onBeforeRender = (renderer, scene, camera) => {
       probeWindow.panelProbe = {renderer, scene, camera};
+      const target = renderer.getRenderTarget();
+      if (target) {
+        const gl = renderer.getContext();
+        const viewport = Array.from(gl.getParameter(gl.VIEWPORT) as Int32Array);
+        if (viewport[0] === 0) probeWindow.roomViews = [];
+        (probeWindow.roomViews ||= []).push({
+          width: target.width, height: target.height, viewport,
+          scissor: Array.from(gl.getParameter(gl.SCISSOR_BOX) as Int32Array),
+          scissorTest: gl.isEnabled(gl.SCISSOR_TEST), projection: camera.projectionMatrix.elements[0],
+        });
+      }
     };
   });
 }

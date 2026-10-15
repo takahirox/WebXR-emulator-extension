@@ -147,8 +147,8 @@ export default class EmulatedXRDevice extends XRDevice {
       this._appendBaseLayerCanvasToDiv(sessionId);
       if (session.ar) {
         const canvas = session.baseLayer!.context.canvas;
-        canvas.width = this.handheld ? this.resolution.width : window.innerWidth;
-        canvas.height = this.handheld ? this.resolution.height : window.innerHeight;
+        canvas.width = this.handheld ? this.resolution.width : this.arScene!.renderer.domElement.width;
+        canvas.height = this.handheld ? this.resolution.height : this.arScene!.renderer.domElement.height;
         this.arScene!.setCanvas(canvas);
         if (canvas.parentElement) {
           // Not sure why but this is necessary for Firefox.
@@ -254,6 +254,17 @@ export default class EmulatedXRDevice extends XRDevice {
     // guaranteed by the caller that session.baseLayer is not null
     const context = session.baseLayer!.context;
     const canvas = context.canvas;
+    if (session.ar && !this.handheld && this.arScene) {
+      // Match the MR room's physical drawing buffer before calculating views or
+      // running application rendering. Only resize when needed: resizing clears GL.
+      const display = this.arScene.renderer.domElement;
+      if (canvas.width !== display.width || canvas.height !== display.height) {
+        canvas.width = display.width;
+        canvas.height = display.height;
+        // Three.js texture storage is immutable; replace it for the new size.
+        this.arScene.setCanvas(canvas);
+      }
+    }
     const near = renderState.depthNear;
     const far = renderState.depthFar;
     const width = canvas.width;

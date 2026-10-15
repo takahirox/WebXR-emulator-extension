@@ -314,22 +314,23 @@ export default class ARScene {
         const width = renderer.domElement.width;
         const height = renderer.domElement.height;
         if (renderTarget.width !== width || renderTarget.height !== height) renderTarget.setSize(width, height);
-        renderer.setRenderTarget(renderTarget);
         const eyes = this.stereoEffectEnabled ? [-0.02, 0.02] : [0];
         const eyeCamera = tabletCamera;
         eyeCamera.fov = 90;
         eyeCamera.aspect = width / eyes.length / height;
         eyeCamera.updateProjectionMatrix();
-        renderer.setScissorTest(true);
+        renderTarget.scissorTest = true;
         for (let i = 0; i < eyes.length; i++) {
           eyeCamera.position.copy(camera.position);
           eyeCamera.quaternion.copy(camera.quaternion);
           eyeCamera.translateX(eyes[i]);
-          renderer.setViewport(i * width / eyes.length, 0, width / eyes.length, height);
-          renderer.setScissor(i * width / eyes.length, 0, width / eyes.length, height);
+          // Render target rectangles use physical pixels. Renderer setters use
+          // logical pixels and would apply the display pixel ratio a second time.
+          renderTarget.viewport.set(i * width / eyes.length, 0, width / eyes.length, height);
+          renderTarget.scissor.copy(renderTarget.viewport);
+          renderer.setRenderTarget(renderTarget);
           renderer.render(scene, eyeCamera);
         }
-        renderer.setScissorTest(false);
         renderer.setRenderTarget(null);
         renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
         renderer.render(compositeScene, compositeCamera);
@@ -370,6 +371,7 @@ export default class ARScene {
     const onResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
+      renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();

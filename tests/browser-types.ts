@@ -26,7 +26,8 @@ export interface SmokeState {
   synchronousGlobals: boolean;
   overridesNativeXR: boolean;
   frames: number;
-  views: {eye: string; x: number; projection: number; viewport: {x: number; width: number}}[];
+  views: {eye: string; x: number; projection: number; viewport: {x: number; y: number; width: number; height: number}}[];
+  framebuffer: {width: number; height: number};
   inputModes: string[];
   viewerPosition: number[];
   inputPositions: Record<string, number[]>;
@@ -39,7 +40,7 @@ export interface SmokeState {
 }
 export interface SmokeWindow {
   navigator: Omit<Navigator, 'xr'> & {xr: {isSessionSupported(mode: SessionMode): Promise<boolean>; requestSession(mode: SessionMode, options: {requiredFeatures: string[]}): Promise<Session>}};
-  XRWebGLLayer: new (session: Session, context: WebGLRenderingContext) => {getViewport(view: object): {x: number; width: number}};
+  XRWebGLLayer: new (session: Session, context: WebGLRenderingContext) => {getViewport(view: object): {x: number; y: number; width: number; height: number}};
   XRRigidTransform: new (position?: DOMPointInit) => {matrix: Float32Array};
   XRRay: new (transform?: {matrix: Float32Array}) => {origin: DOMPointReadOnly; direction: DOMPointReadOnly};
   smoke: {
@@ -52,6 +53,14 @@ export interface SmokeWindow {
 }
 
 export interface PanelProbeWindow extends Window {
+  roomViews?: {
+    width: number;
+    height: number;
+    viewport: number[];
+    scissor: number[];
+    scissorTest: boolean;
+    projection: number;
+  }[];
   panelProbe?: {
     renderer: import('three').WebGLRenderer;
     scene: import('three').Scene;
