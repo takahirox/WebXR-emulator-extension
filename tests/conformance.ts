@@ -702,44 +702,78 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) throws(() => session[method](), 'InvalidStateError', `${method} after session end`);
     check(session.inputSources.length === 0 && session.requestAnimationFrame(() => {}) === 0, 'ended input and animation lifecycle');
     if (!handheld) {
-      const controllers = await xr.navigator.xr.requestSession(mode);
-      const controllerCanvas = document.createElement('canvas'); document.body.append(controllerCanvas);
-      const context = controllerCanvas.getContext('webgl', {xrCompatible: true} as WebGLContextAttributes)!;
-      try {
-        controllers.updateRenderState({baseLayer: new xr.XRWebGLLayer(controllers, context)});
-        const next = <T>(callback: () => T): Promise<T> => new Promise((resolve, reject) => controllers.requestAnimationFrame(() => { try { resolve(callback()); } catch (error) { reject(error); } }));
-        const input = await next(() => controllers.inputSources[0]); const gamepad = input.gamepad!;
-        check(input.hand === null && gamepad.mapping === 'xr-standard' && gamepad.axes.length === 4 && gamepad.axes[0] === 0 && gamepad.axes[1] === 0 && !gamepad.buttons[2].pressed, 'Quest controller mapping, placeholder axes/buttons and absent hand');
-        check(input.profiles[0] === 'meta-quest-touch-plus', 'Quest Touch Plus profile');
-        const handlerError = new Error('Expected throwing XR onselectstart regression');
-        let starts = 0; let reported = 0;
-        const receiveError = (event: ErrorEvent) => { if (event.error === handlerError) { reported++; event.preventDefault(); } };
-        window.addEventListener('error', receiveError);
-        controllers.onselectstart = () => {
-          for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) throws(() => controllers[method](), 'InvalidStateError', `${method} rejects input event frames`);
-          starts++; throw handlerError;
-        };
+      for (let cycle = 0; cycle < 2; cycle++) {
+        const controllers = await xr.navigator.xr.requestSession(mode);
+        const retainedSources = controllers.inputSources;
+        check(retainedSources.length === 0, 'retained input collection starts empty before first frame');
+        const controllerCanvas = document.createElement('canvas'); document.body.append(controllerCanvas);
+        const context = controllerCanvas.getContext('webgl', {xrCompatible: true} as WebGLContextAttributes)!;
         try {
-          window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: true}}));
-          await Promise.race([
-            (async () => { for (let count = 0; count < 3; count++) await next(() => check(gamepad.buttons[0].pressed, 'animation continues after throwing input handler')); })(),
-            new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('Throwing handler stopped XR rendering')), 3000)),
-          ]);
-          check(starts === 1 && reported === 1, 'throwing event property reports its error and commits held input state once');
-          window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: false}}));
-          await next(() => check(!gamepad.buttons[0].pressed, 'input release continues after throwing event property'));
-        } finally { controllers.onselectstart = null; window.removeEventListener('error', receiveError); }
-        window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: true}}));
-        await next(() => check(input.gamepad === gamepad && gamepad.buttons[0].pressed && gamepad.buttons[0].value === 1, 'gamepad identity and trigger press state across frames'));
-        window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: false}}));
-        await next(() => check(!gamepad.buttons[0].pressed && gamepad.buttons[0].value === 0, 'gamepad trigger release state across frames'));
-      } finally { if (!controllers.ended) await controllers.end(); controllerCanvas.remove(); }
+          controllers.updateRenderState({baseLayer: new xr.XRWebGLLayer(controllers, context)});
+          const next = <T>(callback: () => T): Promise<T> => new Promise((resolve, reject) => controllers.requestAnimationFrame(() => { try { resolve(callback()); } catch (error) { reject(error); } }));
+          const input = await next(() => controllers.inputSources[0]); const gamepad = input.gamepad!;
+          check(retainedSources === controllers.inputSources && retainedSources instanceof xr.XRInputSourceArray && !Array.isArray(retainedSources), 'session retains a live XRInputSourceArray');
+          check(Number(retainedSources.length) === 2 && retainedSources[0] === input && [...retainedSources][1] === controllers.inputSources[1], 'saved empty collection observes controller additions and iteration');
+          check([...retainedSources.keys()].join(',') === '0,1' && [...retainedSources.values()][0] === input && [...retainedSources.entries()][1][1] === retainedSources[1], 'input collection exposes WebIDL iterator methods');
+          const receiver = {};
+          const visited: Runtime.XRInputSource[] = [];
+          retainedSources.forEach(function (this: unknown, source, index, collection) {
+            check(this === receiver && collection === retainedSources && source === retainedSources[index], 'input collection forEach arguments and receiver');
+            visited.push(source);
+          }, receiver);
+          check(visited.length === 2 && Object.keys(retainedSources).join(',') === '0,1' && (0 in retainedSources) && !(2 in retainedSources) && retainedSources[2] === undefined, 'input collection indexed property enumeration and bounds');
+          check(!Reflect.set(retainedSources, '0', null) && !Reflect.set(retainedSources, 'length', 0) && !Reflect.deleteProperty(retainedSources, '0') && !Reflect.defineProperty(retainedSources, '0', {value: null}), 'input collection rejects indexed and length mutation');
+          check(retainedSources[0] === input && Number(retainedSources.length) === 2, 'attempted mutations preserve live sources');
+          for (const button of [0, 1]) check(!gamepad.buttons[button].pressed && !gamepad.buttons[button].touched && gamepad.buttons[button].value === 0, `controller cycle ${cycle} resets trigger/squeeze state`);
+          check(input.hand === null && gamepad.mapping === 'xr-standard' && gamepad.axes.length === 4 && gamepad.axes[0] === 0 && gamepad.axes[1] === 0 && !gamepad.buttons[2].pressed, 'Quest controller mapping, placeholder axes/buttons and absent hand');
+          check(input.profiles[0] === 'meta-quest-touch-plus', 'Quest Touch Plus profile');
+          const handlerError = new Error('Expected throwing XR onselectstart regression');
+          let starts = 0; let reported = 0;
+          const receiveError = (event: ErrorEvent) => { if (event.error === handlerError) { reported++; event.preventDefault(); } };
+          window.addEventListener('error', receiveError);
+          controllers.onselectstart = () => {
+            for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) throws(() => controllers[method](), 'InvalidStateError', `${method} rejects input event frames`);
+            starts++; throw handlerError;
+          };
+          try {
+            window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: true}}));
+            await Promise.race([
+              (async () => { for (let count = 0; count < 3; count++) await next(() => check(gamepad.buttons[0].pressed, 'animation continues after throwing input handler')); })(),
+              new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('Throwing handler stopped XR rendering')), 3000)),
+            ]);
+            check(starts === 1 && reported === 1, 'throwing event property reports its error and commits held input state once');
+            window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: false}}));
+            await next(() => check(!gamepad.buttons[0].pressed, 'input release continues after throwing event property'));
+          } finally { controllers.onselectstart = null; window.removeEventListener('error', receiveError); }
+          const press = (pressed: boolean) => {
+            for (const buttonIndex of [0, 1]) window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex, pressed}}));
+          };
+          const checkButtons = (pressed: boolean, phase: string) => {
+            check(input.gamepad === gamepad, 'gamepad identity persists across frames');
+            for (const buttonIndex of [0, 1]) {
+              const button = gamepad.buttons[buttonIndex];
+              check(button.pressed === pressed && button.touched === pressed && button.value === Number(pressed), `controller cycle ${cycle} button ${buttonIndex}: ${phase} touch follows digital press`);
+            }
+          };
+          press(true);
+          await next(() => checkButtons(true, 'press'));
+          for (let frame = 0; frame < 3; frame++) await next(() => checkButtons(true, `hold frame ${frame}`));
+          press(false);
+          await next(() => checkButtons(false, 'release'));
+          // End with both buttons held to verify the next session resets them.
+          press(true);
+          await next(() => checkButtons(true, 'held at shutdown'));
+        } finally { if (!controllers.ended) await controllers.end(); controllerCanvas.remove(); }
+        check(retainedSources === controllers.inputSources && retainedSources.length === 0 && [...retainedSources].length === 0 && Object.keys(retainedSources).length === 0 && !(0 in retainedSources) && retainedSources[0] === undefined, 'saved populated collection becomes empty at shutdown');
+      }
     }
     // Exercise shutdown through real controller signals and the phone's screen
     // touch handlers. No private source maps or device callbacks are mocked.
     const shutdownHandlers = ['added', 'selectstart', 'select', 'selectend', ...(handheld ? ['removed'] : ['squeezestart', 'squeeze', 'squeezeend'])];
     for (const shutdownHandler of shutdownHandlers) {
       const inputSession = await xr.navigator.xr.requestSession(mode);
+      const retainedSources = inputSession.inputSources;
+      check(retainedSources.length === 0, 'input event session starts with empty live collection');
       const inputCanvas = document.createElement('canvas'); document.body.append(inputCanvas);
       const context = inputCanvas.getContext('webgl', {xrCompatible: true} as WebGLContextAttributes)!;
       const order: string[] = [];
@@ -759,6 +793,9 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       };
       inputSession.addEventListener('inputsourceschange', event => {
         const change = event as Runtime.XRInputSourcesChangeEvent;
+        const current = [...retainedSources];
+        check(retainedSources === inputSession.inputSources && change.added.every(source => current.includes(source)) && change.removed.every(source => !current.includes(source)), 'saved input collection reflects additions/removals before inputsourceschange');
+        if (change.removed.length) check(retainedSources.length === 0 && retainedSources[0] === undefined && !(0 in retainedSources), 'saved phone collection removes released transient input');
         record(change.added.length ? 'added' : 'removed');
       });
       for (const type of ['selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend']) {
@@ -799,6 +836,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         const pairedEnd = shutdownHandler === 'select' ? ['selectend'] : shutdownHandler === 'squeeze' ? ['squeezeend'] : [];
         check(order.slice(shutdownIndex).join(',') === [shutdownHandler, ...pairedEnd, 'end'].join(','), `shutdown from ${shutdownHandler} finishes only the current action before end`);
         check(endWasQueued && !resolvedBeforeEnd && inputSession.ended && inputSession.inputSources.length === 0 && framesAfterShutdown === 0, `shutdown from ${shutdownHandler} queues end, resolves afterward and stops frame processing`);
+        check(retainedSources === inputSession.inputSources && retainedSources.length === 0 && [...retainedSources].length === 0, `shutdown from ${shutdownHandler} empties retained input collection`);
         check(inputs.every(input => input instanceof xr.XRInputSource && input === inputs[0]), `shutdown from ${shutdownHandler} preserves valid input identity`);
       } finally {
         clearTimeout(timeout);

@@ -58,7 +58,7 @@ export class ControllerInput {
     this.handedness = gamepad.hand;
     this.timestamp = performance.now();
     this.axes = Object.freeze([...gamepad.axes]);
-    this.buttons = Object.freeze(gamepad.buttons.map((button, index) => Object.freeze(index === 2 ? {pressed: false, touched: false, value: 0} : {...button})));
-
+    // The panel supplies digital presses, without independent touch sensing.
+    this.buttons = Object.freeze(gamepad.buttons.map((button, index) => Object.freeze(index === 2 ? {pressed: false, touched: false, value: 0} : {...button, touched: button.pressed})));
   }
 }

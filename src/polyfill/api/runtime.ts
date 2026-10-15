@@ -10,6 +10,8 @@ import XRHitTestSource from './XRHitTestSource';
 import XRTransientInputHitTestSource from './XRTransientInputHitTestSource';
 import XRHitTestResult from './XRHitTestResult';
 import XRTransientInputHitTestResult from './XRTransientInputHitTestResult';
+import XRInputSourceArray from './XRInputSourceArray';
+export {XRInputSourceArray};
 
 export class XREventTarget extends EventTarget {
   _emit(event: Event) {
@@ -112,6 +114,7 @@ export class XRSession extends XREventTarget {
   private endedValue = false;
   private visibility: 'visible' | 'visible-blurred' | 'hidden' = document.hidden ? 'hidden' : 'visible';
   private sources: readonly XRInputSource[] = Object.freeze([]);
+  private readonly inputSourceArray = new XRInputSourceArray(() => this.sources);
   private signals: {type: typeof inputEvents[number]; source: DeviceInput}[] = [];
   private listeners: [string, (detail: InputSignal) => void][] = [];
   private endListener: (id: number) => void;
@@ -154,7 +157,7 @@ export class XRSession extends XREventTarget {
   get ended() { return this.endedValue; }
   get renderState() { return this.activeRenderState; }
   get visibilityState() { return this.visibility; }
-  get inputSources() { return this.ended ? Object.freeze([]) : this.sources; }
+  get inputSources() { return this.inputSourceArray; }
   private assertDepthConfiguration() { if (!this.enabledFeatures.includes('depth-sensing')) invalidState('Depth sensing was not enabled.'); }
   private assertDepthFrame() {
     this._assertLive();
@@ -327,7 +330,7 @@ export class XRFrame {
     if (_animation) {
       for (const source of session._hitSources) this.hitResults.set(source, session._device.getHitTestResults(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix))));
       for (const source of session._transientSources) {
-        const input = session.inputSources.find(input => input.targetRayMode === 'screen' && input.profiles.includes(source._profile));
+        const input = Array.from(session.inputSources).find(input => input.targetRayMode === 'screen' && input.profiles.includes(source._profile));
         const hits = session._device.getHitTestResultsForTransientInput(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix)));
         this.transientResults.set(source, input ? [new XRTransientInputHitTestResult(this, hits, input)] : []);
       }
@@ -404,7 +407,7 @@ export class XRInputSource {
   private gripWorld: mat4 | null = null;
   constructor(private session: XRSession, private raw: DeviceInput, index: number) {
     this.hand = session.enabledFeatures.includes('hand-tracking') ? new XRHand(session, index) : null;
-    const provider = (type: string) => () => session.inputSources.includes(this) ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
+    const provider = (type: string) => () => Array.from(session.inputSources).includes(this) ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
     this.targetRaySpace = new XRSpace(session, provider('target-ray')); this.grip = new XRSpace(session, provider('grip'));
   }
   _updatePose() {

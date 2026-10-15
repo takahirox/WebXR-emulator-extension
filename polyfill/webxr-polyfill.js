@@ -1836,6 +1836,43 @@ function WebXRPolyfillInjection() {
       }
   }
 
+  const providers = new WeakMap();
+  const isIndex = (key) => typeof key === 'string' && /^(0|[1-9]\d*)$/.test(key) && Number(key) < 0xffffffff;
+  const isReadonly = (key) => key === 'length' || isIndex(key);
+  class XRInputSourceArray {
+      constructor(provider) {
+          const collection = new Proxy(this, {
+              get: (target, key, receiver) => isIndex(key) ? provider()[Number(key)] : Reflect.get(target, key, receiver),
+              has: (target, key) => isIndex(key) ? Number(key) < provider().length : Reflect.has(target, key),
+              ownKeys: target => [...[...provider().keys()].map(String), ...Reflect.ownKeys(target)],
+              getOwnPropertyDescriptor: (target, key) => isIndex(key)
+                  ? (Number(key) < provider().length ? { value: provider()[Number(key)], writable: false, enumerable: true, configurable: true } : undefined)
+                  : Reflect.getOwnPropertyDescriptor(target, key),
+              set: (target, key, value, receiver) => !isReadonly(key) && Reflect.set(target, key, value, receiver),
+              defineProperty: (target, key, descriptor) => !isReadonly(key) && Reflect.defineProperty(target, key, descriptor),
+              deleteProperty: (target, key) => !isReadonly(key) && Reflect.deleteProperty(target, key),
+              preventExtensions: () => false,
+          });
+          providers.set(collection, provider);
+          return collection;
+      }
+      get length() { return providers.get(this)().length; }
+      get [Symbol.toStringTag]() { return 'XRInputSourceArray'; }
+      *values() { for (let index = 0; index < this.length; index++)
+          yield this[index]; }
+      *keys() { for (let index = 0; index < this.length; index++)
+          yield index; }
+      *entries() { for (const index of this.keys())
+          yield [index, this[index]]; }
+      forEach(callback, thisArg) {
+          if (typeof callback !== 'function')
+              throw new TypeError('Expected callback.');
+          for (const [index, value] of this.entries())
+              callback.call(thisArg, value, index, this);
+      }
+      [Symbol.iterator]() { return this.values(); }
+  }
+
   class XREventTarget extends EventTarget {
       _emit(event) {
           this.dispatchEvent(event);
@@ -1967,6 +2004,7 @@ function WebXRPolyfillInjection() {
           this.endedValue = false;
           this.visibility = document.hidden ? 'hidden' : 'visible';
           this.sources = Object.freeze([]);
+          this.inputSourceArray = new XRInputSourceArray(() => this.sources);
           this.signals = [];
           this.listeners = [];
           this.immersiveSuppressed = false;
@@ -2099,7 +2137,7 @@ function WebXRPolyfillInjection() {
       get ended() { return this.endedValue; }
       get renderState() { return this.activeRenderState; }
       get visibilityState() { return this.visibility; }
-      get inputSources() { return this.ended ? Object.freeze([]) : this.sources; }
+      get inputSources() { return this.inputSourceArray; }
       assertDepthConfiguration() { if (!this.enabledFeatures.includes('depth-sensing'))
           invalidState('Depth sensing was not enabled.'); }
       assertDepthFrame() {
@@ -2273,7 +2311,7 @@ function WebXRPolyfillInjection() {
               for (const source of session._hitSources)
                   this.hitResults.set(source, session._device.getHitTestResults(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix))));
               for (const source of session._transientSources) {
-                  const input = session.inputSources.find(input => input.targetRayMode === 'screen' && input.profiles.includes(source._profile));
+                  const input = Array.from(session.inputSources).find(input => input.targetRayMode === 'screen' && input.profiles.includes(source._profile));
                   const hits = session._device.getHitTestResultsForTransientInput(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix)));
                   this.transientResults.set(source, input ? [new XRTransientInputHitTestResult(this, hits, input)] : []);
               }
@@ -2399,7 +2437,7 @@ function WebXRPolyfillInjection() {
           this.targetWorld = null;
           this.gripWorld = null;
           this.hand = session.enabledFeatures.includes('hand-tracking') ? new XRHand(session, index) : null;
-          const provider = (type) => () => session.inputSources.includes(this) ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
+          const provider = (type) => () => Array.from(session.inputSources).includes(this) ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
           this.targetRaySpace = new XRSpace(session, provider('target-ray'));
           this.grip = new XRSpace(session, provider('grip'));
       }
@@ -2423,6 +2461,7 @@ function WebXRPolyfillInjection() {
     XREventTarget: XREventTarget,
     XRFrame: XRFrame,
     XRInputSource: XRInputSource,
+    XRInputSourceArray: XRInputSourceArray,
     XRInputSourceEvent: XRInputSourceEvent,
     XRInputSourcesChangeEvent: XRInputSourcesChangeEvent,
     XRRenderState: XRRenderState,
@@ -2495,7 +2534,7 @@ function WebXRPolyfillInjection() {
           this.handedness = gamepad.hand;
           this.timestamp = performance.now();
           this.axes = Object.freeze([...gamepad.axes]);
-          this.buttons = Object.freeze(gamepad.buttons.map((button, index) => Object.freeze(index === 2 ? { pressed: false, touched: false, value: 0 } : { ...button })));
+          this.buttons = Object.freeze(gamepad.buttons.map((button, index) => Object.freeze(index === 2 ? { pressed: false, touched: false, value: 0 } : { ...button, touched: button.pressed })));
       }
   }
 
