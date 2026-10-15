@@ -53,14 +53,14 @@ export class XRCompositionLayer extends XRLayer {
   readonly _clearOnAccess: boolean;
   _needsClear = true;
   _lastClearFrame: XRFrame | null = null;
-  private redraw = true;
+  _needsRedraw = true;
   constructor(readonly _binding: XRWebGLBinding, readonly _init: LayerInit) {
     super(); this.layout = _init.layout ?? 'mono';
     this._clearOnAccess = _init.clearOnAccess === undefined || Boolean(_init.clearOnAccess);
     const gl = _binding._gl2(); this._color = gl.createTexture()!;
     this._depth = _init.depthFormat === 0 ? null : gl.createTexture();
   }
-  get needsRedraw() { return this.redraw; }
+  get needsRedraw() { return this._needsRedraw; }
   get textureWidth() { return this._width; }
   get textureHeight() { return this._height; }
   get textureArrayLength() { return 1; }
@@ -74,7 +74,7 @@ export class XRCompositionLayer extends XRLayer {
   _allocate(width: number, height: number) {
     const gl = this._binding._gl2();
     if (width === this._width && height === this._height) return;
-    this._width = width; this._height = height; this.redraw = true; this._needsClear = true;
+    this._width = width; this._height = height; this._needsRedraw = true; this._needsClear = true;
     const texture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
     const unpackBuffer = gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) as WebGLBuffer | null;
     gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
@@ -203,11 +203,14 @@ export class XRWebGLBinding {
     this.check(layer, view._frame);
     const stereo = view.eye !== 'none'; const half = Math.floor(layer._width / 2);
     const viewport = new XRViewport(view.eye === 'right' ? half : 0, 0, stereo ? (view.eye === 'right' ? layer._width - half : half) : layer._width, layer._height);
+    layer._needsRedraw = false;
     return new XRWebGLSubImage(viewport, layer._color, layer._depth, layer._width, layer._height);
   }
   getSubImage(layer: XRQuadLayer, frame: XRFrame, eye = 'none') {
     if (!(layer instanceof XRQuadLayer) || !frameObjects.has(frame)) throw new TypeError('Expected quad layer and XRFrame.');
     if (!['none', 'left', 'right'].includes(eye)) throw new TypeError('Invalid XREye.'); this.check(layer, frame);
+    // Unlike projection access, composition access clears the flag in a task.
+    setTimeout(() => { layer._needsRedraw = false; }, 0);
     return new XRWebGLSubImage(new XRViewport(0, 0, layer._width, layer._height), layer._color, layer._depth, layer._width, layer._height);
   }
   getDepthInformation(view: XRView): never { this.assert(); view._frame._assertActive(true); return unsupported('GPU depth is not supported; request cpu-optimized depth.'); }

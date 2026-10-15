@@ -249,6 +249,49 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         return frame;
       });
       if (!handheld) {
+        const originalHands = await nextFrame(frame => [...session.inputSources].map(input => ({input, transform: frame.getJointPose(input.hand!.get('wrist'), reference)!.transform})));
+        const poseInput = (input: Runtime.XRInputSource, position: number[], quaternion: number[]) => window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: `${input.handedness}Controller`, position, quaternion}}));
+        try {
+          for (const rotated of [false, true]) for (const curled of [false, true]) {
+            const quaternion = rotated ? [0.5, 0.5, 0.5, 0.5] : [0, 0, 0, 1];
+            for (const {input} of originalHands) {
+              poseInput(input, [input.handedness === 'right' ? 0.5 : -0.5, 1.5, -1], quaternion);
+              window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: `${input.handedness}Controller`, buttonIndex: 0, pressed: curled}}));
+            }
+            await nextFrame(frame => {
+              for (const {input} of originalHands) {
+                const label = `${input.handedness} hand (curled=${curled}, rotated=${rotated})`;
+                const joints = [...input.hand!.values()];
+                const poses = joints.map(joint => frame.getJointPose(joint, reference)!.transform.matrix);
+                const wrist = poses[0]; const rotation = new xr.XRRigidTransform({}, {x: quaternion[0], y: quaternion[1], z: quaternion[2], w: quaternion[3]}).matrix;
+                check([0, 1, 2, 4, 5, 6, 8, 9, 10].every(i => Math.abs(wrist[i] - rotation[i]) < 1e-5), `${label}: wrist follows controller rotation`);
+                let aligned = true; let palmAxes = true; let tips = true;
+                for (let i = 1; i < joints.length; i++) {
+                  const tip = joints[i].jointName.endsWith('tip');
+                  const current = poses[i]; const other = poses[tip ? i - 1 : i + 1];
+                  const direction = [0, 1, 2].map(axis => tip ? current[12 + axis] - other[12 + axis] : other[12 + axis] - current[12 + axis]);
+                  const length = Math.hypot(...direction); const bone = direction.map(value => value / length);
+                  aligned &&= bone.every((value, axis) => Math.abs(value + current[8 + axis]) < 1e-5);
+                  // Project the palm's outward normal perpendicular to the bone
+                  // to check roll independently of the forward-axis assertion.
+                  const dot = bone.reduce((sum, value, axis) => sum - value * wrist[4 + axis], 0);
+                  const normal = bone.map((value, axis) => -wrist[4 + axis] - dot * value); const normalLength = Math.hypot(...normal);
+                  palmAxes &&= normal.every((value, axis) => Math.abs(value / normalLength + current[4 + axis]) < 1e-5);
+                  if (tip) tips &&= [0, 1, 2, 4, 5, 6, 8, 9, 10].every(axis => Math.abs(current[axis] - other[axis]) < 1e-5);
+                }
+                check(aligned, `${label}: every joint -Z follows its bone`);
+                check(palmAxes, `${label}: every joint -Y points outward from the palm`);
+                check(tips, `${label}: tips retain distal orientation`);
+              }
+            });
+          }
+        } finally {
+          for (const {input, transform: {position: p, orientation: q}} of originalHands) {
+            poseInput(input, [p.x, p.y + 1.6, p.z], [q.x, q.y, q.z, q.w]);
+            window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: `${input.handedness}Controller`, buttonIndex: 0, pressed: false}}));
+          }
+          await nextFrame(() => {});
+        }
         const order: string[] = [];
         for (const type of ['selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend']) {
           session.addEventListener(type, event => {
@@ -348,6 +391,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, applicationTexture);
       const projection = binding.createProjectionLayer({depthFormat: gl.DEPTH_COMPONENT24});
       const quad = peerBinding.createQuadLayer({space: reference, transform: new xr.XRRigidTransform({z: -1}), viewPixelWidth: 64, viewPixelHeight: 64, width: 1, height: 1, depthFormat: 0});
+      check(projection.needsRedraw && quad.needsRedraw, 'new projection and quad layers need redraw');
       for (const space of [null, undefined, {}, inlineSpace]) {
         throws(() => { quad.space = space as Geometry.XRSpace; }, 'TypeError', 'invalid quad space assignment');
         check(quad.space === reference, 'failed quad space assignment preserves the previous space');
@@ -361,12 +405,15 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       check(session.renderState.baseLayer === legacy, 'layer transition is pending until the next frame');
       const fbo = gl.createFramebuffer();
       await nextFrame(frame => {
+        throws(() => binding.getSubImage(quad, frame, 'invalid'), 'TypeError', 'invalid eye does not acknowledge redraw');
+        check(projection.needsRedraw && quad.needsRedraw, 'unaccessed layers retain redraw at frame start');
         check(gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) === unpackBuffer && gl.getParameter(gl.TEXTURE_BINDING_2D) === applicationTexture && gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE1, 'frame allocation preserves application unpack buffer and texture state');
         check(session.renderState.baseLayer === null && session.renderState.layers?.[0] === projection, 'composition layers clear the active legacy base layer');
         const views = frame.getViewerPose(reference)!.views;
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
         for (const view of views) {
           const image = peerBinding.getViewSubImage(projection, view);
+          check(!projection.needsRedraw, 'projection access clears redraw synchronously for each eye');
           check(gl.isTexture(image.colorTexture) && image.viewport.width > 0, 'projection subimage texture and viewport');
           gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
           gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, image.depthStencilTexture, 0);
@@ -375,10 +422,15 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
           gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
         }
         const image = binding.getSubImage(quad, frame);
+        check(quad.needsRedraw, 'quad access retains redraw synchronously');
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, null, 0);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0); gl.clearColor(1, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       });
+      check(quad.needsRedraw, 'quad redraw remains set through the microtask checkpoint');
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      check(!quad.needsRedraw && !projection.needsRedraw, 'queued quad redraw acknowledgement completes');
+      await nextFrame(() => check(!quad.needsRedraw && !projection.needsRedraw, 'subsequent frames preserve acknowledged redraw flags'));
       const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       check(pixels.some((value, index) => index % 4 === 2 && value > 200), 'projection layer is actually composited into the output');
@@ -469,6 +521,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         const width = projection.textureWidth; canvas.width += 2;
         const image = binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]);
         check(projection.textureWidth !== width && image.colorTextureWidth === gl.drawingBufferWidth, 'projection resources resize with the drawing buffer');
+        check(!projection.needsRedraw && !quad.needsRedraw, 'access acknowledges resized projection without invalidating quad');
         check(gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) === unpackBuffer && gl.getParameter(gl.TEXTURE_BINDING_2D) === applicationTexture && gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE1, 'resize preserves application unpack buffer and texture state');
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
@@ -477,6 +530,11 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       });
       canvas.width -= 2;
+      await nextFrame(frame => {
+        check(projection.needsRedraw && !quad.needsRedraw, 'frame-start resource resize invalidates only projection redraw');
+        binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]);
+        check(!projection.needsRedraw, 'resized projection redraw clears synchronously on access');
+      });
       gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null); gl.deleteBuffer(unpackBuffer); gl.bindTexture(gl.TEXTURE_2D, null); gl.deleteTexture(applicationTexture); gl.activeTexture(gl.TEXTURE0);
       session.updateRenderState({layers: [projection]});
       const sampler = gl.createSampler()!;

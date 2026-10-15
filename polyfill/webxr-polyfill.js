@@ -508,6 +508,51 @@ function WebXRPolyfillInjection() {
     return out;
   }
   var perspective = perspectiveNO;
+  function targetTo(out, eye, target, up) {
+    var eyex = eye[0],
+      eyey = eye[1],
+      eyez = eye[2],
+      upx = up[0],
+      upy = up[1],
+      upz = up[2];
+    var z0 = eyex - target[0],
+      z1 = eyey - target[1],
+      z2 = eyez - target[2];
+    var len = z0 * z0 + z1 * z1 + z2 * z2;
+    if (len > 0) {
+      len = 1 / Math.sqrt(len);
+      z0 *= len;
+      z1 *= len;
+      z2 *= len;
+    }
+    var x0 = upy * z2 - upz * z1,
+      x1 = upz * z0 - upx * z2,
+      x2 = upx * z1 - upy * z0;
+    len = x0 * x0 + x1 * x1 + x2 * x2;
+    if (len > 0) {
+      len = 1 / Math.sqrt(len);
+      x0 *= len;
+      x1 *= len;
+      x2 *= len;
+    }
+    out[0] = x0;
+    out[1] = x1;
+    out[2] = x2;
+    out[3] = 0;
+    out[4] = z1 * x2 - z2 * x1;
+    out[5] = z2 * x0 - z0 * x2;
+    out[6] = z0 * x1 - z1 * x0;
+    out[7] = 0;
+    out[8] = z0;
+    out[9] = z1;
+    out[10] = z2;
+    out[11] = 0;
+    out[12] = eyex;
+    out[13] = eyey;
+    out[14] = eyez;
+    out[15] = 1;
+    return out;
+  }
 
   function create$2() {
     var out = new ARRAY_TYPE(3);
@@ -541,6 +586,12 @@ function WebXRPolyfillInjection() {
     out[0] = x;
     out[1] = y;
     out[2] = z;
+    return out;
+  }
+  function add(out, a, b) {
+    out[0] = a[0] + b[0];
+    out[1] = a[1] + b[1];
+    out[2] = a[2] + b[2];
     return out;
   }
   function subtract(out, a, b) {
@@ -1046,14 +1097,14 @@ function WebXRPolyfillInjection() {
           this._destroyed = false;
           this._needsClear = true;
           this._lastClearFrame = null;
-          this.redraw = true;
+          this._needsRedraw = true;
           this.layout = (_a = _init.layout) !== null && _a !== void 0 ? _a : 'mono';
           this._clearOnAccess = _init.clearOnAccess === undefined || Boolean(_init.clearOnAccess);
           const gl = _binding._gl2();
           this._color = gl.createTexture();
           this._depth = _init.depthFormat === 0 ? null : gl.createTexture();
       }
-      get needsRedraw() { return this.redraw; }
+      get needsRedraw() { return this._needsRedraw; }
       get textureWidth() { return this._width; }
       get textureHeight() { return this._height; }
       get textureArrayLength() { return 1; }
@@ -1073,7 +1124,7 @@ function WebXRPolyfillInjection() {
               return;
           this._width = width;
           this._height = height;
-          this.redraw = true;
+          this._needsRedraw = true;
           this._needsClear = true;
           const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
           const unpackBuffer = gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING);
@@ -1257,6 +1308,7 @@ function WebXRPolyfillInjection() {
           const stereo = view.eye !== 'none';
           const half = Math.floor(layer._width / 2);
           const viewport = new XRViewport(view.eye === 'right' ? half : 0, 0, stereo ? (view.eye === 'right' ? layer._width - half : half) : layer._width, layer._height);
+          layer._needsRedraw = false;
           return new XRWebGLSubImage(viewport, layer._color, layer._depth, layer._width, layer._height);
       }
       getSubImage(layer, frame, eye = 'none') {
@@ -1265,6 +1317,7 @@ function WebXRPolyfillInjection() {
           if (!['none', 'left', 'right'].includes(eye))
               throw new TypeError('Invalid XREye.');
           this.check(layer, frame);
+          setTimeout(() => { layer._needsRedraw = false; }, 0);
           return new XRWebGLSubImage(new XRViewport(0, 0, layer._width, layer._height), layer._color, layer._depth, layer._width, layer._height);
       }
       getDepthInformation(view) { this.assert(); view._frame._assertActive(true); return unsupported('GPU depth is not supported; request cpu-optimized depth.'); }
@@ -1485,7 +1538,10 @@ function WebXRPolyfillInjection() {
                   const joint = index <= 4 ? index : 1 + (index - 5) % 5;
                   const side = gamepad.hand === 'left' ? -1 : 1;
                   const curled = gamepad.buttons[0].pressed;
-                  return translate(matrix, matrix, [(finger - 2) * 0.019 * side, curled ? -joint * 0.009 : 0, -0.025 - joint * (curled ? 0.008 : 0.025)]);
+                  const position = (bone) => fromValues((finger - 2) * 0.019 * side, curled ? -bone * 0.009 : 0, -0.025 - bone * (curled ? 0.008 : 0.025));
+                  const origin = position(joint);
+                  const target = name.endsWith('tip') ? add(create$2(), origin, subtract(create$2(), origin, position(joint - 1))) : position(joint + 1);
+                  return multiply(matrix, matrix, targetTo(create$3(), origin, target, [0, 1, 0]));
               }));
           }
       }

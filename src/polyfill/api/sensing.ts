@@ -44,7 +44,12 @@ export class XRHand implements Iterable<[string, XRJointSpace]> {
         const joint = index <= 4 ? index : 1 + (index - 5) % 5;
         const side = gamepad.hand === 'left' ? -1 : 1;
         const curled = gamepad.buttons[0].pressed;
-        return mat4.translate(matrix, matrix, [(finger - 2) * 0.019 * side, curled ? -joint * 0.009 : 0, -0.025 - joint * (curled ? 0.008 : 0.025)]);
+        const position = (bone: number): vec3 => vec3.fromValues((finger - 2) * 0.019 * side, curled ? -bone * 0.009 : 0, -0.025 - bone * (curled ? 0.008 : 0.025));
+        const origin = position(joint);
+        // -Z follows the outgoing bone; tips continue the distal bone. The
+        // palm's +Y fixes roll, keeping -Y outward from the palm's skin.
+        const target = name.endsWith('tip') ? vec3.add(vec3.create(), origin, vec3.subtract(vec3.create(), origin, position(joint - 1))) : position(joint + 1);
+        return mat4.multiply(matrix, matrix, mat4.targetTo(mat4.create(), origin, target, [0, 1, 0]));
       }));
     }
   }
