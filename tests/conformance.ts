@@ -28,6 +28,54 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       let error: unknown; try { operation(); } catch (caught) { error = caught; }
       check(error instanceof Error && error.name === name, `${label}: ${name} (got ${String(error)})`);
     }
+    // Exercise the installed Three.js client, including its projection-layer path
+    // for sessions that did not request the layers feature.
+    const threeUrl = '/three.module.js'; const three = await import(threeUrl) as typeof import('three');
+    for (const withLayers of [false, true]) {
+      const client = await xr.navigator.xr.requestSession(mode, {requiredFeatures: ['local-floor', ...(withLayers ? ['layers'] : [])]});
+      const renderer = new three.WebGLRenderer({antialias: false, preserveDrawingBuffer: true});
+      renderer.setSize(640, 480); renderer.xr.enabled = true; document.body.append(renderer.domElement);
+      const geometry = new three.BoxGeometry(0.5, 0.5, 0.5); const material = new three.MeshBasicMaterial({color: 0xff0000});
+      const mesh = new three.Mesh(geometry, material); const scene = new three.Scene(); scene.add(mesh); scene.background = new three.Color(0x0000ff);
+      try {
+        await renderer.xr.setSession(client as unknown as XRSession);
+        const layer = renderer.xr.getBaseLayer() as unknown as Layers.XRProjectionLayer;
+        const size = renderer.getDrawingBufferSize(new three.Vector2());
+        check(layer instanceof xr.XRProjectionLayer && layer.textureWidth > 0 && layer.textureHeight > 0 && size.x === layer.textureWidth && size.y === layer.textureHeight, `Three.js initializes usable projection dimensions (layers=${withLayers})`);
+        if (!withLayers) {
+          check(!client.enabledFeatures.includes('layers'), 'projection rendering does not implicitly enable layers');
+          const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
+          const space = await client.requestReferenceSpace('local-floor');
+          throws(() => binding.createQuadLayer({space, viewPixelWidth: 32, viewPixelHeight: 32}), 'NotSupportedError', 'quad creation still requires layers');
+          const second = binding.createProjectionLayer();
+          throws(() => client.updateRenderState({layers: [layer, second]}), 'NotSupportedError', 'multiple projections still require layers'); second.destroy();
+        }
+        await new Promise<void>((resolve, reject) => {
+          let frames = 0;
+          const timeout = setTimeout(() => { renderer.setAnimationLoop(null); reject(new Error('Three.js XR frames did not complete')); }, 15000);
+          renderer.setAnimationLoop((_time, frame) => {
+            if (!frame) return;
+            try {
+              const pose = frame.getViewerPose(renderer.xr.getReferenceSpace()!)!;
+              mesh.position.set(0, 0, -2).applyMatrix4(new three.Matrix4().fromArray(pose.transform.matrix));
+              renderer.render(scene, new three.PerspectiveCamera());
+              const target = renderer.getRenderTarget()!;
+              check(target.width > 0 && target.height > 0, `Three.js render target remains usable (layers=${withLayers})`);
+              const gl = renderer.getContext();
+              check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE, `Three.js color and depth attachments have matching dimensions (layers=${withLayers})`);
+              if (++frames === 3) { renderer.setAnimationLoop(null); clearTimeout(timeout); resolve(); }
+            } catch (error) { renderer.setAnimationLoop(null); clearTimeout(timeout); reject(error); }
+          });
+        });
+        const gl = renderer.getContext(); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+        gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const red = pixels.filter((v, i) => i % 4 === 0 && v > 200).length; const blue = pixels.filter((v, i) => i % 4 === 2 && v > 200).length;
+        // Three.js deliberately clears the background to transparent for AR.
+        check(red > 0 && (mode === 'immersive-ar' || blue > 0), `Three.js mesh reaches the presentation canvas with the mode's background (layers=${withLayers})`);
+        check(gl.getError() === gl.NO_ERROR, `Three.js projection rendering has no GL errors (layers=${withLayers})`);
+      } finally { renderer.setAnimationLoop(null); if (!client.ended) await client.end(); renderer.dispose(); geometry.dispose(); material.dispose(); renderer.domElement.remove(); }
+    }
     check(['XRSystem', 'XRSession', 'XRFrame', 'XRSpace', 'XRReferenceSpace', 'XRRigidTransform', 'XRWebGLLayer', 'XRWebGLBinding', 'XRAnchor', 'XRHand', 'XRJointPose', 'XRCPUDepthInformation', 'XRLightProbe'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'), 'public constructors installed');
     await rejects(() => xr.navigator.xr.isSessionSupported('invalid' as SessionMode), 'TypeError', 'invalid support mode');
     await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['unbounded']}), 'NotSupportedError', 'unimplemented reference space required');
@@ -113,6 +161,16 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       await gl.makeXRCompatible();
       const legacy = new xr.XRWebGLLayer(session, gl); session.updateRenderState({baseLayer: legacy});
       function nextFrame<T>(callback: (frame: Runtime.XRFrame) => T): Promise<T> { return new Promise((resolve, reject) => session.requestAnimationFrame((_time, frame) => { try { resolve(callback(frame)); } catch (error) { reject(error); } })); }
+      const depthEnabled = session.enabledFeatures.includes('depth-sensing');
+      if (!depthEnabled) for (const property of ['depthUsage', 'depthDataFormat', 'depthType', 'depthActive'] as const) throws(() => session[property], 'InvalidStateError', `unconfigured ${property}`);
+      for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) {
+        throws(() => session[method](), 'InvalidStateError', `${method} outside animation frame`);
+        await nextFrame(() => {
+          if (depthEnabled) { session[method](); session[method](); check(session.depthActive === (method === 'resumeDepthSensing'), `${method} is effective and idempotent in a frame`); }
+          else throws(() => session[method](), 'NotSupportedError', `${method} without feature in active frame`);
+        });
+        throws(() => session[method](), 'InvalidStateError', `${method} after animation frame`);
+      }
       let savedFrame!: Runtime.XRFrame;
       const sequence: number[] = [];
       const cancelled = session.requestAnimationFrame(() => sequence.push(99)); session.cancelAnimationFrame(cancelled);
@@ -207,18 +265,26 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         hit.cancel(); transient.cancel();
         throws(() => hit.cancel(), 'InvalidStateError', 'repeated hit cancellation');
         await nextFrame(frame => throws(() => frame.getHitTestResults(hit), 'InvalidStateError', 'cancelled hit source on later frame'));
-        session.pauseDepthSensing(); await nextFrame(frame => check(frame.getDepthInformation(frame.getViewerPose(reference)!.views[0]) === null, 'paused depth sensing')); session.resumeDepthSensing();
+        await nextFrame(() => session.pauseDepthSensing());
+        await nextFrame(frame => { check(frame.getDepthInformation(frame.getViewerPose(reference)!.views[0]) === null, 'paused depth sensing persists across frames'); session.resumeDepthSensing(); });
+        await nextFrame(frame => check(frame.getDepthInformation(frame.getViewerPose(reference)!.views[0]) !== null, 'resumed depth sensing returns data'));
       }
       // Exercise real texture allocation, subimages and the compositor, then return to legacy.
       const binding = new xr.XRWebGLBinding(session, gl);
+      const unpackBuffer = gl.createBuffer(); const applicationTexture = gl.createTexture();
+      gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, unpackBuffer); gl.bufferData(gl.PIXEL_UNPACK_BUFFER, 16, gl.STATIC_DRAW);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, applicationTexture);
       const projection = binding.createProjectionLayer({depthFormat: gl.DEPTH_COMPONENT24});
       const quad = binding.createQuadLayer({space: reference, transform: new xr.XRRigidTransform({z: -1}), viewPixelWidth: 64, viewPixelHeight: 64, width: 1, height: 1, depthFormat: 0});
+      check(projection.textureWidth > 0 && projection.textureHeight > 0 && quad.textureWidth === 64 && quad.textureHeight === 64, 'layer dimensions initialized before the first frame');
+      check(gl.getError() === gl.NO_ERROR && gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) === unpackBuffer && gl.getParameter(gl.TEXTURE_BINDING_2D) === applicationTexture && gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE1, 'initial allocation preserves application unpack buffer and texture state');
       throws(() => binding.createProjectionLayer({textureType: 'texture-array'}), 'NotSupportedError', 'unsupported layer texture array');
       throws(() => session.updateRenderState({baseLayer: legacy, layers: [projection]}), 'NotSupportedError', 'one update cannot supply both layer properties');
       session.updateRenderState({layers: [projection, quad]});
       check(session.renderState.baseLayer === legacy, 'layer transition is pending until the next frame');
       const fbo = gl.createFramebuffer();
       await nextFrame(frame => {
+        check(gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) === unpackBuffer && gl.getParameter(gl.TEXTURE_BINDING_2D) === applicationTexture && gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE1, 'frame allocation preserves application unpack buffer and texture state');
         check(session.renderState.baseLayer === null && session.renderState.layers?.[0] === projection, 'composition layers clear the active legacy base layer');
         const views = frame.getViewerPose(reference)!.views;
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -226,10 +292,13 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
           const image = binding.getViewSubImage(projection, view);
           check(gl.isTexture(image.colorTexture) && image.viewport.width > 0, 'projection subimage texture and viewport');
           gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, image.depthStencilTexture, 0);
+          check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE && gl.getError() === gl.NO_ERROR, 'resized layer color and depth attachments are complete with an application unpack buffer');
           gl.viewport(image.viewport.x, image.viewport.y, image.viewport.width, image.viewport.height);
           gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
         }
         const image = binding.getSubImage(quad, frame);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, null, 0);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0); gl.clearColor(1, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       });
@@ -237,6 +306,21 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       check(pixels.some((value, index) => index % 4 === 2 && value > 200), 'projection layer is actually composited into the output');
       check(pixels.some((value, index) => index % 4 === 0 && value > 200), 'quad layer is actually composited into the output');
+      await nextFrame(frame => {
+        // Resize during the callback so MR's frame-start sizing cannot undo it
+        // before getViewSubImage exercises reallocation.
+        const width = projection.textureWidth; canvas.width += 2;
+        const image = binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]);
+        check(projection.textureWidth !== width && image.colorTextureWidth === gl.drawingBufferWidth, 'projection resources resize with the drawing buffer');
+        check(gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) === unpackBuffer && gl.getParameter(gl.TEXTURE_BINDING_2D) === applicationTexture && gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE1, 'resize preserves application unpack buffer and texture state');
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, image.depthStencilTexture, 0);
+        check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE && gl.getError() === gl.NO_ERROR, 'resizing with an application unpack buffer allocates complete color and depth attachments');
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      });
+      canvas.width -= 2;
+      gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null); gl.deleteBuffer(unpackBuffer); gl.bindTexture(gl.TEXTURE_2D, null); gl.deleteTexture(applicationTexture); gl.activeTexture(gl.TEXTURE0);
       session.updateRenderState({layers: [projection]});
       const sampler = gl.createSampler()!;
       gl.samplerParameteri(sampler, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
@@ -287,6 +371,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     check(!overlay.hasAttribute('style') && session.domOverlayState === null, 'unsupported overlay leaves DOM unchanged');
     await rejects(() => session.requestReferenceSpace('viewer'), 'InvalidStateError', 'ended reference space request');
     await rejects(() => session.end(), 'InvalidStateError', 'repeated session end');
+    for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) throws(() => session[method](), 'InvalidStateError', `${method} after session end`);
     check(session.inputSources.length === 0 && session.requestAnimationFrame(() => {}) === 0, 'ended input and animation lifecycle');
     if (!handheld) {
       const controllers = await xr.navigator.xr.requestSession(mode);
@@ -302,7 +387,10 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         let starts = 0; let reported = 0;
         const receiveError = (event: ErrorEvent) => { if (event.error === handlerError) { reported++; event.preventDefault(); } };
         window.addEventListener('error', receiveError);
-        controllers.onselectstart = () => { starts++; throw handlerError; };
+        controllers.onselectstart = () => {
+          for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) throws(() => controllers[method](), 'InvalidStateError', `${method} rejects input event frames`);
+          starts++; throw handlerError;
+        };
         try {
           window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: true}}));
           await Promise.race([

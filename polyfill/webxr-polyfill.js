@@ -1066,19 +1066,26 @@ function WebXRPolyfillInjection() {
           this._height = height;
           this.redraw = true;
           const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
-          gl.bindTexture(gl.TEXTURE_2D, this._color);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-          for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER])
-              gl.texParameteri(gl.TEXTURE_2D, parameter, gl.LINEAR);
-          for (const parameter of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T])
-              gl.texParameteri(gl.TEXTURE_2D, parameter, gl.CLAMP_TO_EDGE);
-          if (this._depth) {
-              gl.bindTexture(gl.TEXTURE_2D, this._depth);
-              gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+          const unpackBuffer = gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING);
+          gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
+          try {
+              gl.bindTexture(gl.TEXTURE_2D, this._color);
+              gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
               for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER])
-                  gl.texParameteri(gl.TEXTURE_2D, parameter, gl.NEAREST);
+                  gl.texParameteri(gl.TEXTURE_2D, parameter, gl.LINEAR);
+              for (const parameter of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T])
+                  gl.texParameteri(gl.TEXTURE_2D, parameter, gl.CLAMP_TO_EDGE);
+              if (this._depth) {
+                  gl.bindTexture(gl.TEXTURE_2D, this._depth);
+                  gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+                  for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER])
+                      gl.texParameteri(gl.TEXTURE_2D, parameter, gl.NEAREST);
+              }
           }
-          gl.bindTexture(gl.TEXTURE_2D, texture);
+          finally {
+              gl.bindTexture(gl.TEXTURE_2D, texture);
+              gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, unpackBuffer);
+          }
       }
   }
   class XRProjectionLayer extends XRCompositionLayer {
@@ -1146,7 +1153,6 @@ function WebXRPolyfillInjection() {
           invalidState('WebGL context is lost.'); }
       validate(init) {
           this.assert();
-          this._session._require('layers');
           const gl = this._gl2();
           if (init.textureType && !['texture', 'texture-array'].includes(init.textureType))
               throw new TypeError('Invalid XRTextureType.');
@@ -1166,11 +1172,12 @@ function WebXRPolyfillInjection() {
           if (init.scaleFactor !== undefined && (!Number.isFinite(init.scaleFactor) || init.scaleFactor <= 0))
               throw new TypeError('scaleFactor must be positive.');
           const layer = new XRProjectionLayer(this, { ...init, layout: this._session._device.handheld ? 'mono' : 'stereo-left-right' });
-          this.layers.add(layer);
+          this.initialize(layer);
           return layer;
       }
       createQuadLayer(init) {
           var _a, _b;
+          this._session._require('layers');
           this.validate(init);
           this._session._owns(init.space);
           if (init.layout && init.layout !== 'mono')
@@ -1185,8 +1192,18 @@ function WebXRPolyfillInjection() {
           if (((_a = init.width) !== null && _a !== void 0 ? _a : 1) <= 0 || ((_b = init.height) !== null && _b !== void 0 ? _b : 1) <= 0)
               throw new TypeError('Quad physical dimensions must be positive.');
           const layer = new XRQuadLayer(this, init);
-          this.layers.add(layer);
+          this.initialize(layer);
           return layer;
+      }
+      initialize(layer) {
+          try {
+              this.allocate(layer);
+              this.layers.add(layer);
+          }
+          catch (error) {
+              layer.destroy();
+              throw error;
+          }
       }
       createCylinderLayer() { return unsupported('Cylinder layers are not implemented.'); }
       createEquirectLayer() { return unsupported('Equirectangular layers are not implemented.'); }
@@ -1206,8 +1223,9 @@ function WebXRPolyfillInjection() {
           const gl = this._gl2();
           const scale = Math.min(1, (_a = layer._init.scaleFactor) !== null && _a !== void 0 ? _a : 1);
           const maximum = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-          const width = layer instanceof XRProjectionLayer ? Math.max(2, Math.floor(gl.drawingBufferWidth * scale)) : layer._init.viewPixelWidth;
-          const height = layer instanceof XRProjectionLayer ? Math.max(1, Math.floor(gl.drawingBufferHeight * scale)) : layer._init.viewPixelHeight;
+          const size = layer instanceof XRProjectionLayer && layer._width === 0 ? this._session._device.getRecommendedFramebufferSize(this._session._id) : { width: gl.drawingBufferWidth, height: gl.drawingBufferHeight };
+          const width = layer instanceof XRProjectionLayer ? Math.max(2, Math.floor(size.width * scale)) : layer._init.viewPixelWidth;
+          const height = layer instanceof XRProjectionLayer ? Math.max(1, Math.floor(size.height * scale)) : layer._init.viewPixelHeight;
           if (width > maximum || height > maximum)
               unsupported('Layer exceeds MAX_TEXTURE_SIZE.');
           layer._allocate(width, height);
@@ -1851,6 +1869,7 @@ function WebXRPolyfillInjection() {
           this.nextCallback = 0;
           this.frameHandle = 0;
           this.currentCallbacks = null;
+          this.animationFrame = null;
           this.pendingRenderState = null;
           this.presentation = null;
           this.endedValue = false;
@@ -1934,6 +1953,7 @@ function WebXRPolyfillInjection() {
               const callbacks = this.currentCallbacks = this.callbacks;
               this.callbacks = new Map();
               frame._active = true;
+              this.animationFrame = frame;
               try {
                   for (const [id, callback] of callbacks) {
                       if (this.ended)
@@ -1951,6 +1971,7 @@ function WebXRPolyfillInjection() {
               }
               finally {
                   frame._active = false;
+                  this.animationFrame = null;
                   this.currentCallbacks = null;
                   if (!this.ended)
                       this._device.onFrameEnd(this._id);
@@ -1978,12 +1999,21 @@ function WebXRPolyfillInjection() {
       get renderState() { return this.activeRenderState; }
       get visibilityState() { return this.visibility; }
       get inputSources() { return this.ended ? Object.freeze([]) : this.sources; }
-      get depthUsage() { this._require('depth-sensing'); return 'cpu-optimized'; }
-      get depthDataFormat() { this._require('depth-sensing'); return 'float32'; }
-      get depthType() { this._require('depth-sensing'); return 'smooth'; }
-      get depthActive() { this._require('depth-sensing'); return this.depthRunning; }
-      pauseDepthSensing() { this._require('depth-sensing'); this.depthRunning = false; }
-      resumeDepthSensing() { this._require('depth-sensing'); this.depthRunning = true; }
+      assertDepthConfiguration() { if (!this.enabledFeatures.includes('depth-sensing'))
+          invalidState('Depth sensing was not enabled.'); }
+      assertDepthFrame() {
+          var _a;
+          this._assertLive();
+          if (!((_a = this.animationFrame) === null || _a === void 0 ? void 0 : _a._active))
+              invalidState('Depth sensing can only be changed during an active animation frame.');
+          this._require('depth-sensing');
+      }
+      get depthUsage() { this.assertDepthConfiguration(); return 'cpu-optimized'; }
+      get depthDataFormat() { this.assertDepthConfiguration(); return 'float32'; }
+      get depthType() { this.assertDepthConfiguration(); return 'smooth'; }
+      get depthActive() { this.assertDepthConfiguration(); return this.depthRunning; }
+      pauseDepthSensing() { this.assertDepthFrame(); this.depthRunning = false; }
+      resumeDepthSensing() { this.assertDepthFrame(); this.depthRunning = true; }
       get preferredReflectionFormat() { return 'srgba8'; }
       get persistentAnchors() { return Object.freeze([]); }
       async restorePersistentAnchor(_uuid) { this._require('anchors'); return unsupported('Persistent anchors are not simulated.'); }
@@ -2038,7 +2068,8 @@ function WebXRPolyfillInjection() {
           if (init.baseLayer && (!(init.baseLayer instanceof XRWebGLLayer$1) || init.baseLayer._session !== this))
               invalidState('Layer belongs to a different session.');
           if (init.layers !== undefined && init.layers !== null) {
-              this._require('layers');
+              if (!this.enabledFeatures.includes('layers') && (init.layers.length > 1 || init.layers.some(layer => !(layer instanceof XRProjectionLayer))))
+                  unsupported('Only a single projection layer is supported without the layers feature.');
               if (new Set(init.layers).size !== init.layers.length)
                   throw new TypeError('Duplicate composition layers.');
               for (const layer of init.layers)
@@ -29630,6 +29661,16 @@ void main() {
           this.hitTestResultsForTransientInput = new Map();
           this._initializeControllers(config);
           this._setupEventListeners();
+      }
+      getRecommendedFramebufferSize(sessionId) {
+          const session = this.sessions.get(sessionId);
+          if (session.ar) {
+              if (this.handheld)
+                  return { ...this.resolution };
+              const display = this.arScene.renderer.domElement;
+              return { width: display.width, height: display.height };
+          }
+          return { width: window.innerWidth, height: window.innerHeight };
       }
       onBaseLayerSet(sessionId, layer) {
           const session = this.sessions.get(sessionId);

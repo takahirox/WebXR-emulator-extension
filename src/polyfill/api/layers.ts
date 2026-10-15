@@ -67,16 +67,22 @@ export class XRCompositionLayer extends XRLayer {
     if (width === this._width && height === this._height) return;
     this._width = width; this._height = height; this.redraw = true;
     const texture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
-    gl.bindTexture(gl.TEXTURE_2D, this._color);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, parameter, gl.LINEAR);
-    for (const parameter of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, parameter, gl.CLAMP_TO_EDGE);
-    if (this._depth) {
-      gl.bindTexture(gl.TEXTURE_2D, this._depth);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
-      for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, parameter, gl.NEAREST);
+    const unpackBuffer = gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) as WebGLBuffer | null;
+    gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
+    try {
+      gl.bindTexture(gl.TEXTURE_2D, this._color);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, parameter, gl.LINEAR);
+      for (const parameter of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, parameter, gl.CLAMP_TO_EDGE);
+      if (this._depth) {
+        gl.bindTexture(gl.TEXTURE_2D, this._depth);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+        for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, parameter, gl.NEAREST);
+      }
+    } finally {
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, unpackBuffer);
     }
-    gl.bindTexture(gl.TEXTURE_2D, texture);
   }
 }
 export class XRProjectionLayer extends XRCompositionLayer {
@@ -120,7 +126,7 @@ export class XRWebGLBinding {
   _gl2(): GL { if (!(this._context instanceof WebGL2RenderingContext)) unsupported('Simulated composition layers require WebGL2.'); return this._context as GL; }
   private assert() { this._session._assertLive(); if (this._context.isContextLost()) invalidState('WebGL context is lost.'); }
   private validate(init: LayerInit) {
-    this.assert(); this._session._require('layers'); const gl = this._gl2();
+    this.assert(); const gl = this._gl2();
     if (init.textureType && !['texture', 'texture-array'].includes(init.textureType)) throw new TypeError('Invalid XRTextureType.');
     if (init.textureType === 'texture-array') unsupported('Only 2D textures are implemented.');
     if (init.colorFormat !== undefined && !([gl.RGBA, gl.RGBA8] as number[]).includes(init.colorFormat)) unsupported('Only RGBA8 color textures are implemented.');
@@ -131,16 +137,21 @@ export class XRWebGLBinding {
   createProjectionLayer(init: LayerInit = {}) {
     this.validate(init);
     if (init.scaleFactor !== undefined && (!Number.isFinite(init.scaleFactor) || init.scaleFactor <= 0)) throw new TypeError('scaleFactor must be positive.');
-    const layer = new XRProjectionLayer(this, {...init, layout: this._session._device.handheld ? 'mono' : 'stereo-left-right'}); this.layers.add(layer); return layer;
+    const layer = new XRProjectionLayer(this, {...init, layout: this._session._device.handheld ? 'mono' : 'stereo-left-right'});
+    this.initialize(layer); return layer;
   }
   createQuadLayer(init: LayerInit & {space: XRSpace}) {
-    this.validate(init); this._session._owns(init.space);
+    this._session._require('layers'); this.validate(init); this._session._owns(init.space);
     if (init.layout && init.layout !== 'mono') unsupported('Only mono quad layers are implemented.');
     if (!(init.space instanceof XRSpace)) throw new TypeError('Expected XRSpace.');
     for (const value of [init.viewPixelWidth, init.viewPixelHeight]) if (value === undefined || !Number.isInteger(value) || value <= 0) throw new TypeError('Quad pixel dimensions must be positive integers.');
     if (init.transform && !(init.transform instanceof XRRigidTransform)) throw new TypeError('Expected XRRigidTransform.');
     if ((init.width ?? 1) <= 0 || (init.height ?? 1) <= 0) throw new TypeError('Quad physical dimensions must be positive.');
-    const layer = new XRQuadLayer(this, init); this.layers.add(layer); return layer;
+    const layer = new XRQuadLayer(this, init); this.initialize(layer); return layer;
+  }
+  private initialize(layer: XRCompositionLayer) {
+    try { this.allocate(layer); this.layers.add(layer); }
+    catch (error) { layer.destroy(); throw error; }
   }
   createCylinderLayer(): never { return unsupported('Cylinder layers are not implemented.'); }
   createEquirectLayer(): never { return unsupported('Equirectangular layers are not implemented.'); }
@@ -154,8 +165,11 @@ export class XRWebGLBinding {
   private allocate(layer: XRCompositionLayer) {
     const gl = this._gl2(); const scale = Math.min(1, layer._init.scaleFactor ?? 1);
     const maximum = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
-    const width = layer instanceof XRProjectionLayer ? Math.max(2, Math.floor(gl.drawingBufferWidth * scale)) : layer._init.viewPixelWidth!;
-    const height = layer instanceof XRProjectionLayer ? Math.max(1, Math.floor(gl.drawingBufferHeight * scale)) : layer._init.viewPixelHeight!;
+    // Clients size their render targets immediately. Use the presentation size
+    // before the device has resized the application's canvas on its first frame.
+    const size = layer instanceof XRProjectionLayer && layer._width === 0 ? this._session._device.getRecommendedFramebufferSize(this._session._id) : {width: gl.drawingBufferWidth, height: gl.drawingBufferHeight};
+    const width = layer instanceof XRProjectionLayer ? Math.max(2, Math.floor(size.width * scale)) : layer._init.viewPixelWidth!;
+    const height = layer instanceof XRProjectionLayer ? Math.max(1, Math.floor(size.height * scale)) : layer._init.viewPixelHeight!;
     if (width > maximum || height > maximum) unsupported('Layer exceeds MAX_TEXTURE_SIZE.');
     layer._allocate(width, height);
   }

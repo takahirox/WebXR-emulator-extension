@@ -131,6 +131,16 @@ export default class EmulatedXRDevice extends XRDevice {
     this._setupEventListeners();
   }
 
+  getRecommendedFramebufferSize(sessionId: number) {
+    const session = this.sessions.get(sessionId)!;
+    if (session.ar) {
+      if (this.handheld) return {...this.resolution};
+      const display = this.arScene!.renderer.domElement;
+      return {width: display.width, height: display.height};
+    }
+    return {width: window.innerWidth, height: window.innerHeight};
+  }
+
   onBaseLayerSet(sessionId: number, layer: BaseLayer) {
     const session = this.sessions.get(sessionId)!;
 

@@ -202,5 +202,49 @@
       "test:samples"
     ],
     "firefoxRuntime": "not executed; packaging passed"
+  },
+  "projectionDepthReviewFixes": {
+    "issue": 11,
+    "browser": "156.0.8078.4",
+    "commands": {
+      "npm ci": "passed",
+      "npm run typecheck": "passed",
+      "npm run build:firefox": "passed; includes npm run build and npm run typecheck",
+      "npm run test:browser": "passed",
+      "git diff --check": "passed"
+    },
+    "checks": [
+      "Three.js 0.186.1 renders a mesh through a single projection layer with and without the layers feature on Quest VR/MR and Android AR; renderer/target dimensions are nonzero, framebuffer attachments are complete, presentation pixels contain the mesh, and no GL errors occur",
+      "Without the layers feature, quad creation and submission of multiple projection layers reject with NotSupportedError",
+      "Projection and quad texture dimensions/resources are initialized before the first frame; projection dimensions use the device presentation size",
+      "Initial allocation and resizing preserve application pixel-unpack buffer, active texture unit and texture bindings; color/depth attachments remain complete without GL errors",
+      "Depth configuration getters without depth sensing throw InvalidStateError; pause/resume reject outside animation frames, in input event frames, and after session end",
+      "During active animation frames pause/resume throw NotSupportedError without depth sensing; enabled calls are idempotent and pause/resume data availability across frames"
+    ],
+    "apiConformance": [
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-vr",
+        "distinctAssertions": 134,
+        "status": "passed"
+      },
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-ar",
+        "distinctAssertions": 168,
+        "status": "passed"
+      },
+      {
+        "profile": "Generic Android Phone (ARCore)",
+        "mode": "immersive-ar",
+        "distinctAssertions": 141,
+        "status": "passed"
+      }
+    ],
+    "notRerun": [
+      "test:wpt",
+      "test:samples"
+    ],
+    "firefoxRuntime": "not executed; packaging passed"
   }
 }

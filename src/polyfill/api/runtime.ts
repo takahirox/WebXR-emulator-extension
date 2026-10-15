@@ -4,7 +4,7 @@ import type {SessionMode} from '../../types/contracts';
 import type {SessionOptions, HitTestOptions, TransientHitTestOptions} from '../../types/polyfill';
 import type {DeviceInput, InputSignal} from '../device-adapter';
 import {XRSpace, XRReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, invalidState, unsupported} from './geometry';
-import {XRCompositionLayer, XRWebGLLayer} from './layers';
+import {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
 import {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation} from './sensing';
 import XRHitTestSource from './XRHitTestSource';
 import XRTransientInputHitTestSource from './XRTransientInputHitTestSource';
@@ -106,6 +106,7 @@ export class XRSession extends XREventTarget {
   private nextCallback = 0;
   private frameHandle = 0;
   private currentCallbacks: Map<number, Callback> | null = null;
+  private animationFrame: XRFrame | null = null;
   private pendingRenderState: XRRenderState | null = null;
   private presentation: XRWebGLLayer | null = null;
   private activeRenderState: XRRenderState;
@@ -155,12 +156,18 @@ export class XRSession extends XREventTarget {
   get renderState() { return this.activeRenderState; }
   get visibilityState() { return this.visibility; }
   get inputSources() { return this.ended ? Object.freeze([]) : this.sources; }
-  get depthUsage() { this._require('depth-sensing'); return 'cpu-optimized'; }
-  get depthDataFormat() { this._require('depth-sensing'); return 'float32'; }
-  get depthType() { this._require('depth-sensing'); return 'smooth'; }
-  get depthActive() { this._require('depth-sensing'); return this.depthRunning; }
-  pauseDepthSensing() { this._require('depth-sensing'); this.depthRunning = false; }
-  resumeDepthSensing() { this._require('depth-sensing'); this.depthRunning = true; }
+  private assertDepthConfiguration() { if (!this.enabledFeatures.includes('depth-sensing')) invalidState('Depth sensing was not enabled.'); }
+  private assertDepthFrame() {
+    this._assertLive();
+    if (!this.animationFrame?._active) invalidState('Depth sensing can only be changed during an active animation frame.');
+    this._require('depth-sensing');
+  }
+  get depthUsage() { this.assertDepthConfiguration(); return 'cpu-optimized'; }
+  get depthDataFormat() { this.assertDepthConfiguration(); return 'float32'; }
+  get depthType() { this.assertDepthConfiguration(); return 'smooth'; }
+  get depthActive() { this.assertDepthConfiguration(); return this.depthRunning; }
+  pauseDepthSensing() { this.assertDepthFrame(); this.depthRunning = false; }
+  resumeDepthSensing() { this.assertDepthFrame(); this.depthRunning = true; }
   get preferredReflectionFormat() { return 'srgba8'; }
   get persistentAnchors() { return Object.freeze([] as string[]); }
   async restorePersistentAnchor(_uuid: string): Promise<XRAnchor> { this._require('anchors'); return unsupported('Persistent anchors are not simulated.'); }
@@ -200,7 +207,7 @@ export class XRSession extends XREventTarget {
     if (init.baseLayer !== undefined && init.layers !== undefined) unsupported('baseLayer and layers cannot both be supplied.');
     if (init.baseLayer && (!(init.baseLayer instanceof XRWebGLLayer) || init.baseLayer._session !== this)) invalidState('Layer belongs to a different session.');
     if (init.layers !== undefined && init.layers !== null) {
-      this._require('layers');
+      if (!this.enabledFeatures.includes('layers') && (init.layers.length > 1 || init.layers.some(layer => !(layer instanceof XRProjectionLayer)))) unsupported('Only a single projection layer is supported without the layers feature.');
       if (new Set(init.layers).size !== init.layers.length) throw new TypeError('Duplicate composition layers.');
       for (const layer of init.layers) if (!(layer instanceof XRCompositionLayer) || layer._binding._session !== this || layer._destroyed) invalidState('Invalid composition layer.');
       if (init.layers.some(layer => layer._binding !== init.layers![0]._binding)) unsupported('All layers must share one binding/context.');
@@ -281,6 +288,7 @@ export class XRSession extends XREventTarget {
     const layers = this.renderState.layers;
     if (layers?.length) layers[0]._binding._prepare(layers);
     const callbacks = this.currentCallbacks = this.callbacks; this.callbacks = new Map(); frame._active = true;
+    this.animationFrame = frame;
     try {
       for (const [id, callback] of callbacks) {
         if (this.ended) break;
@@ -288,7 +296,7 @@ export class XRSession extends XREventTarget {
         try { callback(time, frame); } catch (error) { window.dispatchEvent(new ErrorEvent('error', {error, message: String(error)})); }
       }
       if (!this.ended && layers?.length) layers[0]._binding._compose(frame, layers);
-    } finally { frame._active = false; this.currentCallbacks = null; if (!this.ended) this._device.onFrameEnd(this._id); }
+    } finally { frame._active = false; this.animationFrame = null; this.currentCallbacks = null; if (!this.ended) this._device.onFrameEnd(this._id); }
   };
 }
 

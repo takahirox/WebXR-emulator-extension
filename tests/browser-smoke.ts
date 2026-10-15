@@ -32,8 +32,13 @@ const root = process.cwd();
 const fixture = ts.transpileModule(await readFile(path.join(root, 'tests/fixture.ts'), 'utf8'), {
   compilerOptions: {target: ts.ScriptTarget.ES2018, module: ts.ModuleKind.None},
 }).outputText;
+const threeModules = new Map<string, string>(await Promise.all(['three.module.js', 'three.core.js'].map(async name =>
+  [`/${name}`, await readFile(path.join(root, 'node_modules/three/build', name), 'utf8')] as const)));
 const server = createServer((request, response) => {
-  if (request.url === '/fixture.js') {
+  if (threeModules.has(request.url!)) {
+    response.setHeader('Content-Type', 'application/javascript');
+    response.end(threeModules.get(request.url!));
+  } else if (request.url === '/fixture.js') {
     response.setHeader('Content-Type', 'application/javascript');
     response.end(fixture);
   } else if (request.url === '/' || request.url === '/frame' || request.url === '/csp') {
