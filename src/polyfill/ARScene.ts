@@ -1,5 +1,5 @@
 import {
-  BoxBufferGeometry,
+  BoxGeometry,
   CanvasTexture,
   Color,
   DirectionalLight,
@@ -10,15 +10,16 @@ import {
   WebGLRenderer,
   WebGLRenderTarget,
   PerspectiveCamera,
-  PlaneBufferGeometry,
+  PlaneGeometry,
   Raycaster,
   Scene,
-  SphereBufferGeometry,
+  SRGBColorSpace,
+  SphereGeometry,
   Vector2,
   Vector3
 } from 'three';
-import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { TransformControls } from 'three/addons/controls/TransformControls.js'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import MyControls from './MyControls';
 import type {DeviceSize} from '../types/contracts';
 
@@ -28,6 +29,7 @@ const DEFAULT_TABLET_POSITION = [0, 1.6, -0.2];
 const DEFAULT_POINTER_POSITION = [0, 1.6, -0.15];
 
 const dummyCanvasTexture = new CanvasTexture(document.createElement('canvas'));
+dummyCanvasTexture.colorSpace = SRGBColorSpace;
 const raycaster = new Raycaster();
 
 export default class ARScene {
@@ -39,6 +41,7 @@ export default class ARScene {
   screen!: Mesh & {material: MeshBasicMaterial};
   tabletCamera!: PerspectiveCamera;
   room: Object3D | null = null;
+  private readonly appTexture = {value: dummyCanvasTexture};
   isTouched: boolean;
   onCameraPoseUpdate: ((position: number[], quaternion: number[]) => void) | null;
   onTabletPoseUpdate: ((position: number[], quaternion: number[]) => void) | null;
@@ -62,11 +65,11 @@ export default class ARScene {
     const height = window.innerHeight;
 
     const canvas = document.createElement('canvas');
-    // WebXR app Canvas size may not be power of two. So using WebGL2.
-    // @TODO: Error message for non WebGL2 support browser?
+    // Modern Three.js requires WebGL2 for both render passes.
     const context = canvas.getContext('webgl2', {antialias: true});
 
-    const renderer = new WebGLRenderer({canvas: canvas, context: context!});
+    if (!context) throw new Error('WebXR Emulator AR rendering requires WebGL2.');
+    const renderer = new WebGLRenderer({canvas, context});
     renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.domElement.oncontextmenu = () => { return false; };
@@ -84,47 +87,38 @@ export default class ARScene {
     // @TODO: Proper fov
     const tabletCamera = new PerspectiveCamera(90, deviceSize.width / deviceSize.height, 0.1, 1000.0);
 
-    const light = new DirectionalLight(0xffffff, 4.0);
+    // Convert the legacy light intensity to modern physical units.
+    const light = new DirectionalLight(0xffffff, 4 * Math.PI);
     light.position.set(-1, 1, -1);
     scene.add(light);
 
     const outsideFrameWidth = 0.005;
     const screen = new Mesh(
-      new PlaneBufferGeometry(deviceSize.width - outsideFrameWidth, deviceSize.height - outsideFrameWidth),
-      new MeshBasicMaterial({color: 0xffffff, map: renderTarget.texture})
+      new PlaneGeometry(deviceSize.width - outsideFrameWidth, deviceSize.height - outsideFrameWidth),
+      new MeshBasicMaterial({color: 0xffffff, map: renderTarget.texture, toneMapped: false})
     ) as Mesh & {material: MeshBasicMaterial};
     screen.position.z = deviceSize.depth * 0.5 + 0.0001;  // 0.0001 is for not hiding the screen by the device
-    screen.material.userData.map2 = {value: {needsUpdate: true}}; // Dummy. Updated in onBeforeCompile()
     screen.add(tabletCamera);
 
-    // Edit shader to mix WebXR app Canvas and ARScene renderTarget.
-    // @TODO: Is there any easier way?
+    // The render target contains linear light; CanvasTexture is tagged sRGB so
+    // WebGL2 decodes it on sampling. Composite straight alpha in linear light,
+    // then let the material's output chunk encode to the display exactly once.
+    // CanvasTexture.flipY keeps the application's top at the tablet's top.
     screen.material.onBeforeCompile = shader => {
-      // Uniform for WebXR app Canvas.
-      // @TODO: Rename map2 to better name.
-      shader.uniforms.map2 = {
-        // Set dummy so far and replace with the right one latter.
-        value: dummyCanvasTexture
-      };
+      shader.uniforms.appTexture = this.appTexture;
       shader.fragmentShader = shader.fragmentShader
-        .replace(
-          '#include <map_pars_fragment>\n',
-          '#include <map_pars_fragment>\n' +
-          'uniform sampler2D map2;\n'
-        ).replace(
-          '#include <map_fragment>\n',
-          // For the simplicity of shader, assuming both map and map2 aren't null
-          'vec4 texelColor = mapTexelToLinear(texture2D(map, vUv));\n' +
-          'vec4 texelColor2 = mapTexelToLinear(texture2D(map2, vUv));\n' +
-          // @TODO: Mix more properly if possible?
-          'diffuseColor *= vec4(texelColor.rgb * (1.0 - texelColor2.a) + texelColor2.rgb * texelColor2.a, texelColor.a);\n'
-        );
-      screen.material.userData.map2 = shader.uniforms.map2;
-      //console.log(shader);
+        .replace('#include <map_pars_fragment>',
+          '#include <map_pars_fragment>\nuniform sampler2D appTexture;')
+        .replace('#include <map_fragment>', `
+          vec4 roomColor = texture2D(map, vMapUv);
+          vec4 appColor = texture2D(appTexture, vMapUv);
+          diffuseColor *= vec4(mix(roomColor.rgb, appColor.rgb, appColor.a), roomColor.a);
+        `);
     };
+    screen.material.customProgramCacheKey = () => 'ar-screen-composite-v1';
 
     const tablet = new Mesh(
-      new BoxBufferGeometry(deviceSize.width, deviceSize.height, deviceSize.depth),
+      new BoxGeometry(deviceSize.width, deviceSize.height, deviceSize.depth),
       new MeshStandardMaterial({color: 0x000000})
     ) as Mesh & {material: MeshStandardMaterial};
     tablet.position.fromArray(DEFAULT_TABLET_POSITION);
@@ -132,7 +126,7 @@ export default class ARScene {
     scene.add(tablet);
 
     const pointer = new Mesh(
-      new SphereBufferGeometry(0.01),
+      new SphereGeometry(0.01),
       new MeshBasicMaterial({color: 0xff8888, transparent: true, opacity: 0.6})
     ) as Mesh & {material: MeshBasicMaterial};
     pointer.visible = false;
@@ -162,7 +156,7 @@ export default class ARScene {
     transformControls.addEventListener('mouseUp', () => {
       cameraControls.enabled = true;
     });
-    scene.add(transformControls);
+    scene.add(transformControls.getHelper());
 
     // Raycasting for
     //   - switching transform operation mode by left clicking
@@ -188,13 +182,14 @@ export default class ARScene {
       };
       mouse.set(point.x * 2 - 1, -(point.y * 2) + 1);
       raycaster.setFromCamera(mouse, camera);
-      return raycaster.intersectObjects(targetObjects);
+      return raycaster.intersectObjects(targetObjects, false);
     };
 
     renderer.domElement.addEventListener('mousedown', event => {
       if (event.button === 0) {
         // left click for translate operation mode
-        if (raycast(event).length > 0) {
+        mouseDownTime = null;
+        if (!transformControls.dragging && raycast(event).length > 0) {
           mouseDownTime = performance.now();
         }
       } else if (event.button === 2) {
@@ -230,16 +225,16 @@ export default class ARScene {
                         transformModes.disabled;
         switch (transformMode) {
           case transformModes.disabled:
-            transformControls.visible = false;
+            transformControls.getHelper().visible = false;
             transformControls.enabled = false;
             break;
           case transformModes.translate:
-            transformControls.visible = true;
+            transformControls.getHelper().visible = true;
             transformControls.enabled = true;
             transformControls.setMode('translate');
             break;
           case transformModes.rotate:
-            transformControls.visible = true; // just in case
+            transformControls.getHelper().visible = true; // just in case
             transformControls.enabled = true; // just in case
             transformControls.setMode('rotate');
             break;
@@ -297,7 +292,7 @@ export default class ARScene {
 
       cameraControls.update();
       // @TODO: If possible, update the canvas texture only when the canvas is updated
-      screen.material.userData.map2.value.needsUpdate = true;
+      this.appTexture.value.needsUpdate = true;
       screen.visible = true;
       scene.traverse(object => {
         if (object.userData.virtual) {
@@ -348,11 +343,15 @@ export default class ARScene {
   }
 
   setCanvas(canvas: HTMLCanvasElement) {
-    this.screen.material.userData.map2.value = new CanvasTexture(canvas);
+    this.releaseCanvas();
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    this.appTexture.value = texture;
   }
 
   releaseCanvas() {
-    this.screen.material.userData.map2.value = dummyCanvasTexture;
+    if (this.appTexture.value !== dummyCanvasTexture) this.appTexture.value.dispose();
+    this.appTexture.value = dummyCanvasTexture;
   }
 
   // Raycasting for AR hit testing API

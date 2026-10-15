@@ -28,6 +28,8 @@ Load the Firefox package through `about:debugging`, grant site access, and reloa
 
 ## Validation
 
+These are the original Issue #5 results. The later [Three.js migration](threejs-migration.md) replaces the legacy renderer and records current dependency security and browser checks.
+
 Executed on macOS arm64, Node.js 24.12.0, npm 11.6.2. The browser acceptance run used desktop **Chrome for Testing 155.0.8059.79**, matching the [stable-channel download metadata](https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json) on 2026-10-15. It used a fresh temporary profile, the unpacked MV3 extension, and no MV2 compatibility flags. Playwright software WebGL was enabled; no XR hardware was needed.
 
 - `npm ci`: passed (54 packages installed). npm reports the existing high-severity advisory in retained Three.js; upgrading the renderer is outside this migration.

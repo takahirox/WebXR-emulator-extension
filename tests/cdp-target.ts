@@ -3,16 +3,26 @@ import type { CDPSession } from 'playwright';
 export async function attachTarget(cdp: CDPSession, targetId: string) {
   const {sessionId}: {sessionId: string} = await cdp.send('Target.attachToTarget', {targetId, flatten: false});
   let nextId = 0;
-  const pending = new Map<number, {resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>}>();
+  const events = new Map<string, (params: unknown) => void>();
+  const errors: string[] = [];
+  const pending = new Map<number, {resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>; method: string}>();
   const receive = (event: {sessionId: string; message: string}) => {
     if (event.sessionId !== sessionId) return;
-    const message = JSON.parse(event.message) as {id?: number; error?: {message: string}; result?: unknown};
-    if (message.id === undefined) return;
+    const message = JSON.parse(event.message) as {id?: number; error?: {message: string}; result?: unknown; method?: string; params?: unknown};
+    if (message.id === undefined) {
+      if (message.method === 'Runtime.exceptionThrown' || message.method === 'Log.entryAdded') {
+        const data = message.params as {exceptionDetails?: {text: string}; entry?: {level: string; text: string}};
+        if (data.exceptionDetails) errors.push(data.exceptionDetails.text);
+        if (data.entry?.level === 'error') errors.push(data.entry.text);
+      }
+      if (message.method) events.get(message.method)?.(message.params);
+      return;
+    }
     const callback = pending.get(message.id);
     if (!callback) return;
     pending.delete(message.id);
     clearTimeout(callback.timer);
-    if (message.error) callback.reject(new Error(message.error.message));
+    if (message.error) callback.reject(new Error(`${callback.method}: ${message.error.message}`));
     else callback.resolve(message.result);
   };
   cdp.on('Target.receivedMessageFromTarget', receive);
@@ -20,13 +30,20 @@ export async function attachTarget(cdp: CDPSession, targetId: string) {
     const id = ++nextId;
     const result = new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Timed out: ${method}`)); }, 20000);
-      pending.set(id, {resolve, reject, timer});
+      pending.set(id, {resolve, reject, timer, method});
     });
     await cdp.send('Target.sendMessageToTarget', {sessionId, message: JSON.stringify({id, method, params})});
     return await result as T;
   }
   return {
     command,
+    errors,
+    nextEvent<T>(method: string): Promise<T> {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { events.delete(method); reject(new Error(`Timed out: ${method}`)); }, 20000);
+        events.set(method, params => { clearTimeout(timer); events.delete(method); resolve(params as T); });
+      });
+    },
     async detach() {
       cdp.off('Target.receivedMessageFromTarget', receive);
       for (const callback of pending.values()) { clearTimeout(callback.timer); callback.reject(new Error('Target detached')); }

@@ -5,7 +5,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 const destination = 'build/firefox';
 await rm(destination, {recursive: true, force: true});
 await mkdir(destination, {recursive: true});
-for (const entry of ['dist', 'polyfill', 'src', 'assets', 'icons']) {
+for (const entry of ['dist', 'polyfill', 'src', 'assets', 'icons', 'licenses']) {
   await cp(entry, `${destination}/${entry}`, {recursive: true, filter: source => !source.endsWith('.ts')});
 }
 const manifest = JSON.parse(await readFile('manifest.json', 'utf8'));

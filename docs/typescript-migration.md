@@ -2,7 +2,7 @@
 
 Issue [#3](https://github.com/takahirox/WebXR-emulator-extension/issues/3) migrates all 15 maintained application JavaScript files and the Rollup build configuration together. The build configuration is now `build.ts`. No maintained JavaScript source remains. JavaScript in `src/app/three/` is unmodified vendor code; `polyfill/webxr-polyfill.js` and `dist/**/*.js` are generated browser artifacts. HTML has no maintained inline application JavaScript.
 
-The original MV2 validation below is historical. For the current Manifest V3 architecture and browser results, see [Manifest V3 migration](manifest-v3.md).
+The Three.js r111/vendor descriptions and original MV2 validation below are historical. Issue [#7](https://github.com/takahirox/WebXR-emulator-extension/issues/7) replaces them with locally bundled r186 core/addons and matching revision declarations; see [Three.js migration](threejs-migration.md) for the current renderer contract and validation. For the current Manifest V3 architecture and browser results, see [Manifest V3 migration](manifest-v3.md).
 
 ## Source and build contracts
 

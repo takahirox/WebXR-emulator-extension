@@ -20,11 +20,11 @@ const MOUSE = {
   PAN: 2
 };
 
-const changeEvent = {type: 'change'};
+const changeEvent = {type: 'change'} as const;
 const EPS = 0.000001;
 
 // @TODO: Rename
-export default class MyControls extends EventDispatcher {
+export default class MyControls extends EventDispatcher<{change: {}}> {
   object: Object3D;
   domElement: HTMLElement;
   _enabled: boolean;
