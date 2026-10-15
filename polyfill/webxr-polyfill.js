@@ -1256,6 +1256,7 @@ function WebXRPolyfillInjection() {
               var _a;
               (_a = this.framebuffer) !== null && _a !== void 0 ? _a : (this.framebuffer = gl.createFramebuffer());
               gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+              gl.disable(gl.RASTERIZER_DISCARD);
               gl.disable(gl.SCISSOR_TEST);
               gl.colorMask(true, true, true, true);
               gl.depthMask(true);
@@ -1276,48 +1277,55 @@ function WebXRPolyfillInjection() {
           this.preserve(() => {
               this.setupProgram();
               gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
-              gl.useProgram(this.program);
-              gl.bindVertexArray(this.vao);
-              gl.disable(gl.DEPTH_TEST);
-              gl.disable(gl.SCISSOR_TEST);
-              gl.disable(gl.CULL_FACE);
-              gl.colorMask(true, true, true, true);
-              for (const cap of [gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE])
-                  gl.disable(cap);
-              gl.enable(gl.BLEND);
-              gl.blendEquation(gl.FUNC_ADD);
-              gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-              gl.activeTexture(gl.TEXTURE0);
-              gl.bindSampler(0, null);
-              gl.uniform1i(gl.getUniformLocation(this.program, 'image'), 0);
-              const pose = frame.getViewerPose(this._session._viewer);
-              for (const layer of layers) {
-                  if (layer._destroyed)
-                      continue;
-                  gl.bindTexture(gl.TEXTURE_2D, layer._color);
-                  for (const view of pose.views) {
-                      const viewport = this._presentation.getViewport(view);
-                      gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-                      let matrix = create$3();
-                      let uv = [0, 1];
-                      if (layer instanceof XRProjectionLayer) {
-                          if (view.eye !== 'none')
-                              uv = [view.eye === 'right' && !layer.forceMonoPresentation ? 0.5 : 0, 0.5];
+              const drawBuffer = gl.getParameter(gl.DRAW_BUFFER0);
+              gl.drawBuffers([gl.BACK]);
+              try {
+                  gl.useProgram(this.program);
+                  gl.bindVertexArray(this.vao);
+                  gl.disable(gl.DEPTH_TEST);
+                  gl.disable(gl.SCISSOR_TEST);
+                  gl.disable(gl.CULL_FACE);
+                  gl.colorMask(true, true, true, true);
+                  for (const cap of [gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE])
+                      gl.disable(cap);
+                  gl.enable(gl.BLEND);
+                  gl.blendEquation(gl.FUNC_ADD);
+                  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+                  gl.activeTexture(gl.TEXTURE0);
+                  gl.bindSampler(0, null);
+                  gl.uniform1i(gl.getUniformLocation(this.program, 'image'), 0);
+                  const pose = frame.getViewerPose(this._session._viewer);
+                  for (const layer of layers) {
+                      if (layer._destroyed)
+                          continue;
+                      gl.bindTexture(gl.TEXTURE_2D, layer._color);
+                      for (const view of pose.views) {
+                          const viewport = this._presentation.getViewport(view);
+                          gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+                          let matrix = create$3();
+                          let uv = [0, 1];
+                          if (layer instanceof XRProjectionLayer) {
+                              if (view.eye !== 'none')
+                                  uv = [view.eye === 'right' && !layer.forceMonoPresentation ? 0.5 : 0, 0.5];
+                          }
+                          else if (layer instanceof XRQuadLayer) {
+                              const world = frame._world(layer.space);
+                              if (!world)
+                                  continue;
+                              matrix = multiply(matrix, world, layer.transform.matrix);
+                              scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
+                              multiply(matrix, invert(create$3(), view._worldMatrix), matrix);
+                              multiply(matrix, view.projectionMatrix, matrix);
+                          }
+                          gl.uniform2f(gl.getUniformLocation(this.program, 'alphaOptions'), layer.opacity, layer.blendTextureSourceAlpha ? 1 : 0);
+                          gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'matrix'), false, matrix);
+                          gl.uniform2fv(gl.getUniformLocation(this.program, 'uvRange'), uv);
+                          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
                       }
-                      else if (layer instanceof XRQuadLayer) {
-                          const world = frame._world(layer.space);
-                          if (!world)
-                              continue;
-                          matrix = multiply(matrix, world, layer.transform.matrix);
-                          scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
-                          multiply(matrix, invert(create$3(), view._worldMatrix), matrix);
-                          multiply(matrix, view.projectionMatrix, matrix);
-                      }
-                      gl.uniform2f(gl.getUniformLocation(this.program, 'alphaOptions'), layer.opacity, layer.blendTextureSourceAlpha ? 1 : 0);
-                      gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'matrix'), false, matrix);
-                      gl.uniform2fv(gl.getUniformLocation(this.program, 'uvRange'), uv);
-                      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
                   }
+              }
+              finally {
+                  gl.drawBuffers([drawBuffer]);
               }
           });
       }
@@ -1832,11 +1840,7 @@ function WebXRPolyfillInjection() {
                       enabled.add(feature);
               }
               const id = await device.requestSession(mode, enabled);
-              const session = new XRSession(device, mode, id, enabled);
-              this.sessions.add(session);
-              if (mode === 'inline' && this.immersive)
-                  session._setImmersiveSuppressed(true);
-              session.addEventListener('end', () => {
+              const session = new XRSession(device, mode, id, enabled, () => {
                   this.sessions.delete(session);
                   if (this.immersive === session) {
                       this.immersive = null;
@@ -1844,6 +1848,9 @@ function WebXRPolyfillInjection() {
                           inline._setImmersiveSuppressed(false);
                   }
               });
+              this.sessions.add(session);
+              if (mode === 'inline' && this.immersive)
+                  session._setImmersiveSuppressed(true);
               if (mode !== 'inline') {
                   this.immersive = session;
                   for (const other of this.sessions)
@@ -1860,11 +1867,12 @@ function WebXRPolyfillInjection() {
   }
   const inputEvents = ['select-start', 'select-end', 'squeeze-start', 'squeeze-end'];
   class XRSession extends XREventTarget {
-      constructor(_device, _mode, _id, enabled) {
+      constructor(_device, _mode, _id, enabled, onShutdown) {
           super();
           this._device = _device;
           this._mode = _mode;
           this._id = _id;
+          this.onShutdown = onShutdown;
           this.callbacks = new Map();
           this.nextCallback = 0;
           this.frameHandle = 0;
@@ -1930,18 +1938,27 @@ function WebXRPolyfillInjection() {
                   source._updatePose();
               if (added.length)
                   this._emit(new XRInputSourcesChangeEvent('inputsourceschange', { session: this, added, removed: [] }));
+              if (this.ended)
+                  return;
               for (const signal of this.signals.splice(0)) {
                   if (this.ended)
                       break;
+                  const source = this.inputWrappers.get(signal.source);
+                  if (!source)
+                      continue;
                   const prefix = signal.type.startsWith('squeeze') ? 'squeeze' : 'select';
                   const starting = signal.type.endsWith('start');
                   if (!starting)
-                      this.emitInput(prefix, signal.source, time);
-                  this.emitInput(`${prefix}${starting ? 'start' : 'end'}`, signal.source, time);
+                      this.emitInput(prefix, source, time);
+                  this.emitInput(`${prefix}${starting ? 'start' : 'end'}`, source, time);
               }
+              if (this.ended)
+                  return;
               this.sources = Object.freeze(next.slice());
               if (removed.length)
                   this._emit(new XRInputSourcesChangeEvent('inputsourceschange', { session: this, added: [], removed: [...removed] }));
+              if (this.ended)
+                  return;
               for (const [raw, wrapper] of this.inputWrappers)
                   if (removed.includes(wrapper))
                       this.inputWrappers.delete(raw);
@@ -2095,7 +2112,12 @@ function WebXRPolyfillInjection() {
           throw new TypeError('Expected callback.'); if (this.ended)
           return 0; const id = ++this.nextCallback; this.callbacks.set(id, callback); return id; }
       cancelAnimationFrame(id) { var _a; this.callbacks.delete(id); (_a = this.currentCallbacks) === null || _a === void 0 ? void 0 : _a.delete(id); }
-      async end() { this._assertLive(); this._device.endSession(this._id); this._finish(); }
+      async end() {
+          this._assertLive();
+          this._device.endSession(this._id);
+          this._finish();
+          await new Promise(resolve => setTimeout(resolve, 0));
+      }
       _finish() {
           var _a;
           if (this.ended)
@@ -2117,7 +2139,8 @@ function WebXRPolyfillInjection() {
               source._deactivate();
           this._hitSources.clear();
           this._transientSources.clear();
-          this._emit(new XRSessionEvent('end', { session: this }));
+          setTimeout(() => this._emit(new XRSessionEvent('end', { session: this })), 0);
+          this.onShutdown();
       }
       async requestHitTestSource(options) {
           this._require('hit-test');
@@ -2134,11 +2157,11 @@ function WebXRPolyfillInjection() {
           this._device.addHitTestSourceForTransientInput(source);
           return source;
       }
-      emitInput(type, source, time) {
+      emitInput(type, inputSource, time) {
           const frame = new XRFrame(this, time, false);
           frame._active = true;
           try {
-              this._emit(new XRInputSourceEvent(type, { frame, inputSource: this.inputWrappers.get(source) }));
+              this._emit(new XRInputSourceEvent(type, { frame, inputSource }));
           }
           finally {
               frame._active = false;

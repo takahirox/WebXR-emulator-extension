@@ -80,16 +80,15 @@ export class XRSystem extends XREventTarget {
         if (supported) enabled.add(feature);
       }
       const id = await device.requestSession(mode, enabled);
-      const session = new XRSession(device, mode, id, enabled);
-      this.sessions.add(session);
-      if (mode === 'inline' && this.immersive) session._setImmersiveSuppressed(true);
-      session.addEventListener('end', () => {
+      const session = new XRSession(device, mode, id, enabled, () => {
         this.sessions.delete(session);
         if (this.immersive === session) {
           this.immersive = null;
           for (const inline of this.sessions) inline._setImmersiveSuppressed(false);
         }
       });
+      this.sessions.add(session);
+      if (mode === 'inline' && this.immersive) session._setImmersiveSuppressed(true);
       if (mode !== 'inline') {
         this.immersive = session;
         for (const other of this.sessions) if (other !== session) other._setImmersiveSuppressed(true);
@@ -137,7 +136,7 @@ export class XRSession extends XREventTarget {
   onsqueezestart: ((event: Event) => void) | null = null;
   onsqueeze: ((event: Event) => void) | null = null;
   onsqueezeend: ((event: Event) => void) | null = null;
-  constructor(readonly _device: EmulatedXRDevice, readonly _mode: SessionMode, readonly _id: number, enabled: Set<string>) {
+  constructor(readonly _device: EmulatedXRDevice, readonly _mode: SessionMode, readonly _id: number, enabled: Set<string>, private onShutdown: () => void) {
     super(); sessionObjects.add(this); this.features = Object.freeze([...enabled]); this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
     this.activeRenderState = new XRRenderState({inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null});
     this._viewer = new XRReferenceSpace(this, 'viewer', () => mat4.clone(_device.getBasePoseMatrix()));
@@ -222,7 +221,10 @@ export class XRSession extends XREventTarget {
   }
   requestAnimationFrame(callback: Callback) { if (typeof callback !== 'function') throw new TypeError('Expected callback.'); if (this.ended) return 0; const id = ++this.nextCallback; this.callbacks.set(id, callback); return id; }
   cancelAnimationFrame(id: number) { this.callbacks.delete(id); this.currentCallbacks?.delete(id); }
-  async end() { this._assertLive(); this._device.endSession(this._id); this._finish(); }
+  async end() {
+    this._assertLive(); this._device.endSession(this._id); this._finish();
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+  }
   private _finish() {
     if (this.ended) return;
     this.endedValue = true; this._device.cancelAnimationFrame(this.frameHandle);
@@ -234,7 +236,9 @@ export class XRSession extends XREventTarget {
     this.callbacks.clear(); this.currentCallbacks?.clear(); this.signals = []; this.sources = Object.freeze([]);
     for (const source of [...this._hitSources, ...this._transientSources]) source._deactivate();
     this._hitSources.clear(); this._transientSources.clear();
-    this._emit(new XRSessionEvent('end', {session: this}));
+    // Release system state now, but deliver the public event in a later task.
+    setTimeout(() => this._emit(new XRSessionEvent('end', {session: this})), 0);
+    this.onShutdown();
   }
   async requestHitTestSource(options: HitTestOptions) {
     this._require('hit-test'); this._owns(options.space);
@@ -243,9 +247,9 @@ export class XRSession extends XREventTarget {
   async requestHitTestSourceForTransientInput(options: TransientHitTestOptions) {
     this._require('hit-test'); const source = new XRTransientInputHitTestSource(this, options); this._transientSources.add(source); this._device.addHitTestSourceForTransientInput(source); return source;
   }
-  private emitInput(type: string, source: DeviceInput, time: number) {
+  private emitInput(type: string, inputSource: XRInputSource, time: number) {
     const frame = new XRFrame(this, time, false); frame._active = true;
-    try { this._emit(new XRInputSourceEvent(type, {frame, inputSource: this.inputWrappers.get(source)!})); } finally { frame._active = false; }
+    try { this._emit(new XRInputSourceEvent(type, {frame, inputSource})); } finally { frame._active = false; }
   }
   private tick = (time: number) => {
     if (this.ended) return;
@@ -273,15 +277,22 @@ export class XRSession extends XREventTarget {
     this.sources = Object.freeze([...next, ...removed]);
     for (const source of next) source._updatePose();
     if (added.length) this._emit(new XRInputSourcesChangeEvent('inputsourceschange', {session: this, added, removed: []}));
+    if (this.ended) return;
     for (const signal of this.signals.splice(0)) {
       if (this.ended) break;
+      // A completed action delivers both events with the same identity, even if
+      // its first handler shuts down the session and clears the wrapper map.
+      const source = this.inputWrappers.get(signal.source);
+      if (!source) continue;
       const prefix = signal.type.startsWith('squeeze') ? 'squeeze' : 'select';
       const starting = signal.type.endsWith('start');
-      if (!starting) this.emitInput(prefix, signal.source, time);
-      this.emitInput(`${prefix}${starting ? 'start' : 'end'}`, signal.source, time);
+      if (!starting) this.emitInput(prefix, source, time);
+      this.emitInput(`${prefix}${starting ? 'start' : 'end'}`, source, time);
     }
+    if (this.ended) return;
     this.sources = Object.freeze(next.slice());
     if (removed.length) this._emit(new XRInputSourcesChangeEvent('inputsourceschange', {session: this, added: [], removed: [...removed]}));
+    if (this.ended) return;
     for (const [raw, wrapper] of this.inputWrappers) if (removed.includes(wrapper)) this.inputWrappers.delete(raw);
     this._device.computeHitTests(this._id);
     const frame = new XRFrame(this, time, true);

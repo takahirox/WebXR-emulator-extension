@@ -191,7 +191,7 @@ export class XRWebGLBinding {
     const gl = this._gl2();
     this.preserve(() => {
       this.framebuffer ??= gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-      gl.disable(gl.SCISSOR_TEST); gl.colorMask(true, true, true, true); gl.depthMask(true); gl.clearColor(0, 0, 0, 0); gl.clearDepth(1);
+      gl.disable(gl.RASTERIZER_DISCARD); gl.disable(gl.SCISSOR_TEST); gl.colorMask(true, true, true, true); gl.depthMask(true); gl.clearColor(0, 0, 0, 0); gl.clearDepth(1);
       for (const layer of layers) {
         if (layer._destroyed) continue; this.allocate(layer);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, layer._color, 0);
@@ -203,34 +203,39 @@ export class XRWebGLBinding {
   _compose(frame: XRFrame, layers: readonly XRCompositionLayer[]) {
     const gl = this._gl2();
     this.preserve(() => {
-      this.setupProgram(); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null); gl.useProgram(this.program); gl.bindVertexArray(this.vao);
-      gl.disable(gl.DEPTH_TEST); gl.disable(gl.SCISSOR_TEST); gl.disable(gl.CULL_FACE); gl.colorMask(true, true, true, true);
-      for (const cap of [gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE]) gl.disable(cap);
-      gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      gl.activeTexture(gl.TEXTURE0); gl.bindSampler(0, null); gl.uniform1i(gl.getUniformLocation(this.program!, 'image'), 0);
-      const pose = frame.getViewerPose(this._session._viewer)!;
-      for (const layer of layers) {
-        if (layer._destroyed) continue;
-        gl.bindTexture(gl.TEXTURE_2D, layer._color);
-        for (const view of pose.views) {
-          const viewport = this._presentation.getViewport(view);
-          gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-          let matrix = mat4.create(); let uv = [0, 1];
-          if (layer instanceof XRProjectionLayer) {
-            if (view.eye !== 'none') uv = [view.eye === 'right' && !layer.forceMonoPresentation ? 0.5 : 0, 0.5];
-          } else if (layer instanceof XRQuadLayer) {
-            const world = frame._world(layer.space); if (!world) continue;
-            matrix = mat4.multiply(matrix, world, layer.transform.matrix);
-            mat4.scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
-            mat4.multiply(matrix, mat4.invert(mat4.create(), view._worldMatrix)!, matrix);
-            mat4.multiply(matrix, view.projectionMatrix, matrix);
+      this.setupProgram(); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+      const drawBuffer = gl.getParameter(gl.DRAW_BUFFER0) as number;
+      gl.drawBuffers([gl.BACK]);
+      try {
+        gl.useProgram(this.program); gl.bindVertexArray(this.vao);
+        gl.disable(gl.DEPTH_TEST); gl.disable(gl.SCISSOR_TEST); gl.disable(gl.CULL_FACE); gl.colorMask(true, true, true, true);
+        for (const cap of [gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE]) gl.disable(cap);
+        gl.enable(gl.BLEND); gl.blendEquation(gl.FUNC_ADD); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.activeTexture(gl.TEXTURE0); gl.bindSampler(0, null); gl.uniform1i(gl.getUniformLocation(this.program!, 'image'), 0);
+        const pose = frame.getViewerPose(this._session._viewer)!;
+        for (const layer of layers) {
+          if (layer._destroyed) continue;
+          gl.bindTexture(gl.TEXTURE_2D, layer._color);
+          for (const view of pose.views) {
+            const viewport = this._presentation.getViewport(view);
+            gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+            let matrix = mat4.create(); let uv = [0, 1];
+            if (layer instanceof XRProjectionLayer) {
+              if (view.eye !== 'none') uv = [view.eye === 'right' && !layer.forceMonoPresentation ? 0.5 : 0, 0.5];
+            } else if (layer instanceof XRQuadLayer) {
+              const world = frame._world(layer.space); if (!world) continue;
+              matrix = mat4.multiply(matrix, world, layer.transform.matrix);
+              mat4.scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
+              mat4.multiply(matrix, mat4.invert(mat4.create(), view._worldMatrix)!, matrix);
+              mat4.multiply(matrix, view.projectionMatrix, matrix);
+            }
+            gl.uniform2f(gl.getUniformLocation(this.program!, 'alphaOptions'), layer.opacity, layer.blendTextureSourceAlpha ? 1 : 0);
+            gl.uniformMatrix4fv(gl.getUniformLocation(this.program!, 'matrix'), false, matrix as Float32Array);
+            gl.uniform2fv(gl.getUniformLocation(this.program!, 'uvRange'), uv);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
           }
-          gl.uniform2f(gl.getUniformLocation(this.program!, 'alphaOptions'), layer.opacity, layer.blendTextureSourceAlpha ? 1 : 0);
-          gl.uniformMatrix4fv(gl.getUniformLocation(this.program!, 'matrix'), false, matrix as Float32Array);
-          gl.uniform2fv(gl.getUniformLocation(this.program!, 'uvRange'), uv);
-          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
-      }
+      } finally { gl.drawBuffers([drawBuffer]); }
     });
   }
   private setupProgram() {

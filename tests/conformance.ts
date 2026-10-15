@@ -343,6 +343,42 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         gl.disable(cap); gl.bindSampler(0, null);
       }
       gl.deleteSampler(sampler);
+      for (const leaveFramebufferBound of [false, true]) {
+        await nextFrame(frame => {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+          const image = binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+          gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.drawBuffers([gl.NONE]);
+          if (leaveFramebufferBound) gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, fbo);
+        });
+        check(gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING) === (leaveFramebufferBound ? fbo : null), `composition restores draw framebuffer (${leaveFramebufferBound})`);
+        if (leaveFramebufferBound) check(gl.getParameter(gl.DRAW_BUFFER0) === gl.COLOR_ATTACHMENT0, 'composition preserves application framebuffer draw buffer');
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        const pixel = new Uint8Array(4); gl.readPixels(1, 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+        check(pixel.join(',') === '0,0,255,255', `composition draws blue with default draw buffer NONE (${leaveFramebufferBound})`);
+        check(gl.getParameter(gl.DRAW_BUFFER0) === gl.NONE && gl.getError() === gl.NO_ERROR, `composition restores default draw buffer without GL errors (${leaveFramebufferBound})`);
+        gl.drawBuffers([gl.BACK]);
+      }
+      await nextFrame(frame => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        const image = binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+        gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.enable(gl.RASTERIZER_DISCARD);
+      });
+      for (let count = 0; count < 2; count++) {
+        await nextFrame(frame => {
+          check(gl.isEnabled(gl.RASTERIZER_DISCARD), `preparation restores rasterizer discard in consecutive frame ${count}`);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+          const image = binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
+          const pixel = new Uint8Array(4); gl.readPixels(1, 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+          check(pixel.join(',') === '0,0,0,0' && gl.getError() === gl.NO_ERROR, `layer clears stale blue with persistent rasterizer discard in frame ${count}`);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        });
+      }
+      gl.disable(gl.RASTERIZER_DISCARD);
       await nextFrame(frame => {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null); const pixel = new Uint8Array(4);
         // Device clears the default framebuffer at start; render a layer in this frame
@@ -406,6 +442,77 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex: 0, pressed: false}}));
         await next(() => check(!gamepad.buttons[0].pressed && gamepad.buttons[0].value === 0, 'gamepad trigger release state across frames'));
       } finally { if (!controllers.ended) await controllers.end(); controllerCanvas.remove(); }
+    }
+    // Exercise shutdown through real controller signals and the phone's screen
+    // touch handlers. No private source maps or device callbacks are mocked.
+    const shutdownHandlers = ['added', 'selectstart', 'select', 'selectend', ...(handheld ? ['removed'] : ['squeezestart', 'squeeze', 'squeezeend'])];
+    for (const shutdownHandler of shutdownHandlers) {
+      const inputSession = await xr.navigator.xr.requestSession(mode);
+      const inputCanvas = document.createElement('canvas'); document.body.append(inputCanvas);
+      const context = inputCanvas.getContext('webgl', {xrCompatible: true} as WebGLContextAttributes)!;
+      const order: string[] = [];
+      const inputs: (Runtime.XRInputSource | undefined)[] = [];
+      let shutdownIndex = -1; let endPromise: Promise<void> | undefined; let microtaskRan = false; let endWasQueued = false; let resolvedBeforeEnd = false; let framesAfterShutdown = 0;
+      let resolveEnded!: () => void;
+      const ended = new Promise<void>(resolve => { resolveEnded = resolve; });
+      let resolveStarted!: () => void;
+      const started = new Promise<void>(resolve => { resolveStarted = resolve; });
+      const record = (type: string) => {
+        order.push(type);
+        if (type === shutdownHandler && shutdownIndex < 0) {
+          shutdownIndex = order.length - 1;
+          endPromise = inputSession.end().then(() => { resolvedBeforeEnd = !order.includes('end'); });
+          queueMicrotask(() => { microtaskRan = true; });
+        }
+      };
+      inputSession.addEventListener('inputsourceschange', event => {
+        const change = event as Runtime.XRInputSourcesChangeEvent;
+        record(change.added.length ? 'added' : 'removed');
+      });
+      for (const type of ['selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend']) {
+        inputSession.addEventListener(type, event => {
+          inputs.push((event as Runtime.XRInputSourceEvent).inputSource);
+          record(type);
+          if (type.endsWith('start')) resolveStarted();
+        });
+      }
+      inputSession.addEventListener('end', () => { endWasQueued = microtaskRan; order.push('end'); resolveEnded(); });
+      const render = () => {
+        if (shutdownIndex >= 0) framesAfterShutdown++;
+        inputSession.requestAnimationFrame(render);
+      };
+      const buttonIndex = shutdownHandler.startsWith('squeeze') ? 1 : 0;
+      const press = (pressed: boolean) => {
+        if (handheld) {
+          const screen = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)!;
+          const rect = screen.getBoundingClientRect();
+          screen.dispatchEvent(new MouseEvent(pressed ? 'mousedown' : 'mouseup', {button: 2, clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2}));
+        } else window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex, pressed}}));
+      };
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<never>((_resolve, reject) => { timeout = setTimeout(() => reject(new Error(`Timed out ending session from ${shutdownHandler}`)), 5000); });
+      try {
+        inputSession.updateRenderState({baseLayer: new xr.XRWebGLLayer(inputSession, context)});
+        inputSession.requestAnimationFrame(render);
+        if (shutdownHandler !== 'added' || handheld) {
+          await new Promise<void>(resolve => inputSession.requestAnimationFrame(() => resolve()));
+          press(true);
+          if (shutdownHandler !== 'added') {
+            await Promise.race([started, deadline]);
+            if (!inputSession.ended) press(false);
+          }
+        }
+        await Promise.race([ended, deadline]);
+        await endPromise;
+        const pairedEnd = shutdownHandler === 'select' ? ['selectend'] : shutdownHandler === 'squeeze' ? ['squeezeend'] : [];
+        check(order.slice(shutdownIndex).join(',') === [shutdownHandler, ...pairedEnd, 'end'].join(','), `shutdown from ${shutdownHandler} finishes only the current action before end`);
+        check(endWasQueued && !resolvedBeforeEnd && inputSession.ended && inputSession.inputSources.length === 0 && framesAfterShutdown === 0, `shutdown from ${shutdownHandler} queues end, resolves afterward and stops frame processing`);
+        check(inputs.every(input => input instanceof xr.XRInputSource && input === inputs[0]), `shutdown from ${shutdownHandler} preserves valid input identity`);
+      } finally {
+        clearTimeout(timeout);
+        if (!inputSession.ended) await inputSession.end();
+        inputCanvas.remove();
+      }
     }
     return {mode, handheld, assertions: new Set(passed).size, passed: [...new Set(passed)]};
   }, {mode, handheld});

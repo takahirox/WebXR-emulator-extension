@@ -246,5 +246,56 @@
       "test:samples"
     ],
     "firefoxRuntime": "not executed; packaging passed"
+  },
+  "layerInputShutdownReviewFixes": {
+    "issue": 11,
+    "browser": "156.0.8078.4",
+    "commands": {
+      "npm ci": "passed",
+      "npm run typecheck": "passed",
+      "npm run build": "passed",
+      "npm run build:firefox": "passed",
+      "npm run test:browser": "passed",
+      "npm run test:wpt": "passed",
+      "npm run test:samples": "passed",
+      "git diff --check": "passed"
+    },
+    "checks": [
+      "Projection output remains opaque blue when the default framebuffer draw buffer is NONE, whether the application leaves the default framebuffer or its own framebuffer bound; default and application draw-buffer states and framebuffer binding are restored without GL errors",
+      "Projection textures clear stale blue pixels to transparent black in two consecutive frames with RASTERIZER_DISCARD left enabled; preparation and composition restore the enabled capability",
+      "Ending sessions from selectstart/select/selectend and squeezestart/squeeze/squeezeend handlers preserves input identity, completes the current action pair before the queued end event, and stops further frame processing",
+      "Android transient screen touches exercise ending sessions from source addition, selectstart/select/selectend and source removal handlers; no undefined input identities, extra source events or post-shutdown animation callbacks occur",
+      "End events run after the input handler microtasks; end promises resolve after event delivery"
+    ],
+    "apiConformance": [
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-vr",
+        "distinctAssertions": 166,
+        "status": "passed"
+      },
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-ar",
+        "distinctAssertions": 200,
+        "status": "passed"
+      },
+      {
+        "profile": "Generic Android Phone (ARCore)",
+        "mode": "immersive-ar",
+        "distinctAssertions": 167,
+        "status": "passed"
+      }
+    ],
+    "wpt": {
+      "revision": "e1859580b5fcf74940a18d2f783296b4961035e3",
+      "files": 5,
+      "status": "passed"
+    },
+    "samples": {
+      "runs": 3,
+      "status": "passed"
+    },
+    "firefoxRuntime": "not executed; packaging passed"
   }
 }
