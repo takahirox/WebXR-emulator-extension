@@ -98,10 +98,44 @@
             detail: typeof cloneInto !== 'undefined' ? cloneInto(detail, window) : detail,
         }));
     }
+    function isRecord(value) {
+        return typeof value === 'object' && value !== null;
+    }
+    function isVector(value, length) {
+        return (Array.isArray(value) || ArrayBuffer.isView(value)) &&
+            Array.from(value).length === length &&
+            Array.from(value).every(v => typeof v === 'number' && Number.isFinite(v));
+    }
+    function isPose(value) {
+        return isVector(value.position, 3) && isVector(value.quaternion, 4);
+    }
+    function isController(value) {
+        return value === 'rightController' || value === 'leftController';
+    }
+    function isDeviceMessage(value) {
+        if (!isRecord(value))
+            return false;
+        switch (value.action) {
+            case 'webxr-startup':
+            case 'device-enter-immersive':
+            case 'device-leave-immersive': return true;
+            case 'device-pose': return isPose(value);
+            case 'device-input-pose': return isPose(value) && isController(value.objectName);
+            default: return false;
+        }
+    }
 
-    const port = chrome.runtime.connect({ name: 'contentScript' });
-    const postMessage = (message) => port.postMessage(message);
-    port.onMessage.addListener((message) => {
+    function sendRuntimeMessage(envelope) {
+        chrome.runtime.sendMessage(envelope, () => {
+            void chrome.runtime.lastError;
+        });
+    }
+
+    const postMessage = (message) => sendRuntimeMessage({ source: 'content', message });
+    chrome.runtime.onMessage.addListener((envelope) => {
+        if ((envelope === null || envelope === void 0 ? void 0 : envelope.source) !== 'background')
+            return;
+        const message = envelope.message;
         switch (message.action) {
             case 'webxr-device':
                 dispatchCustomEvent('webxr-device', {
@@ -139,18 +173,22 @@
         }
     });
     window.addEventListener('device-pose', event => {
+        if (!isDeviceMessage({ ...event.detail, action: 'device-pose' }))
+            return;
         postMessage({
             action: 'device-pose',
-            position: event.detail.position,
-            quaternion: event.detail.quaternion
+            position: Array.from(event.detail.position),
+            quaternion: Array.from(event.detail.quaternion)
         });
     }, false);
     window.addEventListener('device-input-pose', event => {
+        if (!isDeviceMessage({ ...event.detail, action: 'device-input-pose' }))
+            return;
         postMessage({
             action: 'device-input-pose',
             objectName: event.detail.objectName,
-            position: event.detail.position,
-            quaternion: event.detail.quaternion
+            position: Array.from(event.detail.position),
+            quaternion: Array.from(event.detail.quaternion)
         });
     }, false);
     window.addEventListener('device-enter-immersive', event => {
@@ -172,19 +210,6 @@
             });
         });
     }, false);
-    const loadScript = (source) => {
-        const script = document.createElement('script');
-        script.textContent = source;
-        (document.head || document.documentElement).appendChild(script);
-        script.parentNode.removeChild(script);
-    };
-    loadScript(`
-  (function() {
-    (` + WebXRPolyfillInjection + `)();
-    const polyfill = new CustomWebXRPolyfill();
-    //console.log(this); // to check if loaded
-  })();
-`);
     ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
         manager.loadFromStorage().then(() => {
             dispatchCustomEvent('webxr-device-init', {

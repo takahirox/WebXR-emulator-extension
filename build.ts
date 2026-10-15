@@ -6,7 +6,7 @@ import cleanup from 'rollup-plugin-cleanup';
 import { rm } from 'node:fs/promises';
 
 async function build() {
-  for (const entry of ['polyfill/CustomWebXRPolyfill', 'extension/background', 'extension/content-script', 'extension/devtools', 'app/panel']) {
+  for (const entry of ['polyfill/CustomWebXRPolyfill', 'extension/background', 'extension/main-world', 'extension/content-script', 'extension/devtools', 'app/panel']) {
     const polyfill = entry.startsWith('polyfill/');
     const bundle = await rollup({
       input: `.build/${entry}.js`,

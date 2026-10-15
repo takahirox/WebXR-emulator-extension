@@ -65,3 +65,6 @@ typings/
 
 # Local browser validation screenshots
 test-results/
+
+# Browser-specific packaged extension
+build/firefox/

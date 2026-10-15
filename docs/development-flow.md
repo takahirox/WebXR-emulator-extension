@@ -34,7 +34,7 @@ Choose validation for the changed files and the actual tooling:
 - For extension behavior changes, use the README's developer installation instructions and validate the affected behavior in a desktop browser. Record the browser, reproduction steps, and results. Physical XR hardware is required only when the Issue explains why emulator/browser checks are insufficient.
 - For templates or documentation only, check template front matter, Markdown structure, links, whitespace (`git diff --check`), and consistency against the Issue. No new runtime tests, polyfill build, headset/device checks, or deployed-site verification are required for that scope.
 
-For runtime regression checks, `npm run test:browser` loads the unpacked extension in a fresh desktop Chromium profile; follow the README for the Manifest V2 compatible browser executable. There are no lint or Markdown-check scripts. Use applicable available tools and report what was checked; do not add dependencies or CI merely to validate documentation.
+For runtime regression checks, `npm run test:browser` loads the unpacked extension in a fresh desktop Chromium profile; follow the README for current Playwright Chromium or a current stable Chrome for Testing executable. No Manifest V2 compatibility flags are used. There are no lint or Markdown-check scripts. Use applicable available tools and report what was checked; do not add dependencies or CI merely to validate documentation.
 
 ## 3. Create a Pull Request for the Issue
 

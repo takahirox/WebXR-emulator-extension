@@ -5,7 +5,8 @@
   "scripts": {
     "build": "npm run typecheck && tsc -p tsconfig.emit.json && tsx build.ts",
     "typecheck": "tsc --noEmit",
-    "test:browser": "tsx tests/browser-smoke.ts"
+    "test:browser": "tsx tests/browser-smoke.ts",
+    "build:firefox": "npm run build && tsx build-firefox.ts"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",

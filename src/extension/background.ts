@@ -1,54 +1,27 @@
-import type { ExtensionMessage } from '../types/contracts';
+import type { RuntimeMessage } from '../types/contracts';
+import { isDeviceMessage, isPanelMessage } from '../types/contracts';
 
-const connections: Record<number, Record<string, chrome.runtime.Port[]>> = {};
-
-chrome.runtime.onConnect.addListener(port => {
-  // @TODO: release connection when disconnected
-
-  port.onMessage.addListener((message: ExtensionMessage, sender) => {
-    const tabId = message.tabId !== undefined ? message.tabId : sender.sender!.tab!.id!;
-
-    if (connections[tabId] === undefined) {
-      connections[tabId] = {};
-    }
-
-    const portMap = connections[tabId];
-
-    // Can be multiple content scripts per tab
-    // for example if a web page includes iframe.
-    // So manage ports as an array.
-    if (!portMap[port.name]) {
-      portMap[port.name] = [];
-    }
-
-    if (!portMap[port.name].includes(port)) {
-      portMap[port.name].push(port);
-      port.onDisconnect.addListener(() => {
-        if (portMap[port.name].includes(port)) {
-          portMap[port.name].splice(portMap[port.name].indexOf(port), 1);
-        }
-        if (portMap[port.name].length === 0) {
-          delete portMap[port.name]
-        }
-        if (Object.keys(portMap).length === 0) {
-          delete connections[tabId];
-        }
-      });
-    }
-
-    // transfer message between panel and contentScripts of the same tab
-
-    if (port.name === 'panel') {
-      postMessageToPorts(portMap.contentScript, message);
-    }
-    if (port.name === 'contentScript') {
-      postMessageToPorts(portMap.panel, message);
-    }
-  });
+// Register synchronously on every worker start. Routing has no connection or
+// tab registry to lose when Chrome suspends the worker or a frame goes away.
+chrome.runtime.onMessage.addListener((envelope: RuntimeMessage, sender, respond) => {
+  if (sender.id !== chrome.runtime.id || !envelope?.message) return;
+  const message = envelope.message;
+  const complete = () => {
+    // No open panel / navigated or closed tab is an ordinary lifecycle event.
+    void chrome.runtime.lastError;
+    respond();
+  };
+  if (envelope.source === 'content' && sender.tab?.id !== undefined && isDeviceMessage(message)) {
+    // Derive the tab from Chrome, never from data the inspected page supplies.
+    chrome.runtime.sendMessage({source: 'background', message: {...message, tabId: sender.tab.id}}, complete);
+    return true;
+  }
+  if (envelope.source === 'panel' && !sender.tab &&
+      sender.url === chrome.runtime.getURL('src/app/panel.html') &&
+      Number.isInteger(message.tabId) && isPanelMessage(message)) {
+    // Omitting frameId broadcasts to every live content script in the tab,
+    // including frames created after the panel/worker started.
+    chrome.tabs.sendMessage(message.tabId!, {source: 'background', message}, complete);
+    return true;
+  }
 });
-
-const postMessageToPorts = (ports: chrome.runtime.Port[] | undefined, message: ExtensionMessage) => {
-  ports && ports.forEach(port => {
-    port.postMessage(message);
-  });
-};

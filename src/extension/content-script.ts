@@ -1,13 +1,15 @@
 import ConfigurationManager from '../ConfigurationManager';
-import type { ExtensionMessage } from '../types/contracts';
-import { dispatchCustomEvent } from '../types/contracts';
-const port = chrome.runtime.connect({name: 'contentScript'});
-const postMessage = (message: ExtensionMessage) => port.postMessage(message);
+import type { ExtensionMessage, RuntimeMessage } from '../types/contracts';
+import { dispatchCustomEvent, isDeviceMessage } from '../types/contracts';
+import { sendRuntimeMessage } from './messaging';
+const postMessage = (message: ExtensionMessage) => sendRuntimeMessage({source: 'content', message});
 
 // receive message from panel via background
 // and transfer to polyfill as event on window
 
-port.onMessage.addListener((message: ExtensionMessage) => {
+chrome.runtime.onMessage.addListener((envelope: RuntimeMessage) => {
+  if (envelope?.source !== 'background') return;
+  const message = envelope.message;
   switch (message.action) {
     case 'webxr-device':
       dispatchCustomEvent('webxr-device', {
@@ -54,19 +56,21 @@ port.onMessage.addListener((message: ExtensionMessage) => {
 // Transfer to panel via background.
 
 window.addEventListener('device-pose', event => {
+  if (!isDeviceMessage({...event.detail, action: 'device-pose'})) return;
   postMessage({
     action: 'device-pose',
-    position: event.detail.position,
-    quaternion: event.detail.quaternion
+    position: Array.from(event.detail.position),
+    quaternion: Array.from(event.detail.quaternion)
   });
 }, false);
 
 window.addEventListener('device-input-pose', event => {
+  if (!isDeviceMessage({...event.detail, action: 'device-input-pose'})) return;
   postMessage({
     action: 'device-input-pose',
     objectName: event.detail.objectName,
-    position: event.detail.position,
-    quaternion: event.detail.quaternion
+    position: Array.from(event.detail.position),
+    quaternion: Array.from(event.detail.quaternion)
   });
 }, false);
 
@@ -94,28 +98,6 @@ window.addEventListener('webxr-virtual-room-request', event => {
     });
   });
 }, false);
-
-// function to load script in a web page
-
-const loadScript = (source: string) => {
-  const script = document.createElement('script');
-  script.textContent = source;
-  (document.head || document.documentElement).appendChild(script);
-  script.parentNode!.removeChild(script);
-};
-
-// Synchronously adding WebXR polyfill because
-// some applications for example Three.js WebVR examples
-// check if WebXR is available by synchronously checking
-// navigator.xr , window.XR or whatever when the page is loaded.
-
-loadScript(`
-  (function() {
-    (` + WebXRPolyfillInjection + `)();
-    const polyfill = new CustomWebXRPolyfill();
-    //console.log(this); // to check if loaded
-  })();
-`);
 
 // No synchronous storage and fetch APIs so reluctantly
 // reflecting configuration asynchronously

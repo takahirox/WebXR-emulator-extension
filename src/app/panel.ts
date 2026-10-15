@@ -3,13 +3,15 @@ import type { TransformControls } from 'three/examples/jsm/controls/TransformCon
 import type { Capabilities, DeviceDefinition, ControllerName } from '../types/contracts';
 const THREE = window.THREE;
 import ConfigurationManager from '../ConfigurationManager';
-import type { ExtensionMessage } from '../types/contracts';
-const port = chrome.runtime.connect( {name: 'panel'});
+import type { ExtensionMessage, RuntimeMessage } from '../types/contracts';
+import { sendRuntimeMessage } from '../extension/messaging';
 const tabId = chrome.devtools.inspectedWindow.tabId;
 
 // receive message from contentScript via background
 
-port.onMessage.addListener((message: ExtensionMessage) => {
+chrome.runtime.onMessage.addListener((envelope: RuntimeMessage) => {
+  if (envelope?.source !== 'background' || envelope.message.tabId !== tabId) return;
+  const message = envelope.message;
   switch (message.action) {
     case 'webxr-startup':
       // notify the poses to sync
@@ -57,8 +59,7 @@ port.onMessage.addListener((message: ExtensionMessage) => {
 // send message to contentScript via background
 
 const postMessage = (message: ExtensionMessage) => {
-  message.tabId = tabId;
-  port.postMessage(message);
+  sendRuntimeMessage({source: 'panel', message: {...message, tabId}});
 };
 
 const notifyPoseChange = (node: Three.Object3D) => {
