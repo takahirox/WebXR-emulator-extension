@@ -1,4 +1,6 @@
 import {runConformance} from './conformance';
+import {runDOMOverlayImplementation} from './dom-overlay-production';
+import {runDOMOverlayNegotiation} from './dom-overlay-negotiation';
 import {runDOMOverlayPrototype} from './dom-overlay-prototype';
 import ConfigurationManager from '../src/ConfigurationManager';
 import type { DeviceDefinitions } from '../src/types/contracts';
@@ -549,6 +551,28 @@ try {
   await eventually(() => panel.evaluate(() => (document.querySelector('#deviceSelect') as HTMLSelectElement).value), value => value === 'Generic Android Phone (ARCore)', 'phone conformance profile');
   console.log('Checking Android AR API conformance');
   conformance.push(await runConformance(page, 'immersive-ar', true));
+  console.log('Checking disabled public DOM overlay negotiation and late shadow attachment');
+  const overlayNegotiation = await runDOMOverlayNegotiation(page);
+  console.log('Checking retained Android DOM overlay implementation through test-only internal access');
+  const overlayProduction = await runDOMOverlayImplementation(page, stopWorker);
+  await page.evaluate(async () => {
+    const w = window as unknown as {navigator: {xr: import('../src/polyfill/api/runtime').XRSystem}; overlaySwitch: {root: HTMLElement; session: import('../src/polyfill/api/runtime').XRSession}};
+    const root = document.createElement('section'); root.id = 'overlay-switch'; document.body.append(root);
+    const session = await w.navigator.xr.requestSession('immersive-ar');
+    session._startDOMOverlay(root); // Test-only implementation lifecycle check.
+    w.overlaySwitch = {root, session};
+  });
+  await panel.evaluate(() => {
+    const device = document.querySelector('#deviceSelect') as HTMLSelectElement;
+    device.value = 'Meta Quest 3'; device.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => (window as unknown as {overlaySwitch: {session: {ended: boolean}}}).overlaySwitch.session.ended);
+  assert(await page.evaluate(() => { const s = (window as unknown as {overlaySwitch: {root: HTMLElement}}).overlaySwitch; const clean = !s.root.hasAttribute('popover') && s.root.style.length === 0; s.root.remove(); return clean; }), 'profile change cleans up active DOM overlay before replacing the renderer');
+  overlayProduction.evidence.push({profileSwitchCleanup: true});
+  await page.reload();
+  assert.equal(await page.locator('[popover]').count(), 0, 'page reload starts without overlay resources');
+  overlayProduction.evidence.push({reloadCleanup: true});
+  await writeFile(path.join(root, 'test-results/dom-overlay-production.json'), JSON.stringify({browser: await context.browser()!.version(), negotiation: overlayNegotiation, ...overlayProduction}, null, 2));
   await writeFile(path.join(root, 'test-results/dom-overlay-feasibility.json'), JSON.stringify({browser: await context.browser()!.version(), overlayPrototypes}, null, 2));
   await writeFile(path.join(root, 'test-results/webxr-conformance.json'), JSON.stringify({browser: await context.browser()!.version(), conformance}, null, 2));
   assert.deepEqual(pageErrors, []);

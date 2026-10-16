@@ -124,9 +124,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         }
       }
     }
-    // The rendering research fixture is deliberately not a negotiated feature.
-    // Validate nullable WebIDL dictionaries and cross-realm Element brands even
-    // while dom-overlay is unsupported, without changing the supplied DOM.
+    // Interface conversion precedes per-mode and per-root presentation checks.
     for (const invalidRoot of [undefined, null, {}, document, document.createTextNode('not an Element'), Object.create(Element.prototype)]) {
       for (const featureList of ['requiredFeatures', 'optionalFeatures'] as const) {
         await rejects(() => xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root: invalidRoot as Element}}), 'TypeError', `${featureList}: invalid overlay root ${String(invalidRoot)}`);
@@ -144,6 +142,13 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       const foreignRoot = foreignFrame.contentDocument!.body;
       check(!(foreignRoot instanceof Element), 'overlay validation exercises another realm');
       await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: foreignRoot}}), 'NotSupportedError', 'valid foreign-realm root reaches feature negotiation');
+      if (handheld && mode === 'immersive-ar') {
+        const adopted = foreignFrame.contentDocument!.createElement('section');
+        document.body.append(document.adoptNode(adopted));
+        check(!HTMLElement.prototype.isPrototypeOf(adopted), 'adopted root retains its foreign realm prototype');
+        await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: adopted}}), 'NotSupportedError', 'adopted HTML root cannot bypass the overlay security gate');
+        adopted.remove();
+      }
     } finally { foreignFrame.remove(); }
     for (const overlayMode of ['inline', mode] as const) {
       for (const domOverlay of [undefined, null, {root: document.createElementNS('http://www.w3.org/2000/svg', 'svg')}, {root: document.createElement('div')}]) {
@@ -156,7 +161,19 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         check(optionalOverlay.domOverlayState === null, 'ended unsupported session retains null overlay state');
       }
     }
-    await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: document.body}}), 'NotSupportedError', 'DOM overlay compositor unavailable');
+    for (const featureList of ['requiredFeatures', 'optionalFeatures'] as const) {
+      const root = document.createElement('section'); document.body.append(root);
+      try {
+        if (featureList === 'requiredFeatures') {
+          await rejects(() => xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root}}), 'NotSupportedError', 'overlay disabled until lifetime shadow security and targeting are guaranteed');
+        } else {
+          const unsupported = await xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root}});
+          check(unsupported.domOverlayState === null && !unsupported.enabledFeatures.includes('dom-overlay'), 'optional connected HTML overlay omitted');
+          await unsupported.end();
+        }
+        check(!root.hasAttribute('popover') && root.style.length === 0 && root.parentNode === document.body, 'disabled negotiation leaves the original root untouched');
+      } finally { root.remove(); }
+    }
     const inline = await xr.navigator.xr.requestSession('inline', {optionalFeatures: ['anchors', 'layers', 'hand-tracking', 'hit-test', 'dom-overlay']});
     const inlineSpace = await inline.requestReferenceSpace('viewer');
     check(inline.enabledFeatures.join(',') === 'viewer', 'inline excludes immersive features');
@@ -342,7 +359,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       throws(() => savedFrame.getViewerPose(reference), 'InvalidStateError', 'inactive frame viewer pose');
       throws(() => savedFrame.getPose(viewer, reference), 'InvalidStateError', 'inactive frame pose');
       if (mode === 'immersive-ar') {
-        check(session.domOverlayState === null && !session.enabledFeatures.includes('dom-overlay'), 'unimplemented overlay is not advertised');
+        check(session.domOverlayState === null && !session.enabledFeatures.includes('dom-overlay'), 'overlay stays disabled while shadow-tree security is incomplete');
         check(session.depthUsage === 'cpu-optimized' && session.depthDataFormat === 'float32', 'CPU depth format negotiation');
         await rejects(() => session.requestHitTestSource({space: inlineSpace}), 'InvalidStateError', 'foreign hit test space');
         await rejects(() => session.requestHitTestSource({space: viewer, entityTypes: ['point']}), 'NotSupportedError', 'point-cloud entity unsupported');
@@ -728,7 +745,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       await new Promise<void>(resolve => inline.requestAnimationFrame(() => resolve()));
       check(inlineRendered, 'queued inline frames resume after immersive presentation ends');
     } finally { if (!session.ended) await session.end(); if (!inline.ended) await inline.end(); canvas.remove(); overlay.remove(); }
-    check(!overlay.hasAttribute('style') && session.domOverlayState === null, 'unsupported overlay leaves DOM unchanged');
+    check(overlay.style.length === 0 && session.domOverlayState === null, 'session teardown leaves disabled overlay DOM and state unchanged');
     await rejects(() => session.requestReferenceSpace('viewer'), 'InvalidStateError', 'ended reference space request');
     await rejects(() => session.end(), 'InvalidStateError', 'repeated session end');
     for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) throws(() => session[method](), 'InvalidStateError', `${method} after session end`);

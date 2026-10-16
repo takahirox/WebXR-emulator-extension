@@ -12,6 +12,7 @@ import {
   mat4
 } from 'gl-matrix';
 import ARScene from './ARScene';
+import DOMOverlay from './DOMOverlay';
 
 const DEFAULT_MODES: SessionMode[] = ['inline'];
 
@@ -165,8 +166,8 @@ export default class EmulatedXRDevice extends XRDevice {
   }
 
   isFeatureSupported(featureDescriptor: string, mode: SessionMode = this.emulationMode) {
-    // No live-DOM stereo compositor/input path yet; see docs/dom-overlay-feasibility.md.
-    if (featureDescriptor === 'dom-overlay') return false;
+    // Quest has no supported same-root stereo DOM paint source.
+    if (featureDescriptor === 'dom-overlay') return this.handheld && mode === 'immersive-ar' && DOMOverlay.available();
     if (featureDescriptor === 'viewer') return true;
     if (featureDescriptor === 'local' || featureDescriptor === 'local-floor') return mode !== 'inline';
     if (!this.features.includes(featureDescriptor)) return false;
@@ -233,6 +234,16 @@ export default class EmulatedXRDevice extends XRDevice {
     return Promise.resolve(session.id);
   }
 
+  canPresentDOMOverlay(root: Element | undefined) { return DOMOverlay.accepts(root); }
+
+  startDOMOverlay(root: HTMLElement, invalidate: () => void) {
+    document.documentElement.appendChild(this.div);
+    const overlay = new DOMOverlay(root, this.arScene!, this.resolution.width / window.devicePixelRatio,
+      this.resolution.height / window.devicePixelRatio, invalidate);
+    this.arScene!.domOverlay = overlay;
+    return overlay;
+  }
+
   requestAnimationFrame(callback: FrameRequestCallback) {
     return this.global.requestAnimationFrame(callback);
   }
@@ -243,6 +254,7 @@ export default class EmulatedXRDevice extends XRDevice {
 
   onFrameStart(sessionId: number, renderState: RenderState) {
     const session = this.sessions.get(sessionId)!;
+    this.arScene?.domOverlay?.advanceTouch();
     // guaranteed by the caller that session.baseLayer is not null
     const context = session.baseLayer!.context;
     const canvas = context.canvas as HTMLCanvasElement;
@@ -432,6 +444,7 @@ export default class EmulatedXRDevice extends XRDevice {
         this.arScene.eject();
         this.arScene.releaseCanvas();
       }
+      this.div.remove();
       this.touched = false;
       this.isPointerAndTabledCloseEnough = false;
       for (const input of this.gamepadInputSources) input.active = false;
@@ -561,7 +574,7 @@ export default class EmulatedXRDevice extends XRDevice {
     this.originalCanvasParams.width = canvas.width;
     this.originalCanvasParams.height = canvas.height;
 
-    document.body.appendChild(this.div);
+    (session.enabledFeatures.has('dom-overlay') ? document.documentElement : document.body).appendChild(this.div);
 
     // If canvas is OffscreenCanvas we don't further touch so far.
     if (!(canvas instanceof HTMLCanvasElement)) { return; }
@@ -582,9 +595,7 @@ export default class EmulatedXRDevice extends XRDevice {
     // There may be a case where an application operates DOM elements
     // in immersive mode. In such case, we don't restore DOM elements
     // hierarchies so far.
-    if (this.div.parentElement === document.body) {
-      document.body.removeChild(this.div);
-    }
+    this.div.remove();
     if (canvas.parentElement === this.div) {
       this.div.removeChild(canvas);
     }
@@ -615,6 +626,7 @@ export default class EmulatedXRDevice extends XRDevice {
   }
 
   _getTouchCoordinates() {
+    if (this.arScene?.domOverlay) return this.arScene.domOverlay.touchCoordinates(this.gamepads[0].pose.position);
     // @TODO: Optimize if possible
     const pose = this.gamepads[0].pose;
     const matrix = mat4.fromRotationTranslation(mat4.create(), pose.orientation, pose.position);

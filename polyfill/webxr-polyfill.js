@@ -1930,8 +1930,10 @@ function WebXRPolyfillInjection() {
           var _a, _b, _c, _d;
           validateMode(mode);
           const domOverlay = options.domOverlay;
+          let overlayRoot;
           if (domOverlay !== undefined && domOverlay !== null) {
-              Element.prototype.hasAttribute.call(domOverlay.root, '');
+              overlayRoot = domOverlay.root;
+              Element.prototype.hasAttribute.call(overlayRoot, '');
           }
           const needsActivation = mode !== 'inline' || [...((_a = options.requiredFeatures) !== null && _a !== void 0 ? _a : []), ...((_b = options.optionalFeatures) !== null && _b !== void 0 ? _b : [])].some(feature => feature !== 'inline-stereo');
           if (needsActivation && !navigator.userActivation.isActive)
@@ -1948,6 +1950,8 @@ function WebXRPolyfillInjection() {
               const enabled = new Set();
               for (const feature of new Set([...required, ...((_d = options.optionalFeatures) !== null && _d !== void 0 ? _d : [])])) {
                   let supported = device.isFeatureSupported(feature, mode);
+                  if (feature === 'dom-overlay')
+                      supported = supported && device.canPresentDOMOverlay(overlayRoot);
                   if (feature === 'depth-sensing') {
                       if (!options.depthSensing) {
                           supported = false;
@@ -1971,6 +1975,15 @@ function WebXRPolyfillInjection() {
                           inline._setImmersiveSuppressed(false);
                   }
               });
+              if (enabled.has('dom-overlay')) {
+                  try {
+                      session._startDOMOverlay(overlayRoot);
+                  }
+                  catch (error) {
+                      await session.end();
+                      throw error;
+                  }
+              }
               this.sessions.add(session);
               if (mode === 'inline' && this.immersive)
                   session._setImmersiveSuppressed(true);
@@ -1990,6 +2003,11 @@ function WebXRPolyfillInjection() {
   }
   const inputEvents = ['select-start', 'select-end', 'squeeze-start', 'squeeze-end'];
   class XRSession extends XREventTarget {
+      _startDOMOverlay(root) {
+          this.overlay = this._device.startDOMOverlay(root, () => { if (!this.ended)
+              void this.end(); });
+          this.overlayState = Object.freeze({ type: 'screen' });
+      }
       constructor(_device, _mode, _id, enabled, onShutdown) {
           super();
           this._device = _device;
@@ -2015,6 +2033,9 @@ function WebXRPolyfillInjection() {
           this.inputWrappers = new Map();
           this.rawSources = [];
           this.depthRunning = true;
+          this.overlay = null;
+          this.overlayState = null;
+          this.suppressedSelect = new Set();
           this.isSystemKeyboardSupported = false;
           this._hitSources = new Set();
           this._transientSources = new Set();
@@ -2072,6 +2093,23 @@ function WebXRPolyfillInjection() {
                       continue;
                   const prefix = signal.type.startsWith('squeeze') ? 'squeeze' : 'select';
                   const starting = signal.type.endsWith('start');
+                  if (prefix === 'select' && this.overlay) {
+                      if (starting) {
+                          const target = this.overlay.targetForTouch(this._device.gamepads[0].pose.position);
+                          if (target) {
+                              const event = new XRSessionEvent('beforexrselect', { session: this, bubbles: true, composed: true, cancelable: true });
+                              if (!target.dispatchEvent(event))
+                                  this.suppressedSelect.add(signal.source);
+                              if (this.ended)
+                                  break;
+                          }
+                      }
+                      if (this.suppressedSelect.has(signal.source)) {
+                          if (!starting)
+                              this.suppressedSelect.delete(signal.source);
+                          continue;
+                      }
+                  }
                   if (!starting)
                       this.emitInput(prefix, source, time);
                   this.emitInput(`${prefix}${starting ? 'start' : 'end'}`, source, time);
@@ -2168,7 +2206,7 @@ function WebXRPolyfillInjection() {
           return new XRLightProbe(this);
       }
       get environmentBlendMode() { return this._mode === 'immersive-ar' ? 'alpha-blend' : 'opaque'; }
-      get domOverlayState() { return null; }
+      get domOverlayState() { return this.overlayState; }
       _assertLive() { if (this.ended)
           invalidState('The session has ended.'); }
       _require(feature) { this._assertLive(); if (!this.enabledFeatures.includes(feature))
@@ -2250,9 +2288,12 @@ function WebXRPolyfillInjection() {
           await new Promise(resolve => setTimeout(resolve, 0));
       }
       _finish() {
-          var _a;
+          var _a, _b;
           if (this.ended)
               return;
+          (_a = this.overlay) === null || _a === void 0 ? void 0 : _a.dispose();
+          this.overlay = null;
+          this.suppressedSelect.clear();
           this.endedValue = true;
           this._device.cancelAnimationFrame(this.frameHandle);
           for (const [type, listener] of this.listeners)
@@ -2263,7 +2304,7 @@ function WebXRPolyfillInjection() {
               anchor.delete();
           this.inputWrappers.clear();
           this.callbacks.clear();
-          (_a = this.currentCallbacks) === null || _a === void 0 ? void 0 : _a.clear();
+          (_b = this.currentCallbacks) === null || _b === void 0 ? void 0 : _b.clear();
           this.signals = [];
           this.sources = Object.freeze([]);
           for (const source of [...this._hitSources, ...this._transientSources])
@@ -29403,6 +29444,7 @@ void main() {
           this.handheld = handheld;
           this.room = null;
           this.stereoEffectEnabled = true;
+          this.domOverlay = null;
           this.disposed = false;
           this.resetControls = () => { };
           this.cleanup = [];
@@ -29603,6 +29645,7 @@ void main() {
           compositeScene.add(composite);
           this.cleanup.push(() => { composite.geometry.dispose(); composite.material.dispose(); });
           const animate = () => {
+              var _a;
               if (this.disposed)
                   return;
               requestAnimationFrame(animate);
@@ -29653,6 +29696,7 @@ void main() {
               });
               renderer.setRenderTarget(null);
               renderer.render(scene, camera);
+              (_a = this.domOverlay) === null || _a === void 0 ? void 0 : _a.update();
           };
           animate();
           const onResize = () => {
@@ -29686,6 +29730,9 @@ void main() {
           }
       }
       eject() {
+          var _a;
+          (_a = this.domOverlay) === null || _a === void 0 ? void 0 : _a.dispose();
+          this.domOverlay = null;
           const element = this.renderer.domElement;
           element.remove();
           this.isTouched = false;
@@ -29761,6 +29808,283 @@ void main() {
       released() {
           this.pointer.material.color.setHex(0xff8888);
           this.pointer.visible = false;
+      }
+  }
+
+  class DOMOverlay {
+      static available() {
+          return false;
+      }
+      static accepts(root) {
+          return (root === null || root === void 0 ? void 0 : root.namespaceURI) === 'http://www.w3.org/1999/xhtml' && root.ownerDocument === document && root.isConnected &&
+              root !== document.documentElement && !root.matches('iframe, frame, object, embed, :modal') && !root.hasAttribute('popover') &&
+              typeof root.showPopover === 'function';
+      }
+      constructor(root, scene, width, height, invalidate) {
+          this.root = root;
+          this.scene = scene;
+          this.width = width;
+          this.height = height;
+          this.invalidate = invalidate;
+          this.events = new AbortController();
+          this.ray = new Raycaster();
+          this.frames = new Map();
+          this.queued = [];
+          this.currentTouch = null;
+          this.pointer = null;
+          this.disposed = false;
+          this.toggleTimer = 0;
+          this.visible = false;
+          this.dpr = window.devicePixelRatio;
+          this.matrix = new Matrix4();
+          this.corners = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
+          this.toggle = (event) => {
+              if (event.newState === 'closed')
+                  this.toggleTimer = window.setTimeout(() => { if (!this.disposed)
+                      this.invalidate(); }, 0);
+          };
+          this.visibility = () => { if (document.hidden)
+              this.cancel(); this.update(); };
+          this.cancel = () => { if (this.pointer !== null) {
+              this.pointer = null;
+              this.queued.push(null);
+          } };
+          this.down = (event) => {
+              if (!event.isPrimary || event.button !== 0 || this.pointer !== null || !this.visible)
+                  return;
+              if (this.blocked(event.clientX, event.clientY)) {
+                  event.preventDefault();
+                  event.stopImmediatePropagation();
+                  return;
+              }
+              this.pointer = event.pointerId;
+              this.queued.push({ x: event.clientX, y: event.clientY, start: true });
+          };
+          this.move = (event) => {
+              if (event.pointerId !== this.pointer)
+                  return;
+              if (!this.targetAt(event.clientX, event.clientY)) {
+                  this.cancel();
+                  return;
+              }
+              const point = { x: event.clientX, y: event.clientY, start: false };
+              const last = this.queued[this.queued.length - 1];
+              if (last && !last.start)
+                  this.queued[this.queued.length - 1] = point;
+              else
+                  this.queued.push(point);
+          };
+          this.up = (event) => { if (event.pointerId === this.pointer)
+              this.cancel(); };
+          this.style = root.getAttribute('style');
+          this.parent = root.parentNode;
+          this.display = root.style.getPropertyValue('display');
+          this.displayPriority = root.style.getPropertyPriority('display');
+          const originalColor = getComputedStyle(root).color;
+          root.setAttribute('popover', 'manual');
+          const styles = {
+              position: 'fixed', inset: 'auto', left: '0', top: '0', margin: '0', padding: '0', border: '0',
+              'box-sizing': 'border-box', 'min-width': '0', 'min-height': '0', 'max-width': 'none', 'max-height': 'none',
+              color: originalColor, width: `${width}px`, height: `${height}px`, background: 'transparent', contain: 'paint',
+              'transform-origin': '0 0', 'pointer-events': 'auto', overflow: 'auto', isolation: 'isolate',
+              transition: 'none', animation: 'none', 'offset-path': 'none', translate: 'none', rotate: 'none', scale: 'none',
+          };
+          for (const [property, value] of Object.entries(styles))
+              root.style.setProperty(property, value, 'important');
+          this.observer = new MutationObserver(records => {
+              if (records.every(record => record.type === 'attributes' && record.target === root))
+                  return;
+              if (!this.valid())
+                  this.invalidate();
+              else
+                  this.blockFrames();
+          });
+          try {
+              root.showPopover();
+              if (!this.valid() || !root.matches(':popover-open'))
+                  throw new DOMException('The overlay root could not enter the top layer.', 'NotSupportedError');
+              this.blockFrames();
+              this.observer.observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+              const options = { capture: true, signal: this.events.signal };
+              root.addEventListener('pointerdown', this.down, options);
+              root.addEventListener('wheel', () => { }, { passive: false, signal: this.events.signal });
+              window.addEventListener('pointermove', this.move, options);
+              window.addEventListener('pointerup', this.up, options);
+              window.addEventListener('pointercancel', this.up, options);
+              window.addEventListener('blur', this.cancel, { signal: this.events.signal });
+              window.addEventListener('pagehide', this.invalidate, { signal: this.events.signal });
+              document.addEventListener('visibilitychange', this.visibility, { signal: this.events.signal });
+              root.addEventListener('beforetoggle', this.toggle, { signal: this.events.signal });
+              this.update();
+          }
+          catch (error) {
+              this.dispose();
+              throw error;
+          }
+      }
+      valid() {
+          return this.root.isConnected && this.root.ownerDocument === document && this.root.parentNode === this.parent;
+      }
+      blocked(x, y) {
+          for (const frame of this.frames.keys()) {
+              const r = frame.getBoundingClientRect();
+              if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
+                  return true;
+          }
+          return false;
+      }
+      blockFrames() {
+          const visit = (tree) => {
+              for (const node of tree.querySelectorAll('*')) {
+                  if (node.namespaceURI === 'http://www.w3.org/1999/xhtml' && node.matches('iframe, frame, object, embed')) {
+                      const frame = node;
+                      if (!this.frames.has(frame))
+                          this.frames.set(frame, frame.getAttribute('style'));
+                      if (frame.style.getPropertyValue('pointer-events') !== 'none' || frame.style.getPropertyPriority('pointer-events') !== 'important')
+                          frame.style.setProperty('pointer-events', 'none', 'important');
+                  }
+                  if (node.shadowRoot) {
+                      this.observer.observe(node.shadowRoot, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+                      visit(node.shadowRoot);
+                  }
+              }
+          };
+          visit(this.root);
+          if (this.root.shadowRoot)
+              visit(this.root.shadowRoot);
+      }
+      advanceTouch() {
+          var _a, _b, _c, _d, _e, _f, _g;
+          if (this.queued.length) {
+              this.currentTouch = (_a = this.queued.shift()) !== null && _a !== void 0 ? _a : null;
+              if (!this.currentTouch) {
+                  (_c = (_b = this.scene).onRelease) === null || _c === void 0 ? void 0 : _c.call(_b);
+                  return;
+              }
+          }
+          if (!this.currentTouch)
+              return;
+          const { x, y } = this.currentTouch;
+          const world = this.targetAt(x, y) ? this.screenPoint(x, y) : null;
+          if (world)
+              (_e = (_d = this.scene).onTouch) === null || _e === void 0 ? void 0 : _e.call(_d, world.toArray());
+          else {
+              this.currentTouch = null;
+              this.cancel();
+              (_g = (_f = this.scene).onRelease) === null || _g === void 0 ? void 0 : _g.call(_f);
+          }
+      }
+      screenPoint(x, y) {
+          var _a;
+          const rect = this.scene.renderer.domElement.getBoundingClientRect();
+          this.ray.setFromCamera(new Vector2((x - rect.left) / rect.width * 2 - 1, 1 - (y - rect.top) / rect.height * 2), this.scene.camera);
+          return (_a = this.ray.intersectObject(this.scene.screen, false)[0]) === null || _a === void 0 ? void 0 : _a.point;
+      }
+      targetAt(x, y) {
+          if (!this.visible || this.blocked(x, y))
+              return null;
+          let target = document.elementFromPoint(x, y);
+          if (!target)
+              return null;
+          while (target.shadowRoot) {
+              const inner = target.shadowRoot.elementFromPoint(x, y);
+              if (!inner || inner === target)
+                  break;
+              target = inner;
+          }
+          let ancestor = target;
+          while (ancestor && ancestor !== this.root) {
+              ancestor = ancestor instanceof ShadowRoot ? ancestor.host : ancestor.parentNode;
+          }
+          if (ancestor !== this.root)
+              return null;
+          if (target.matches('iframe, frame, object, embed'))
+              return null;
+          return target;
+      }
+      touchCoordinates(position) {
+          const screen = this.scene.screen;
+          const point = screen.worldToLocal(new Vector3().fromArray(position));
+          screen.geometry.computeBoundingBox();
+          const box = screen.geometry.boundingBox;
+          return [2 * (point.x - box.min.x) / (box.max.x - box.min.x) - 1,
+              2 * (point.y - box.min.y) / (box.max.y - box.min.y) - 1];
+      }
+      targetForTouch(position) {
+          const p = new Vector3().fromArray(position).project(this.scene.camera);
+          const rect = this.scene.renderer.domElement.getBoundingClientRect();
+          return this.targetAt(rect.left + (p.x + 1) * rect.width / 2, rect.top + (1 - p.y) * rect.height / 2);
+      }
+      update() {
+          if (this.disposed)
+              return;
+          if (!this.valid()) {
+              this.invalidate();
+              return;
+          }
+          if (this.dpr !== window.devicePixelRatio) {
+              const scale = this.dpr / window.devicePixelRatio;
+              this.dpr = window.devicePixelRatio;
+              this.width *= scale;
+              this.height *= scale;
+              this.root.style.setProperty('width', `${this.width}px`, 'important');
+              this.root.style.setProperty('height', `${this.height}px`, 'important');
+          }
+          const { screen, camera, renderer } = this.scene;
+          screen.updateWorldMatrix(true, false);
+          camera.updateWorldMatrix(true, false);
+          screen.geometry.computeBoundingBox();
+          const box = screen.geometry.boundingBox;
+          const rect = renderer.domElement.getBoundingClientRect();
+          const sx = box.max.x - box.min.x, sy = box.max.y - box.min.y;
+          const local = new Matrix4().set(sx / this.width, 0, 0, box.min.x, 0, -sy / this.height, 0, box.max.y, 0, 0, 1, 0, 0, 0, 0, 1);
+          const viewport = new Matrix4().set(rect.width / 2, 0, 0, rect.left + rect.width / 2, 0, -rect.height / 2, 0, rect.top + rect.height / 2, 0, 0, 1, 0, 0, 0, 0, 1);
+          this.matrix.copy(viewport).multiply(camera.projectionMatrix).multiply(camera.matrixWorldInverse).multiply(screen.matrixWorld).multiply(local);
+          const transform = `matrix3d(${this.matrix.elements.join(',')})`;
+          if (this.root.style.getPropertyValue('transform') !== transform)
+              this.root.style.setProperty('transform', transform, 'important');
+          const cameraLocal = screen.worldToLocal(camera.getWorldPosition(new Vector3()));
+          const coordinates = [[box.min.x, box.max.y], [box.max.x, box.max.y], [box.max.x, box.min.y], [box.min.x, box.min.y]];
+          this.visible = !document.hidden && cameraLocal.z > 0 && coordinates.every(([x, y], i) => {
+              this.corners[i].set(x, y, 0).applyMatrix4(screen.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
+              return this.corners[i].z < -camera.near;
+          });
+          const display = this.visible ? this.display : 'none';
+          const priority = this.visible ? this.displayPriority : 'important';
+          if (this.root.style.getPropertyValue('display') !== display || this.root.style.getPropertyPriority('display') !== priority) {
+              if (display)
+                  this.root.style.setProperty('display', display, priority);
+              else
+                  this.root.style.removeProperty('display');
+          }
+          if (!this.visible)
+              this.cancel();
+      }
+      dispose() {
+          var _a, _b;
+          if (this.disposed)
+              return;
+          this.disposed = true;
+          window.clearTimeout(this.toggleTimer);
+          this.events.abort();
+          this.observer.disconnect();
+          this.queued.length = 0;
+          this.currentTouch = null;
+          (_b = (_a = this.scene).onRelease) === null || _b === void 0 ? void 0 : _b.call(_a);
+          if (this.root.matches(':popover-open'))
+              this.root.hidePopover();
+          this.root.removeAttribute('popover');
+          if (this.style === null)
+              this.root.removeAttribute('style');
+          else
+              this.root.setAttribute('style', this.style);
+          for (const [frame, style] of this.frames) {
+              if (style === null)
+                  frame.removeAttribute('style');
+              else
+                  frame.setAttribute('style', style);
+          }
+          this.frames.clear();
       }
   }
 
@@ -29848,7 +30172,7 @@ void main() {
       }
       isFeatureSupported(featureDescriptor, mode = this.emulationMode) {
           if (featureDescriptor === 'dom-overlay')
-              return false;
+              return this.handheld && mode === 'immersive-ar' && DOMOverlay.available();
           if (featureDescriptor === 'viewer')
               return true;
           if (featureDescriptor === 'local' || featureDescriptor === 'local-floor')
@@ -29920,6 +30244,13 @@ void main() {
           }
           return Promise.resolve(session.id);
       }
+      canPresentDOMOverlay(root) { return DOMOverlay.accepts(root); }
+      startDOMOverlay(root, invalidate) {
+          document.documentElement.appendChild(this.div);
+          const overlay = new DOMOverlay(root, this.arScene, this.resolution.width / window.devicePixelRatio, this.resolution.height / window.devicePixelRatio, invalidate);
+          this.arScene.domOverlay = overlay;
+          return overlay;
+      }
       requestAnimationFrame(callback) {
           return this.global.requestAnimationFrame(callback);
       }
@@ -29927,7 +30258,9 @@ void main() {
           this.global.cancelAnimationFrame(handle);
       }
       onFrameStart(sessionId, renderState) {
+          var _a, _b;
           const session = this.sessions.get(sessionId);
+          (_b = (_a = this.arScene) === null || _a === void 0 ? void 0 : _a.domOverlay) === null || _b === void 0 ? void 0 : _b.advanceTouch();
           const context = session.baseLayer.context;
           const canvas = context.canvas;
           if (session.ar && !this.handheld && this.arScene) {
@@ -30112,6 +30445,7 @@ void main() {
                   this.arScene.eject();
                   this.arScene.releaseCanvas();
               }
+              this.div.remove();
               this.touched = false;
               this.isPointerAndTabledCloseEnough = false;
               for (const input of this.gamepadInputSources)
@@ -30226,7 +30560,7 @@ void main() {
           const canvas = session.baseLayer.context.canvas;
           this.originalCanvasParams.width = canvas.width;
           this.originalCanvasParams.height = canvas.height;
-          document.body.appendChild(this.div);
+          (session.enabledFeatures.has('dom-overlay') ? document.documentElement : document.body).appendChild(this.div);
           if (!(canvas instanceof HTMLCanvasElement)) {
               return;
           }
@@ -30240,9 +30574,7 @@ void main() {
           const canvas = session.baseLayer.context.canvas;
           canvas.width = this.originalCanvasParams.width;
           canvas.height = this.originalCanvasParams.height;
-          if (this.div.parentElement === document.body) {
-              document.body.removeChild(this.div);
-          }
+          this.div.remove();
           if (canvas.parentElement === this.div) {
               this.div.removeChild(canvas);
           }
@@ -30266,6 +30598,9 @@ void main() {
               dz <= 0.01 && dz >= 0.0;
       }
       _getTouchCoordinates() {
+          var _a;
+          if ((_a = this.arScene) === null || _a === void 0 ? void 0 : _a.domOverlay)
+              return this.arScene.domOverlay.touchCoordinates(this.gamepads[0].pose.position);
           const pose = this.gamepads[0].pose;
           const matrix = fromRotationTranslation(create$3(), pose.orientation, pose.position);
           multiply(matrix, this.viewMatrix, matrix);

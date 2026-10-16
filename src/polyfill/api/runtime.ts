@@ -11,6 +11,7 @@ import XRTransientInputHitTestSource from './XRTransientInputHitTestSource';
 import XRHitTestResult from './XRHitTestResult';
 import XRTransientInputHitTestResult from './XRTransientInputHitTestResult';
 import XRInputSourceArray from './XRInputSourceArray';
+import type DOMOverlay from '../DOMOverlay';
 export {XRInputSourceArray};
 
 export class XREventTarget extends EventTarget {
@@ -60,10 +61,12 @@ export class XRSystem extends XREventTarget {
   async requestSession(mode: SessionMode, options: SessionOptions = {}) {
     validateMode(mode);
     const domOverlay = options.domOverlay;
+    let overlayRoot: Element | undefined;
     if (domOverlay !== undefined && domOverlay !== null) {
       // WebIDL interface conversion uses the Element brand, not instanceof:
       // a same-origin iframe's Element has a different realm's prototype.
-      Element.prototype.hasAttribute.call(domOverlay.root, '');
+      overlayRoot = domOverlay.root;
+      Element.prototype.hasAttribute.call(overlayRoot, '');
     }
     const needsActivation = mode !== 'inline' || [...(options.requiredFeatures ?? []), ...(options.optionalFeatures ?? [])].some(feature => feature !== 'inline-stereo');
     if (needsActivation && !navigator.userActivation.isActive) throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
@@ -76,6 +79,7 @@ export class XRSystem extends XREventTarget {
       const enabled = new Set<string>();
       for (const feature of new Set([...required, ...(options.optionalFeatures ?? [])])) {
         let supported = device.isFeatureSupported(feature, mode);
+        if (feature === 'dom-overlay') supported = supported && device.canPresentDOMOverlay(overlayRoot);
         if (feature === 'depth-sensing') {
           if (!options.depthSensing) { supported = false; }
           else {
@@ -94,6 +98,10 @@ export class XRSystem extends XREventTarget {
           for (const inline of this.sessions) inline._setImmersiveSuppressed(false);
         }
       });
+      if (enabled.has('dom-overlay')) {
+        try { session._startDOMOverlay(overlayRoot as HTMLElement); }
+        catch (error) { await session.end(); throw error; }
+      }
       this.sessions.add(session);
       if (mode === 'inline' && this.immersive) session._setImmersiveSuppressed(true);
       if (mode !== 'inline') {
@@ -129,6 +137,13 @@ export class XRSession extends XREventTarget {
   private inputWrappers = new Map<DeviceInput, XRInputSource>();
   private rawSources: DeviceInput[] = [];
   private depthRunning = true;
+  private overlay: DOMOverlay | null = null;
+  private overlayState: Readonly<{type: 'screen'}> | null = null;
+  private suppressedSelect = new Set<DeviceInput>();
+  _startDOMOverlay(root: HTMLElement) {
+    this.overlay = this._device.startDOMOverlay(root, () => { if (!this.ended) void this.end(); });
+    this.overlayState = Object.freeze({type: 'screen'});
+  }
   private readonly features: readonly string[];
   readonly isSystemKeyboardSupported = false;
   readonly interactionMode: 'screen-space' | 'world-space';
@@ -186,7 +201,7 @@ export class XRSession extends XREventTarget {
     return new XRLightProbe(this);
   }
   get environmentBlendMode() { return this._mode === 'immersive-ar' ? 'alpha-blend' : 'opaque'; }
-  get domOverlayState() { return null; }
+  get domOverlayState() { return this.overlayState; }
   _assertLive() { if (this.ended) invalidState('The session has ended.'); }
   _require(feature: string) { this._assertLive(); if (!this.enabledFeatures.includes(feature)) unsupported(`${feature} was not enabled.`); }
   _owns(space: XRSpace) {
@@ -240,6 +255,7 @@ export class XRSession extends XREventTarget {
   }
   private _finish() {
     if (this.ended) return;
+    this.overlay?.dispose(); this.overlay = null; this.suppressedSelect.clear();
     this.endedValue = true; this._device.cancelAnimationFrame(this.frameHandle);
     for (const [type, listener] of this.listeners) this._device.removeEventListener(type, listener);
     this._device.removeEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
@@ -299,6 +315,20 @@ export class XRSession extends XREventTarget {
       if (!source) continue;
       const prefix = signal.type.startsWith('squeeze') ? 'squeeze' : 'select';
       const starting = signal.type.endsWith('start');
+      if (prefix === 'select' && this.overlay) {
+        if (starting) {
+          const target = this.overlay.targetForTouch(this._device.gamepads[0].pose.position);
+          if (target) {
+            const event = new XRSessionEvent('beforexrselect', {session: this, bubbles: true, composed: true, cancelable: true});
+            if (!target.dispatchEvent(event)) this.suppressedSelect.add(signal.source);
+            if (this.ended) break;
+          }
+        }
+        if (this.suppressedSelect.has(signal.source)) {
+          if (!starting) this.suppressedSelect.delete(signal.source);
+          continue;
+        }
+      }
       if (!starting) this.emitInput(prefix, source, time);
       this.emitInput(`${prefix}${starting ? 'start' : 'end'}`, source, time);
     }

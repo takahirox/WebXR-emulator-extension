@@ -1,6 +1,6 @@
 # DOM Overlay rendering investigation (Issue #13)
 
-**Partial result; keep [Issue #13](https://github.com/takahirox/WebXR-emulator-extension/issues/13) open.** Neither Android AR nor Quest MR advertises `dom-overlay`. This checkpoint contains executable browser prototypes, argument-validation fixes, and removal of the unused desktop `z-index` overlay path. It does not implement session overlay presentation or XR/DOM input integration.
+**Historical partial result. Issue #13 was administratively closed after PR #14; [Issue #15](https://github.com/takahirox/WebXR-emulator-extension/issues/15) tracks the outstanding implementation. See the current [production checkpoint](dom-overlay-implementation.md).** At this earlier checkpoint, neither Android AR nor Quest MR advertised `dom-overlay`. This checkpoint contains executable browser prototypes, argument-validation fixes, and removal of the unused desktop `z-index` overlay path. It does not implement session overlay presentation or XR/DOM input integration.
 
 ## Specification and support decision
 
