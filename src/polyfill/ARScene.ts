@@ -23,6 +23,7 @@ import {
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import MyControls from './MyControls';
+import type DOMOverlay from './DOMOverlay';
 import type {DeviceSize} from '../types/contracts';
 
 // @TODO: These default values should be imported from somewhere common place
@@ -44,6 +45,7 @@ export default class ARScene {
   tabletCamera!: PerspectiveCamera;
   room: Object3D | null = null;
   stereoEffectEnabled = true;
+  domOverlay: DOMOverlay | null = null;
   private disposed = false;
   private resetControls = () => {};
   private cleanup: (() => void)[] = [];
@@ -362,6 +364,7 @@ export default class ARScene {
       });
       renderer.setRenderTarget(null);
       renderer.render(scene, camera);
+      this.domOverlay?.update();
     };
 
     animate();
@@ -402,6 +405,7 @@ export default class ARScene {
   }
 
   eject() {
+    this.domOverlay?.dispose(); this.domOverlay = null;
     const element = this.renderer.domElement;
     element.remove();
     this.isTouched = false;

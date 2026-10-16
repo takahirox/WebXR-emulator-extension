@@ -1,4 +1,5 @@
 import {runConformance} from './conformance';
+import {runDOMOverlayProduction} from './dom-overlay-production';
 import {runDOMOverlayPrototype} from './dom-overlay-prototype';
 import ConfigurationManager from '../src/ConfigurationManager';
 import type { DeviceDefinitions } from '../src/types/contracts';
@@ -549,6 +550,24 @@ try {
   await eventually(() => panel.evaluate(() => (document.querySelector('#deviceSelect') as HTMLSelectElement).value), value => value === 'Generic Android Phone (ARCore)', 'phone conformance profile');
   console.log('Checking Android AR API conformance');
   conformance.push(await runConformance(page, 'immersive-ar', true));
+  console.log('Checking Android production DOM overlay presentation and input');
+  const overlayProduction = await runDOMOverlayProduction(page, stopWorker);
+  await page.evaluate(async () => {
+    const w = window as unknown as {navigator: {xr: import('../src/polyfill/api/runtime').XRSystem}; overlaySwitch: {root: HTMLElement; session: import('../src/polyfill/api/runtime').XRSession}};
+    const root = document.createElement('section'); root.id = 'overlay-switch'; document.body.append(root);
+    w.overlaySwitch = {root, session: await w.navigator.xr.requestSession('immersive-ar', {requiredFeatures: ['dom-overlay'], domOverlay: {root}})};
+  });
+  await panel.evaluate(() => {
+    const device = document.querySelector('#deviceSelect') as HTMLSelectElement;
+    device.value = 'Meta Quest 3'; device.dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => (window as unknown as {overlaySwitch: {session: {ended: boolean}}}).overlaySwitch.session.ended);
+  assert(await page.evaluate(() => { const s = (window as unknown as {overlaySwitch: {root: HTMLElement}}).overlaySwitch; const clean = !s.root.hasAttribute('popover') && s.root.style.length === 0; s.root.remove(); return clean; }), 'profile change cleans up active DOM overlay before replacing the renderer');
+  overlayProduction.evidence.push({profileSwitchCleanup: true});
+  await page.reload();
+  assert.equal(await page.locator('[popover]').count(), 0, 'page reload starts without overlay resources');
+  overlayProduction.evidence.push({reloadCleanup: true});
+  await writeFile(path.join(root, 'test-results/dom-overlay-production.json'), JSON.stringify({browser: await context.browser()!.version(), ...overlayProduction}, null, 2));
   await writeFile(path.join(root, 'test-results/dom-overlay-feasibility.json'), JSON.stringify({browser: await context.browser()!.version(), overlayPrototypes}, null, 2));
   await writeFile(path.join(root, 'test-results/webxr-conformance.json'), JSON.stringify({browser: await context.browser()!.version(), conformance}, null, 2));
   assert.deepEqual(pageErrors, []);
