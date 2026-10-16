@@ -137,7 +137,7 @@
       }
     ],
     "questEnabled": false,
-    "xrTouchRay": "Verified normalized Y 0.54 ±0.01 for the displayed control; inner screen mesh coordinates, not outer device bounds."
+    "xrTouchRay": "Verified normalized Y 0.54 \u00b10.01 for the displayed control; inner screen mesh coordinates, not outer device bounds."
   },
   "focusedAPI": [
     {
@@ -431,5 +431,266 @@
     "experimentalSingleRoot": "validation/issue-15/experimental-single-root.png"
   },
   "authorization": "Local worktree implementation and commit only; no push, PR, merge, issue edits or comments. No usage reset/purchase/provider switch.",
-  "requiredPostMergeVerification": "None"
+  "requiredPostMergeVerification": "None",
+  "historicalEvidenceNotice": "Original 2026-10-16 production/sample claims and screenshots below are historical and superseded by reviewFixValidation. Production DOM Overlay negotiation is now disabled in every mode.",
+  "reviewFixValidation": {
+    "testedAtUTC": "2026-10-16T15:48:31.981845+00:00",
+    "browser": "156.0.8078.4",
+    "environment": "Headed Playwright Chromium with the real unpacked MV3 extension, fresh owned profile, no experimental DOM capture flags; software WebGL.",
+    "commands": [
+      {
+        "command": "npm ci",
+        "exitCode": 0
+      },
+      {
+        "command": "npm run typecheck",
+        "exitCode": 0
+      },
+      {
+        "command": "npm run build",
+        "exitCode": 0
+      },
+      {
+        "command": "npm run build:firefox",
+        "exitCode": 0
+      },
+      {
+        "command": "npm run test:browser",
+        "exitCode": 0
+      },
+      {
+        "command": "npm run test:wpt",
+        "exitCode": 0
+      },
+      {
+        "command": "npm run test:samples",
+        "exitCode": 0
+      },
+      {
+        "command": "git diff --check",
+        "exitCode": 0
+      }
+    ],
+    "productionNegotiation": {
+      "enabled": false,
+      "configurations": [
+        "light",
+        "open-root",
+        "closed-root",
+        "open-button",
+        "closed-button"
+      ],
+      "lateShadowFrameEntryRelease": true
+    },
+    "productionModes": {
+      "androidAR": false,
+      "questMR": false,
+      "questVR": false,
+      "inline": false
+    },
+    "findingResolutions": [
+      "P1: Disabled public negotiation because page-level MutationObserver cannot enforce frame restrictions across late shadow attachment and closed trees. Required rejects, optional omitted, state null. A late cross-origin shadow iframe entry/release produces no XR action or stranded source.",
+      "P2 targeting: Descend open shadows before composed-root membership checks. Internal nested open-root and open-control tests deliver beforexrselect to the actual button, preserve native click and suppress XR select on cancellation. Closed configurations remain disabled publicly.",
+      "P2 hiding: Use display:none !important for back-facing/behind-camera surfaces. Descendants with visibility:visible have no rendered boxes, cannot be hit or clicked; front-facing restoration and teardown preserve original root styles."
+    ],
+    "internalImplementationOnly": {
+      "browser": "156.0.8078.4",
+      "negotiation": {
+        "enabled": false,
+        "configurations": [
+          "light",
+          "open-root",
+          "closed-root",
+          "open-button",
+          "closed-button"
+        ],
+        "lateShadowFrameEntryRelease": true
+      },
+      "presentation": "test-only internal Android implementation; public negotiation disabled",
+      "evidence": [
+        {
+          "label": "initial",
+          "error": 0.0002916351522387406,
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "viewport": {
+            "width": 1080,
+            "height": 1920
+          }
+        },
+        {
+          "nativeScroll": true,
+          "nativeClickFocus": true,
+          "cancelableBeforeXRSelect": true,
+          "workerSuspension": true
+        },
+        {
+          "label": "phone-moved",
+          "error": 0.7884369287856837,
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "viewport": {
+            "width": 1080,
+            "height": 1920
+          }
+        },
+        {
+          "label": "camera-moved",
+          "error": 0.7904723211034032,
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "viewport": {
+            "width": 1080,
+            "height": 1920
+          }
+        },
+        {
+          "label": "resized-dpr2",
+          "error": 1.001081443997604,
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "viewport": {
+            "width": 540,
+            "height": 960
+          }
+        },
+        {
+          "embeddedFramesBlocked": [
+            "same-origin",
+            "cross-origin",
+            "opaque-sandbox",
+            "nested",
+            "navigation",
+            "sandbox mutation"
+          ],
+          "blockedPressDraggedOutside": true
+        },
+        {
+          "lifecycle": [
+            "session.end",
+            "end inside beforexrselect",
+            "root removal",
+            "root reparenting",
+            "top-layer dismissal"
+          ]
+        },
+        {
+          "internalOpenShadowTargeting": [
+            "nested open-root",
+            "open-control"
+          ],
+          "publicClosedShadowSupport": false,
+          "hiddenVisibilityOverride": true
+        },
+        {
+          "profileSwitchCleanup": true
+        },
+        {
+          "reloadCleanup": true
+        }
+      ],
+      "androidEnabled": false,
+      "questEnabled": false
+    },
+    "internalTestScope": "Tests explicitly call the retained _startDOMOverlay internal method; they bypass public negotiation solely for regression coverage and do not establish supported production overlays.",
+    "wptSubset": {
+      "files": 5,
+      "scope": "Five pinned geometry/identity files; not DOM Overlay WPT conformance."
+    },
+    "publishedSamples": {
+      "browser": "156.0.8078.4",
+      "results": [
+        {
+          "url": "https://immersive-web.github.io/webxr-samples/immersive-vr-session.html",
+          "deviceKey": "Meta Quest 3",
+          "questMode": "immersive-vr",
+          "probe": {
+            "frames": 126,
+            "hits": 0
+          },
+          "errors": []
+        },
+        {
+          "url": "https://immersive-web.github.io/webxr-samples/hit-test.html",
+          "deviceKey": "Meta Quest 3",
+          "questMode": "immersive-ar",
+          "probe": {
+            "frames": 126,
+            "hits": 2
+          },
+          "errors": []
+        },
+        {
+          "url": "https://immersive-web.github.io/webxr-samples/hit-test.html",
+          "deviceKey": "Generic Android Phone (ARCore)",
+          "questMode": "immersive-ar",
+          "probe": {
+            "frames": 127,
+            "hits": 2
+          },
+          "errors": []
+        },
+        {
+          "url": "https://immersive-web.github.io/webxr-samples/ar-barebones.html",
+          "deviceKey": "Generic Android Phone (ARCore)",
+          "questMode": "immersive-ar",
+          "overlay": {
+            "enabled": false,
+            "type": null,
+            "sameRoot": true
+          },
+          "probe": {
+            "frames": 127,
+            "hits": 0
+          },
+          "errors": []
+        },
+        {
+          "url": "https://immersive-web.github.io/webxr-samples/ar-barebones.html",
+          "deviceKey": "Meta Quest 3",
+          "questMode": "immersive-ar",
+          "overlay": {
+            "enabled": false,
+            "type": null,
+            "sameRoot": true
+          },
+          "probe": {
+            "frames": 126,
+            "hits": 0
+          },
+          "errors": []
+        }
+      ]
+    },
+    "earlierAttempts": [
+      "Internal browser attempts failed after hidden-surface clicks also operated the exposed emulator gizmos. A test-only transparent click guard now isolates that assertion; final targeted/browser checks pass.",
+      "Internal native wheel attempts after hide/resize transitions timed out despite correct DOM hit testing. This remains a recorded acceptance limitation. Final suite asserts scrolling before those transitions and does not claim post-transition wheel support."
+    ],
+    "notRerun": [
+      "Optional experimental HTML-in-Canvas capability probe (historical evidence retained)."
+    ],
+    "notTested": [
+      "Firefox runtime/DevTools",
+      "physical devices",
+      "full DOM Overlay WPT suite"
+    ],
+    "issueComplete": false,
+    "remainingWork": "Keep Issue #15 open. Re-enabling Android requires enforceable lifetime shadow-tree security/actual-target dispatch and remaining input/CSS acceptance. Quest production stereo/controller support remains unavailable."
+  }
 }

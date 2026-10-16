@@ -31,7 +31,7 @@ The following published revisions were checked on 2026-10-16. Working and Editor
 | Two stereo views, tracked controllers | I | I | — |
 | Single `none` view, transient screen input | — | — | I |
 | `hit-test` (plane/mesh room intersections) | — | I | I |
-| `dom-overlay` | — | — | HTML screen subset; see restrictions below |
+| `dom-overlay` | — | — | — (disabled pending shadow-tree security/input guarantees) |
 | `anchors` (session lifetime) | — | I | I |
 | `hand-tracking` (deterministic skeletons) | I | I | — |
 | `layers` (WebGL2 projection + mono quad) | I | I | I |
@@ -55,7 +55,7 @@ Animation callbacks run in registration order with cancellation, one active fram
 
 [Hit test source/results algorithms](https://www.w3.org/TR/2025/WD-webxr-hit-test-1-20251211/#hit-test-source) drive feature, lifecycle, cancellation and error checks. The packaged room is the sensed environment. Plane and mesh queries intersect its polygon surfaces, return nearest-first intersections, apply `offsetRay` in the source's effective space and retain the transformed face normal as pose +Y. Point-cloud queries reject because there is no point cloud. Repeated cancellation throws `InvalidStateError`. A cancelled source remains in an already-created frame's snapshot, but is absent from subsequent frames. A transient query matches `generic-touchscreen` exactly and produces results only for the associated active screen source; Quest has no transient touchscreen.
 
-[DOM overlay interaction](https://www.w3.org/TR/2024/WD-webxr-dom-overlays-1-20240924/#xrinputsource) has a **restricted production Android HTML-root path**. It projects the same live root to the phone screen, reports `screen`, retains native input, dispatches cancelable `beforexrselect` and restores styles/resources on teardown. Quest and inline remain disabled. Invalid root brands reject with `TypeError`; unsupported root ownership/connection/type or mode rejects a required feature and omits an optional one without styling it. Embedded-frame pointer interaction is conservatively blocked. Native `:xr-overlay`, UA/backdrop/viewport CSS, SVG roots and arbitrary closed-shadow security remain unmet, so this is not full standards conformance. See the [implementation/validation report](dom-overlay-implementation.md) for evidence, supported-root constraints, a gated single-root canvas experiment, and the outstanding **Issue #15** requirements. The earlier [Issue #13 investigation](dom-overlay-feasibility.md) is historical.
+[DOM overlay interaction](https://www.w3.org/TR/2024/WD-webxr-dom-overlays-1-20240924/#xrinputsource) remains **disabled in production in all modes**. Required requests reject with `NotSupportedError`; optional requests omit the feature and retain null state without touching the root. Invalid root brands still reject with `TypeError` during conversion. Late shadow attachment bypassed the inspected-frame restriction, and closed-shadow targets cannot receive correctly targeted `beforexrselect` from page-level hit testing. Popover/handler availability alone is insufficient to enable the feature. Internal regression tests exercise the retained Android renderer, open-shadow targeting and subtree hiding; they do not establish public support. Native CSS semantics and Quest stereo remain unmet. See the [implementation/validation report](dom-overlay-implementation.md); **Issue #15 remains open**.
 
 ### Controllers, touch and hands
 
@@ -100,7 +100,7 @@ npm run test:wpt
 npm run test:samples
 ```
 
-`test:browser` loads the unpacked MV3 extension, opens the actual DevTools panel and runs both the original rendering/bridge regressions and the new API cases on all three immersive profile/mode combinations. Deliberate required-feature rejection, optional-feature omission, input event ordering, source/frame ownership, ended sessions, positive Android overlay negotiation and unsupported overlay rejection, anchor movement/deletion, hand joints, depth and actual layer pixels are exercised. Its JSON report and screenshots are written to ignored `test-results/`. The tsx naming helper installed by the test runner is a harness-only identity function needed when Playwright serializes nested functions.
+`test:browser` loads the unpacked MV3 extension, opens the actual DevTools panel and runs both the original rendering/bridge regressions and the new API cases on all three immersive profile/mode combinations. Deliberate required-feature rejection, optional-feature omission, input event ordering, source/frame ownership, ended sessions, disabled overlay negotiation across light/open/closed shadow configurations, anchor movement/deletion, hand joints, depth and actual layer pixels are exercised. Its JSON report and screenshots are written to ignored `test-results/`. The tsx naming helper installed by the test runner is a harness-only identity function needed when Playwright serializes nested functions.
 
 `test:wpt` downloads a pinned upstream WPT revision, **e1859580b5fcf74940a18d2f783296b4961035e3**, and runs these unchanged assertion bodies:
 
@@ -112,7 +112,7 @@ npm run test:samples
 
 The harness replaces `testharnessreport` with a JSON collector. For the constructor and navigator identity cases it replaces native fake-device session setup with a real emulator inline session and a legacy WebGL layer. Those assertions do not depend on immersive hardware. This adaptation does **not** validate the native fake-device infrastructure or immersive session setup. Other WPT files, including IDL and native permission/opaque-framebuffer tests, were not executed. Focused equivalent tests cover the listed emulator behaviors; five passing WPT files are not full-suite conformance. Downloads require network access; files are served locally and not included in extension packages.
 
-`test:samples` loads the published Immersive Web VR-session, hit-test and Barebones AR DOM Overlay samples with the unpacked extension, clicks their actual entry buttons, observes at least 120 XR callbacks and nonempty hit-test results where requested, verifies phone/Quest overlay negotiation and the phone sample's native exit button and captures screenshots. The pages and extension are unmodified; only a test observer wraps requests/callbacks. These externally hosted samples can change independently of this revision.
+`test:samples` loads the published Immersive Web VR-session, hit-test and Barebones AR DOM Overlay samples with the unpacked extension, clicks their actual entry buttons, observes at least 120 XR callbacks and nonempty hit-test results where requested, verifies that both phone and Quest omit the overlay without changing the sample root, and captures screenshots. The pages and extension are unmodified; only a test observer wraps requests/callbacks. These externally hosted samples can change independently of this revision.
 
 ## Validation record and remaining Issue scope
 

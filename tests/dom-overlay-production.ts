@@ -14,10 +14,11 @@ type OverlayWindow = Pick<PanelProbeWindow, 'panelProbe'> & typeof Runtime & {
     events: string[]; rays: number[]; clicks: number; cancel: boolean; endOnBefore: boolean;
     nativeBefore: {session: boolean; target: boolean; bubbles: boolean; composed: boolean; cancelable: boolean}[];
   };
+  shadowOverlay: {session: Runtime.XRSession; container: HTMLElement; root: HTMLElement; button: HTMLButtonElement; canvas: HTMLCanvasElement; events: string[]; clicks: number};
 };
 
-/** Exercises shipped negotiation/presentation/input; no production monkey patches. */
-export async function runDOMOverlayProduction(page: Page, stopWorker: () => Promise<void>) {
+/** Test-only access to the retained implementation; public negotiation stays disabled. */
+export async function runDOMOverlayImplementation(page: Page, stopWorker: () => Promise<void>) {
   await page.evaluate('globalThis.__name = value => value');
   await page.evaluate(async () => {
     const w = window as unknown as OverlayWindow;
@@ -33,7 +34,9 @@ export async function runDOMOverlayProduction(page: Page, stopWorker: () => Prom
     const scroll = document.createElement('div'); Object.assign(scroll.style, {position: 'absolute', left: '25%', top: '55%', width: '50%', height: '10%', overflow: 'auto'});
     const tall = document.createElement('div'); tall.style.height = '2000px'; tall.textContent = 'Native scroll'; scroll.append(tall);
     root.append(button, input, scroll); ancestor.append(root); document.body.append(ancestor);
-    const session = await w.navigator.xr.requestSession('immersive-ar', {requiredFeatures: ['dom-overlay'], domOverlay: {root}});
+    const session = await w.navigator.xr.requestSession('immersive-ar');
+    // Deliberately bypass negotiation only in this implementation regression harness.
+    session._startDOMOverlay(root);
     const state: OverlayWindow['productionOverlay'] = w.productionOverlay = {session, root, button, input, ancestor, scroll, frames: [], events: [], rays: [], clicks: 0, cancel: true, endOnBefore: false, nativeBefore: []};
     button.addEventListener('click', () => state.clicks++);
     root.addEventListener('beforexrselect', event => {
@@ -68,7 +71,7 @@ export async function runDOMOverlayProduction(page: Page, stopWorker: () => Prom
     screen.localToWorld(point).project(camera);
     const display = renderer.domElement.getBoundingClientRect(), button = state.button.getBoundingClientRect();
     const center = {x: button.x + button.width / 2, y: button.y + button.height / 4};
-    return {center, error: Math.hypot(center.x - (display.left + (point.x + 1) * display.width / 2), center.y - (display.top + (1 - point.y) * display.height / 2)),
+    return {center, projectedCenter: {x: display.left + (point.x + 1) * display.width / 2, y: display.top + (1 - point.y) * display.height / 2}, error: Math.hypot(center.x - (display.left + (point.x + 1) * display.width / 2), center.y - (display.top + (1 - point.y) * display.height / 2)),
       target: document.elementFromPoint(center.x, center.y) === state.button,
       identity: document.getElementById('production-overlay') === state.root && state.root.parentNode === state.ancestor,
       inheritedColor: getComputedStyle(state.root).color, clicks: state.clicks, events: state.events.slice(), before: state.nativeBefore.slice(),
@@ -115,6 +118,16 @@ export async function runDOMOverlayProduction(page: Page, stopWorker: () => Prom
     assert(Math.abs(targetRayY - 0.54) < 0.01, `XR target ray uses the visible inner screen coordinates: ${targetRayY}`);
     const sessionState = await page.evaluate(() => (window as unknown as OverlayWindow).productionOverlay.session.domOverlayState);
     assert.deepEqual(sessionState, {type: 'screen'});
+    // Verify native scrolling before display/DPR transitions. Post-transition
+    // Chromium wheel routing remains a recorded limitation of this disabled path.
+    const scroll = await page.locator('#production-overlay > div').boundingBox(); assert(scroll);
+    const scrollPoint = {x: scroll.x + scroll.width / 2, y: scroll.y + scroll.height / 2};
+    const scrollGeometry = await page.evaluate(p => { const s = (window as unknown as OverlayWindow).productionOverlay; return {point: p, target: s.scroll.contains(document.elementFromPoint(p.x, p.y)), height: s.scroll.clientHeight, total: s.scroll.scrollHeight, css: getComputedStyle(s.scroll).overflow, rootScroll: s.root.scrollTop, ended: s.session.ended}; }, scrollPoint);
+    assert(scrollGeometry.target && scrollGeometry.total > scrollGeometry.height, 'native wheel targets the displayed scrollable content');
+    await page.mouse.move(scrollPoint.x, scrollPoint.y); await settle();
+    await page.mouse.wheel(0, 150);
+    await page.waitForFunction(() => (window as unknown as OverlayWindow).productionOverlay.scroll.scrollTop > 0).catch(async error => { console.log('scroll failure', await page.evaluate(p => { const s = (window as unknown as OverlayWindow).productionOverlay; return {rootScroll: s.root.scrollTop, scrollTop: s.scroll.scrollTop, target: document.elementFromPoint(p.x,p.y)?.outerHTML.slice(0,120)}; }, scrollPoint)); throw error; });
+    evidence.push({nativeScroll: true, nativeClickFocus: true, cancelableBeforeXRSelect: true, workerSuspension: true});
     // Move through the same production bridge used by the DevTools panel.
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0.015, 1.6, -0.2], quaternion: [0, Math.sin(0.08), 0, Math.cos(0.08)]}})));
     current = await capture('phone-moved');
@@ -122,15 +135,31 @@ export async function runDOMOverlayProduction(page: Page, stopWorker: () => Prom
     assert((await sample()).clicks >= 3, 'native hit testing follows translated/rotated phone');
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-pose', {detail: {position: [0.008, 1.6, 0], quaternion: [0, 0, 0, 1]}})));
     await capture('camera-moved');
+    await page.evaluate(() => {
+      (window as unknown as OverlayWindow).productionOverlay.button.style.visibility = 'visible';
+      // Catch clicks below the hidden top-layer root so this assertion does not
+      // also operate the emulator's exposed phone/camera transform gizmos.
+      const guard = document.createElement('div'); guard.id = 'hidden-overlay-click-guard';
+      Object.assign(guard.style, {position: 'fixed', inset: '0', zIndex: '10000'}); document.body.append(guard);
+    });
     for (const pose of [
       {position: [0.015, 1.6, -0.2], quaternion: [0, 1, 0, 0]},
       {position: [0.015, 1.6, 0.2], quaternion: [0, 0, 0, 1]},
     ]) {
       await page.evaluate(pose => window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', ...pose}})), pose);
       await settle();
-      assert(await page.evaluate(() => getComputedStyle((window as unknown as OverlayWindow).productionOverlay.root).visibility === 'hidden'), 'back-facing/behind-camera phone has no live overlay hit surface');
+      const hidden = await sample();
+      assert(await page.evaluate(point => {
+        const s = (window as unknown as OverlayWindow).productionOverlay;
+        return getComputedStyle(s.root).display === 'none' && getComputedStyle(s.button).visibility === 'visible' &&
+          s.button.getClientRects().length === 0 && !s.root.contains(document.elementFromPoint(point.x, point.y));
+      }, hidden.projectedCenter), 'back-facing/behind-camera phone removes even visibility:visible descendants from painting and native hit testing');
+      await page.mouse.click(hidden.projectedCenter.x, hidden.projectedCenter.y); await settle();
+      assert.equal((await sample()).clicks, hidden.clicks, 'hidden descendant cannot receive a native click');
     }
-    await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0.015, 1.6, -0.2], quaternion: [0, Math.sin(0.08), 0, Math.cos(0.08)]}})));
+    await page.evaluate(() => { document.getElementById('hidden-overlay-click-guard')?.remove();
+      window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0.015, 1.6, -0.2], quaternion: [0, Math.sin(0.08), 0, Math.cos(0.08)]}}));
+    });
     await settle();
     const cdp = await page.context().newCDPSession(page);
     try {
@@ -141,15 +170,6 @@ export async function runDOMOverlayProduction(page: Page, stopWorker: () => Prom
       await cdp.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 720, deviceScaleFactor: 1, mobile: false});
     } finally { await cdp.detach(); }
     await settle();
-    // Real browser scrolling, without injecting a substitute scroll event.
-    const scroll = await page.locator('#production-overlay > div').boundingBox(); assert(scroll);
-    const scrollPoint = {x: scroll.x + scroll.width / 2, y: scroll.y + scroll.height / 2};
-    const scrollGeometry = await page.evaluate(p => { const s = (window as unknown as OverlayWindow).productionOverlay; return {point: p, target: s.scroll.contains(document.elementFromPoint(p.x, p.y)), height: s.scroll.clientHeight, total: s.scroll.scrollHeight, css: getComputedStyle(s.scroll).overflow, rootScroll: s.root.scrollTop, ended: s.session.ended}; }, scrollPoint);
-    assert(scrollGeometry.target && scrollGeometry.total > scrollGeometry.height, 'native wheel targets the displayed scrollable content');
-    await page.mouse.move(scrollPoint.x, scrollPoint.y); await settle();
-    await page.mouse.wheel(0, 150);
-    await page.waitForFunction(() => (window as unknown as OverlayWindow).productionOverlay.scroll.scrollTop > 0).catch(async error => { console.log('scroll failure', await page.evaluate(p => { const s = (window as unknown as OverlayWindow).productionOverlay; return {rootScroll: s.root.scrollTop, scrollTop: s.scroll.scrollTop, target: document.elementFromPoint(p.x,p.y)?.outerHTML.slice(0,120)}; }, scrollPoint)); throw error; });
-    evidence.push({nativeScroll: true, nativeClickFocus: true, cancelableBeforeXRSelect: true, workerSuspension: true});
     await page.evaluate(() => {
       const s = (window as unknown as OverlayWindow).productionOverlay;
       for (const [index, src] of [`${location.origin}/frame`, `${location.origin.replace('127.0.0.1', 'localhost')}/frame`, 'about:blank'].entries()) {
@@ -161,7 +181,8 @@ export async function runDOMOverlayProduction(page: Page, stopWorker: () => Prom
     });
     await settle();
     for (let index = 0; index < 3; index++) {
-      const box = await page.locator('#production-overlay iframe').nth(index).boundingBox(); assert(box);
+      const box = await page.locator('#production-overlay iframe').nth(index).boundingBox();
+      assert(box, `embedded frame ${index} must be rendered`);
       assert(await page.locator('#production-overlay iframe').nth(index).evaluate(frame => getComputedStyle(frame).pointerEvents === 'none'), 'embedded documents cannot receive native pointer input');
       const before = (await sample()).events.length;
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); await settle();
@@ -194,7 +215,9 @@ export async function runDOMOverlayProduction(page: Page, stopWorker: () => Prom
         const parent = document.createElement('div'), destination = document.createElement('div'), root = document.createElement('article');
         root.style.color = 'rgb(30, 40, 50)'; const original = root.getAttribute('style');
         parent.append(root); document.body.append(parent, destination);
-        const session = await w.navigator.xr.requestSession('immersive-ar', {requiredFeatures: ['dom-overlay'], domOverlay: {root}});
+        const session = await w.navigator.xr.requestSession('immersive-ar');
+        // Test-only implementation lifecycle check.
+        session._startDOMOverlay(root);
         if (operation === 'remove') root.remove();
         else if (operation === 'reparent') destination.append(root);
         else root.hidePopover();
@@ -206,11 +229,50 @@ export async function runDOMOverlayProduction(page: Page, stopWorker: () => Prom
       assert.deepEqual(result, {ended: true, restored: true, position: true}, `${operation} ends overlay and restores styles without resurrecting/moving the root`);
     }
     evidence.push({lifecycle: ['session.end', 'end inside beforexrselect', 'root removal', 'root reparenting', 'top-layer dismissal']});
-    return {presentation: 'production single live root', evidence, questEnabled: false};
+    for (const configuration of ['open-root', 'open-control'] as const) {
+      await page.evaluate(async configuration => {
+        const w = window as unknown as OverlayWindow;
+        const container = document.createElement('div'); document.body.append(container);
+        const root = document.createElement('section'), button = document.createElement('button');
+        button.id = 'shadow-overlay-button'; button.textContent = 'Live shadow control';
+        Object.assign(button.style, {position: 'absolute', left: '25%', top: '20%', width: '50%', height: '12%'});
+        if (configuration === 'open-root') {
+          const nested = document.createElement('div'); container.attachShadow({mode: 'open'}).append(nested);
+          nested.attachShadow({mode: 'open'}).append(root); root.append(button);
+        } else {
+          container.append(root); const host = document.createElement('div'); root.append(host);
+          host.attachShadow({mode: 'open'}).append(button);
+        }
+        const session = await w.navigator.xr.requestSession('immersive-ar');
+        session._startDOMOverlay(root); // Internal harness only, not public support.
+        const canvas = document.createElement('canvas'); document.body.append(canvas);
+        const gl = canvas.getContext('webgl')!; await gl.makeXRCompatible();
+        session.updateRenderState({baseLayer: new w.XRWebGLLayer(session, gl)});
+        const state = w.shadowOverlay = {session, container, root, button, canvas, events: [] as string[], clicks: 0};
+        button.addEventListener('beforexrselect', event => { state.events.push(event.target === button ? 'before' : 'wrong-target'); event.preventDefault(); });
+        button.addEventListener('click', () => state.clicks++);
+        for (const name of ['selectstart', 'select', 'selectend']) session.addEventListener(name, () => state.events.push(name));
+        const frame = () => { if (!session.ended) session.requestAnimationFrame(frame); }; session.requestAnimationFrame(frame);
+      }, configuration);
+      try {
+        await settle();
+        const box = await page.locator('#shadow-overlay-button').boundingBox(); assert(box);
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        await page.waitForFunction(() => (window as unknown as OverlayWindow).shadowOverlay.events.length > 0);
+        await settle();
+        assert.deepEqual(await page.evaluate(() => { const s = (window as unknown as OverlayWindow).shadowOverlay; return {events: s.events, clicks: s.clicks, sources: s.session.inputSources.length}; }),
+          {events: ['before'], clicks: 1, sources: 0}, `${configuration}: deepest live target receives cancellation and native click, with no stranded source`);
+      } finally {
+        await page.evaluate(async () => { const s = (window as unknown as OverlayWindow).shadowOverlay; await s.session.end(); s.canvas.remove(); s.container.remove(); });
+      }
+    }
+    evidence.push({internalOpenShadowTargeting: ['nested open-root', 'open-control'], publicClosedShadowSupport: false, hiddenVisibilityOverride: true});
+    return {presentation: 'test-only internal Android implementation; public negotiation disabled', evidence, androidEnabled: false, questEnabled: false};
   } finally {
     await page.evaluate(async () => {
       const s = (window as unknown as OverlayWindow).productionOverlay;
       if (!s.session.ended) await s.session.end(); s.ancestor.remove();
+      document.getElementById('hidden-overlay-click-guard')?.remove();
       window.dispatchEvent(new CustomEvent('webxr-pose', {detail: {position: [0, 1.6, 0], quaternion: [0, 0, 0, 1]}}));
       window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0, 1.6, -0.2], quaternion: [0, 0, 0, 1]}}));
     });

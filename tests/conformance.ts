@@ -146,9 +146,8 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         const adopted = foreignFrame.contentDocument!.createElement('section');
         document.body.append(document.adoptNode(adopted));
         check(!HTMLElement.prototype.isPrototypeOf(adopted), 'adopted root retains its foreign realm prototype');
-        const adoptedSession = await xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: adopted}});
-        check(adoptedSession.domOverlayState?.type === 'screen', 'connected owned HTML root from another realm can be presented');
-        await adoptedSession.end(); adopted.remove();
+        await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: adopted}}), 'NotSupportedError', 'adopted HTML root cannot bypass the overlay security gate');
+        adopted.remove();
       }
     } finally { foreignFrame.remove(); }
     for (const overlayMode of ['inline', mode] as const) {
@@ -162,19 +161,18 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         check(optionalOverlay.domOverlayState === null, 'ended unsupported session retains null overlay state');
       }
     }
-    if (handheld && mode === 'immersive-ar') {
-      for (const featureList of ['requiredFeatures', 'optionalFeatures'] as const) {
-        const root = document.createElement('section'); document.body.append(root);
-        const supported = await xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root}});
-        check(supported.domOverlayState?.type === 'screen' && supported.enabledFeatures.includes('dom-overlay'), `${featureList}: live phone screen overlay enabled`);
-        check(root.matches(':popover-open') && root.parentNode === document.body, 'overlay active at resolution without changing DOM ancestry');
-        const state = supported.domOverlayState;
-        await supported.end();
-        check(supported.domOverlayState === state && root.style.length === 0 && !root.hasAttribute('popover'), `overlay type stable after end; inline style and popover restored (${supported.domOverlayState === state}, ${root.getAttribute('style')}, ${root.getAttribute('popover')})`);
-        root.remove();
-      }
-    } else {
-      await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: document.body}}), 'NotSupportedError', 'stereo DOM overlay compositor unavailable');
+    for (const featureList of ['requiredFeatures', 'optionalFeatures'] as const) {
+      const root = document.createElement('section'); document.body.append(root);
+      try {
+        if (featureList === 'requiredFeatures') {
+          await rejects(() => xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root}}), 'NotSupportedError', 'overlay disabled until lifetime shadow security and targeting are guaranteed');
+        } else {
+          const unsupported = await xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root}});
+          check(unsupported.domOverlayState === null && !unsupported.enabledFeatures.includes('dom-overlay'), 'optional connected HTML overlay omitted');
+          await unsupported.end();
+        }
+        check(!root.hasAttribute('popover') && root.style.length === 0 && root.parentNode === document.body, 'disabled negotiation leaves the original root untouched');
+      } finally { root.remove(); }
     }
     const inline = await xr.navigator.xr.requestSession('inline', {optionalFeatures: ['anchors', 'layers', 'hand-tracking', 'hit-test', 'dom-overlay']});
     const inlineSpace = await inline.requestReferenceSpace('viewer');
@@ -361,7 +359,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       throws(() => savedFrame.getViewerPose(reference), 'InvalidStateError', 'inactive frame viewer pose');
       throws(() => savedFrame.getPose(viewer, reference), 'InvalidStateError', 'inactive frame pose');
       if (mode === 'immersive-ar') {
-        check(handheld ? session.domOverlayState?.type === 'screen' && session.enabledFeatures.includes('dom-overlay') : session.domOverlayState === null && !session.enabledFeatures.includes('dom-overlay'), 'overlay advertised only with a live screen presentation');
+        check(session.domOverlayState === null && !session.enabledFeatures.includes('dom-overlay'), 'overlay stays disabled while shadow-tree security is incomplete');
         check(session.depthUsage === 'cpu-optimized' && session.depthDataFormat === 'float32', 'CPU depth format negotiation');
         await rejects(() => session.requestHitTestSource({space: inlineSpace}), 'InvalidStateError', 'foreign hit test space');
         await rejects(() => session.requestHitTestSource({space: viewer, entityTypes: ['point']}), 'NotSupportedError', 'point-cloud entity unsupported');
@@ -747,7 +745,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       await new Promise<void>(resolve => inline.requestAnimationFrame(() => resolve()));
       check(inlineRendered, 'queued inline frames resume after immersive presentation ends');
     } finally { if (!session.ended) await session.end(); if (!inline.ended) await inline.end(); canvas.remove(); overlay.remove(); }
-    check(overlay.style.length === 0 && (handheld ? session.domOverlayState?.type === 'screen' : session.domOverlayState === null), 'session teardown restores overlay DOM and retains stable state');
+    check(overlay.style.length === 0 && session.domOverlayState === null, 'session teardown leaves disabled overlay DOM and state unchanged');
     await rejects(() => session.requestReferenceSpace('viewer'), 'InvalidStateError', 'ended reference space request');
     await rejects(() => session.end(), 'InvalidStateError', 'repeated session end');
     for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) throws(() => session[method](), 'InvalidStateError', `${method} after session end`);

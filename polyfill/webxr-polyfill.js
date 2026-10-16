@@ -29813,7 +29813,7 @@ void main() {
 
   class DOMOverlay {
       static available() {
-          return typeof HTMLElement.prototype.showPopover === 'function' && 'onbeforexrselect' in HTMLElement.prototype;
+          return false;
       }
       static accepts(root) {
           return (root === null || root === void 0 ? void 0 : root.namespaceURI) === 'http://www.w3.org/1999/xhtml' && root.ownerDocument === document && root.isConnected &&
@@ -29878,6 +29878,8 @@ void main() {
               this.cancel(); };
           this.style = root.getAttribute('style');
           this.parent = root.parentNode;
+          this.display = root.style.getPropertyValue('display');
+          this.displayPriority = root.style.getPropertyPriority('display');
           const originalColor = getComputedStyle(root).color;
           root.setAttribute('popover', 'manual');
           const styles = {
@@ -29982,7 +29984,7 @@ void main() {
           if (!this.visible || this.blocked(x, y))
               return null;
           let target = document.elementFromPoint(x, y);
-          if (!target || !(target === this.root || this.root.contains(target)))
+          if (!target)
               return null;
           while (target.shadowRoot) {
               const inner = target.shadowRoot.elementFromPoint(x, y);
@@ -29990,6 +29992,12 @@ void main() {
                   break;
               target = inner;
           }
+          let ancestor = target;
+          while (ancestor && ancestor !== this.root) {
+              ancestor = ancestor instanceof ShadowRoot ? ancestor.host : ancestor.parentNode;
+          }
+          if (ancestor !== this.root)
+              return null;
           if (target.matches('iframe, frame, object, embed'))
               return null;
           return target;
@@ -30041,9 +30049,14 @@ void main() {
               this.corners[i].set(x, y, 0).applyMatrix4(screen.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
               return this.corners[i].z < -camera.near;
           });
-          const visibility = this.visible ? 'visible' : 'hidden';
-          if (this.root.style.getPropertyValue('visibility') !== visibility)
-              this.root.style.setProperty('visibility', visibility, 'important');
+          const display = this.visible ? this.display : 'none';
+          const priority = this.visible ? this.displayPriority : 'important';
+          if (this.root.style.getPropertyValue('display') !== display || this.root.style.getPropertyPriority('display') !== priority) {
+              if (display)
+                  this.root.style.setProperty('display', display, priority);
+              else
+                  this.root.style.removeProperty('display');
+          }
           if (!this.visible)
               this.cancel();
       }

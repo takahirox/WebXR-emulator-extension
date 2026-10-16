@@ -55,12 +55,9 @@ try {
     let overlay: unknown;
     if (sample === 'ar-barebones.html') {
       overlay = await page.evaluate(`({enabled: window.sampleProbe.session.enabledFeatures.includes('dom-overlay'), type: window.sampleProbe.session.domOverlayState?.type ?? null, sameRoot: window.sampleProbe.overlayRoot === document.getElementById('overlay')})`);
-      assert.deepEqual(overlay, {enabled: deviceKey.startsWith('Generic'), type: deviceKey.startsWith('Generic') ? 'screen' : null, sameRoot: true});
-      if (deviceKey.startsWith('Generic')) {
-        await page.getByRole('button', {name: 'Exit AR', exact: true}).click();
-        await page.waitForFunction(`window.sampleProbe.ended`);
-        assert(await page.evaluate(`!window.sampleProbe.overlayRoot.hasAttribute('popover') && window.sampleProbe.overlayRoot.style.cssText === window.sampleProbe.originalStyle`), 'published sample exits with native live DOM button and restores root');
-      } else await page.evaluate(`window.sampleProbe.session.end()`);
+      assert.deepEqual(overlay, {enabled: false, type: null, sameRoot: true});
+      assert(await page.evaluate(`!window.sampleProbe.overlayRoot.hasAttribute('popover') && window.sampleProbe.overlayRoot.style.cssText === window.sampleProbe.originalStyle`), 'disabled overlay leaves the published sample root untouched');
+      await page.evaluate(`window.sampleProbe.session.end()`);
     } else await page.evaluate(`window.sampleProbe.session.end()`);
     assert.deepEqual(errors, [], `${deviceKey} ${sample} runtime errors`);
     results.push({url, deviceKey, questMode, overlay, probe: await page.evaluate(() => { const probe = (window as unknown as {sampleProbe: {frames: number; hits: number}}).sampleProbe; return {frames: probe.frames, hits: probe.hits}; }), errors});

@@ -4,7 +4,11 @@ import type ARScene from './ARScene';
 /** Live single-view presentation. No DOM copies, HTML serialization or capture permissions. */
 export default class DOMOverlay {
   static available() {
-    return typeof HTMLElement.prototype.showPopover === 'function' && 'onbeforexrselect' in HTMLElement.prototype;
+    // Popovers do not provide UA shadow-tree hit testing/security. In particular,
+    // existing closed trees cannot be inspected and attachShadow is not observed
+    // by MutationObserver. Keep public negotiation off until both guarantees are
+    // available; an application convention cannot enforce a lifetime restriction.
+    return false;
   }
   static accepts(root: Element | undefined): root is HTMLElement {
     return root?.namespaceURI === 'http://www.w3.org/1999/xhtml' && root.ownerDocument === document && root.isConnected &&
@@ -14,6 +18,8 @@ export default class DOMOverlay {
 
   private readonly style: string | null;
   private readonly parent: Node | null;
+  private readonly display: string;
+  private readonly displayPriority: string;
   private readonly events = new AbortController();
   private readonly observer: MutationObserver;
   private readonly ray = new Raycaster();
@@ -31,6 +37,8 @@ export default class DOMOverlay {
   constructor(readonly root: HTMLElement, private scene: ARScene, private width: number, private height: number,
     private invalidate: () => void) {
     this.style = root.getAttribute('style'); this.parent = root.parentNode;
+    this.display = root.style.getPropertyValue('display');
+    this.displayPriority = root.style.getPropertyPriority('display');
     // Top-layer placement preserves ancestry, selector inheritance and root identity,
     // while escaping ancestor clipping/transform/stacking contexts.
     const originalColor = getComputedStyle(root).color;
@@ -146,13 +154,20 @@ export default class DOMOverlay {
   targetAt(x: number, y: number): Element | null {
     if (!this.visible || this.blocked(x, y)) return null;
     let target = document.elementFromPoint(x, y);
-    if (!target || !(target === this.root || this.root.contains(target))) return null;
+    if (!target) return null;
     // Browser hit testing, including open shadow trees; no bounding-box hit guess.
     while (target.shadowRoot) {
       const inner: Element | null = target.shadowRoot.elementFromPoint(x, y);
       if (!inner || inner === target) break;
       target = inner;
     }
+    // document.elementFromPoint retargets to the outer host when the overlay
+    // itself lives in an open shadow tree. Test composed ancestry after descent.
+    let ancestor: Node | null = target;
+    while (ancestor && ancestor !== this.root) {
+      ancestor = ancestor instanceof ShadowRoot ? ancestor.host : ancestor.parentNode;
+    }
+    if (ancestor !== this.root) return null;
     if (target.matches('iframe, frame, object, embed')) return null;
     return target;
   }
@@ -197,8 +212,15 @@ export default class DOMOverlay {
       this.corners[i].set(x, y, 0).applyMatrix4(screen.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
       return this.corners[i].z < -camera.near;
     });
-    const visibility = this.visible ? 'visible' : 'hidden';
-    if (this.root.style.getPropertyValue('visibility') !== visibility) this.root.style.setProperty('visibility', visibility, 'important');
+    // visibility:hidden can be overridden by descendants. display:none removes
+    // the whole subtree from painting and native hit testing, including children
+    // with visibility:visible, while retaining the popover and original styles.
+    const display = this.visible ? this.display : 'none';
+    const priority = this.visible ? this.displayPriority : 'important';
+    if (this.root.style.getPropertyValue('display') !== display || this.root.style.getPropertyPriority('display') !== priority) {
+      if (display) this.root.style.setProperty('display', display, priority);
+      else this.root.style.removeProperty('display');
+    }
     // Clip both rendering and native hit targets to the physical canvas viewport.
     // The root's own paint containment clips descendants to the phone screen.
     if (!this.visible) this.cancel();
