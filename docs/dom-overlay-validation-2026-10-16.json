@@ -1,0 +1,393 @@
+{
+  "date": "2026-10-16",
+  "issue": 13,
+  "source": "https://github.com/takahirox/WebXR-emulator-extension/issues/13",
+  "upstreamCommit": "f54dc18cf4c89905669b53f54dae70fd9307b80f",
+  "completion": "partial; keep Issue #13 open; dom-overlay remains unsupported in all modes",
+  "browser": "156.0.8078.4",
+  "commands": {
+    "npm ci": "passed; 54 packages added; audit reported zero vulnerabilities",
+    "npm run typecheck": "passed",
+    "npm run build": "passed; also run by build:firefox",
+    "npm run build:firefox": "passed; packaging only",
+    "npm run test:browser": "passed on final code, including rendering prototypes and existing regressions",
+    "npm run test:wpt": "passed; five selected upstream files, not DOM Overlay WPT",
+    "npm run test:samples": "passed; three existing published VR/hit-test sample configurations",
+    "git diff --check": "passed"
+  },
+  "apiConformance": [
+    {
+      "profile": "Meta Quest 3",
+      "mode": "immersive-vr",
+      "distinctAssertions": 442,
+      "status": "passed"
+    },
+    {
+      "profile": "Meta Quest 3",
+      "mode": "immersive-ar",
+      "distinctAssertions": 488,
+      "status": "passed"
+    },
+    {
+      "profile": "Generic Android Phone (ARCore)",
+      "mode": "immersive-ar",
+      "distinctAssertions": 375,
+      "status": "passed"
+    }
+  ],
+  "feasibility": [
+    {
+      "profile": "quest",
+      "variant": "dpr2",
+      "drawImageError": "TypeError",
+      "drawElementAvailable": false,
+      "drawElementImageAvailable": false,
+      "canvasLayoutSubtreeAvailable": false,
+      "webglElementUploadAvailable": false,
+      "webglElementSubUploadAvailable": false,
+      "canvasUpdateGeometryAvailable": false,
+      "singleRootCanOccupyBothEyes": false,
+      "pseudoClassRecognized": true,
+      "nativeRuleCount": 1,
+      "pixels": [
+        {
+          "label": "initial",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ],
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": null
+        },
+        {
+          "label": "clone-diverged",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ],
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": null
+        }
+      ],
+      "originalClickAndFocus": true,
+      "nativeOverlayStyleActive": false,
+      "supported": false,
+      "blocker": "Clone loses root identity, listeners and live control state"
+    },
+    {
+      "profile": "quest",
+      "variant": "resized-dpr2",
+      "drawImageError": "TypeError",
+      "drawElementAvailable": false,
+      "drawElementImageAvailable": false,
+      "canvasLayoutSubtreeAvailable": false,
+      "webglElementUploadAvailable": false,
+      "webglElementSubUploadAvailable": false,
+      "canvasUpdateGeometryAvailable": false,
+      "singleRootCanOccupyBothEyes": false,
+      "pseudoClassRecognized": true,
+      "nativeRuleCount": 1,
+      "pixels": [
+        {
+          "label": "initial",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ],
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": null
+        },
+        {
+          "label": "clone-diverged",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ],
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": null
+        }
+      ],
+      "originalClickAndFocus": true,
+      "nativeOverlayStyleActive": false,
+      "supported": false,
+      "blocker": "Clone loses root identity, listeners and live control state"
+    },
+    {
+      "profile": "quest",
+      "variant": "dpr1",
+      "drawImageError": "TypeError",
+      "drawElementAvailable": false,
+      "drawElementImageAvailable": false,
+      "canvasLayoutSubtreeAvailable": false,
+      "webglElementUploadAvailable": false,
+      "webglElementSubUploadAvailable": false,
+      "canvasUpdateGeometryAvailable": false,
+      "singleRootCanOccupyBothEyes": false,
+      "pseudoClassRecognized": true,
+      "nativeRuleCount": 1,
+      "pixels": [
+        {
+          "label": "initial",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ],
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": null
+        },
+        {
+          "label": "clone-diverged",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ],
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": null
+        }
+      ],
+      "originalClickAndFocus": true,
+      "nativeOverlayStyleActive": false,
+      "supported": false,
+      "blocker": "Clone loses root identity, listeners and live control state"
+    },
+    {
+      "profile": "phone",
+      "variant": "dpr1",
+      "drawImageError": "TypeError",
+      "drawElementAvailable": false,
+      "drawElementImageAvailable": false,
+      "canvasLayoutSubtreeAvailable": false,
+      "webglElementUploadAvailable": false,
+      "webglElementSubUploadAvailable": false,
+      "canvasUpdateGeometryAvailable": false,
+      "singleRootCanOccupyBothEyes": null,
+      "pseudoClassRecognized": true,
+      "nativeRuleCount": 1,
+      "pixels": [
+        {
+          "label": "initial",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": 0.00008171579554527852
+        },
+        {
+          "label": "moved",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": 0.5698570442503795
+        },
+        {
+          "label": "camera-moved",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": 0.5712429993174026
+        }
+      ],
+      "originalClickAndFocus": true,
+      "nativeOverlayStyleActive": false,
+      "supported": false,
+      "blocker": "Prototype only: no XR input/security/lifecycle implementation"
+    },
+    {
+      "profile": "phone",
+      "variant": "resized-dpr2",
+      "drawImageError": "TypeError",
+      "drawElementAvailable": false,
+      "drawElementImageAvailable": false,
+      "canvasLayoutSubtreeAvailable": false,
+      "webglElementUploadAvailable": false,
+      "webglElementSubUploadAvailable": false,
+      "canvasUpdateGeometryAvailable": false,
+      "singleRootCanOccupyBothEyes": null,
+      "pseudoClassRecognized": true,
+      "nativeRuleCount": 1,
+      "pixels": [
+        {
+          "label": "initial",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": 0.000020469075352468656
+        },
+        {
+          "label": "moved",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": 0.7252149737598965
+        },
+        {
+          "label": "camera-moved",
+          "colors": [
+            [
+              3,
+              241,
+              162,
+              255
+            ]
+          ],
+          "projectionError": 0.7270446075290028
+        }
+      ],
+      "originalClickAndFocus": true,
+      "nativeOverlayStyleActive": false,
+      "supported": false,
+      "blocker": "Prototype only: no XR input/security/lifecycle implementation"
+    }
+  ],
+  "wpt": {
+    "revision": "e1859580b5fcf74940a18d2f783296b4961035e3",
+    "files": 5,
+    "assertions": 5,
+    "status": "passed"
+  },
+  "samples": [
+    {
+      "url": "https://immersive-web.github.io/webxr-samples/immersive-vr-session.html",
+      "deviceKey": "Meta Quest 3",
+      "questMode": "immersive-vr",
+      "probe": {
+        "frames": 125,
+        "hits": 0
+      },
+      "errors": []
+    },
+    {
+      "url": "https://immersive-web.github.io/webxr-samples/hit-test.html",
+      "deviceKey": "Meta Quest 3",
+      "questMode": "immersive-ar",
+      "probe": {
+        "frames": 129,
+        "hits": 2
+      },
+      "errors": []
+    },
+    {
+      "url": "https://immersive-web.github.io/webxr-samples/hit-test.html",
+      "deviceKey": "Generic Android Phone (ARCore)",
+      "questMode": "immersive-ar",
+      "probe": {
+        "frames": 129,
+        "hits": 2
+      },
+      "errors": []
+    }
+  ],
+  "developmentFailures": [
+    {
+      "failure": "First phone fixture used a singular CSS matrix, so native hit testing failed",
+      "resolution": "Retained the projected Z component to make the transform invertible; final pixel/hit-target checks pass"
+    },
+    {
+      "failure": "A prototype run timed out at the subsequent phone touch test after restoring viewport metrics",
+      "resolution": "Wait for actual renderer dimensions after resize and allow restored transforms to render"
+    },
+    {
+      "failure": "A later run timed out ending a phone conformance session from inputsourceschange/added",
+      "resolution": "Replace the implicit desktop-center touch assumption with actual projected phone-screen coordinates and wait for presentation; final full run passes"
+    }
+  ],
+  "notRun": [
+    "Firefox runtime/DevTools behavior",
+    "Physical Android or Quest hardware",
+    "DOM Overlay WPT suite and DOM Overlay published samples: feature is not implemented",
+    "Experimental HTML-in-Canvas compositor with browser flags/origin-trial tokens"
+  ],
+  "remainingWork": [
+    "Production Android screen overlay with arbitrary root layout, XR ray/pointer integration, native controls/scrolling and full lifecycle",
+    "Quest single-live-root stereo compositor with tested disparity/projection, controller intersections and correct overlay type",
+    "beforexrselect XRSessionEvent dispatch, full action cancellation/order and independent DOM pointer/click/focus behavior",
+    "Cross-origin iframe XR-interaction blocking or faithful pose/gamepad limiting, including navigation and transition tests",
+    "Enabled-session root/visibility/device/worker lifecycle and feature integration",
+    "Native :xr-overlay and UA cascade/isolation remain incompatible with the test-only CSS projection"
+  ],
+  "remoteActions": "None: no push, pull request, review request, merge or comment; commit-only GitWeave node",
+  "requiredPostMergeVerification": "none",
+  "evidence": [
+    "docs/validation/issue-13/phone-projection.png",
+    "docs/validation/issue-13/quest-clone.png",
+    "tests/dom-overlay-prototype.ts"
+  ]
+}

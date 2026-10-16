@@ -20,7 +20,6 @@ const DEFAULT_HEADSET_POSITION = [0, 1.6, 0];
 
 // 10000 is for AR Scene
 const DIV_Z_INDEX = '9999';
-const DOM_OVERLAY_Z_INDEX = '10001';
 
 // For AR
 const DEFAULT_RESOLUTION = {width: 1024, height: 2048};
@@ -40,7 +39,6 @@ export default class EmulatedXRDevice extends XRDevice {
   stereoEffectEnabled: boolean;
   div: HTMLDivElement;
   originalCanvasParams: {parentElement: HTMLElement | null; width: number; height: number};
-  domOverlayRoot: Element | null;
   handheld: boolean;
   emulationMode: SessionMode;
   resolution: {width: number; height: number};
@@ -52,7 +50,6 @@ export default class EmulatedXRDevice extends XRDevice {
   hitTestResults: Map<XRHitTestSource, mat4[]>;
   hitTestSourcesForTransientInput: XRTransientInputHitTestSource[];
   hitTestResultsForTransientInput: Map<XRTransientInputHitTestSource, mat4[]>;
-  originalOverlayZIndex: string | undefined = undefined;
   matrix: mat4;
   projectionMatrix: mat4;
   leftProjectionMatrix: mat4;
@@ -105,10 +102,6 @@ export default class EmulatedXRDevice extends XRDevice {
       width: 0,
       height: 0
     };
-
-    // For DOM overlay API
-
-    this.domOverlayRoot = null;
 
     // For AR
 
@@ -172,6 +165,8 @@ export default class EmulatedXRDevice extends XRDevice {
   }
 
   isFeatureSupported(featureDescriptor: string, mode: SessionMode = this.emulationMode) {
+    // No live-DOM stereo compositor/input path yet; see docs/dom-overlay-feasibility.md.
+    if (featureDescriptor === 'dom-overlay') return false;
     if (featureDescriptor === 'viewer') return true;
     if (featureDescriptor === 'local' || featureDescriptor === 'local-floor') return mode !== 'inline';
     if (!this.features.includes(featureDescriptor)) return false;
@@ -433,7 +428,6 @@ export default class EmulatedXRDevice extends XRDevice {
     session.ended = true;
     if (session.immersive) {
       if (session.baseLayer) this._removeBaseLayerCanvasFromDiv(sessionId);
-      this.domOverlayRoot = null;
       if (session.ar && this.arScene) {
         this.arScene.eject();
         this.arScene.releaseCanvas();
@@ -535,12 +529,6 @@ export default class EmulatedXRDevice extends XRDevice {
     // @TODO: implement
   }
 
-  // DOM Overlay API
-
-  setDomOverlayRoot(root: Element) {
-    this.domOverlayRoot = root;
-  }
-
   // AR Hitting test
 
   addHitTestSource(source: XRHitTestSource) {
@@ -582,20 +570,6 @@ export default class EmulatedXRDevice extends XRDevice {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     this.div.appendChild(canvas);
-
-    // DOM overlay API
-    // @TODO: Is this the best place to handle?
-    // @TODO: What if dom element is appened/removed while in immersive mode?
-    //        Should we observe?
-    if (this.domOverlayRoot) {
-      const el = this.domOverlayRoot as HTMLElement;
-      this.originalOverlayZIndex = el.style.zIndex;
-      if (this.domOverlayRoot.contains(this.div)) {
-        this.div.style.zIndex = '';
-      } else {
-        el.style.zIndex = DOM_OVERLAY_Z_INDEX;
-      }
-    }
   }
 
   _removeBaseLayerCanvasFromDiv(sessionId: number) {
@@ -622,15 +596,6 @@ export default class EmulatedXRDevice extends XRDevice {
       this.originalCanvasParams.parentElement.appendChild(canvas);
     }
     this.originalCanvasParams.parentElement = null;
-
-    // DOM overlay API
-    // @TODO: Is this the best place to handle?
-    if (this.domOverlayRoot) {
-      const el = this.domOverlayRoot as HTMLElement;
-      el.style.zIndex = this.originalOverlayZIndex!;
-      this.originalOverlayZIndex = undefined;
-      this.div.style.zIndex = DIV_Z_INDEX;
-    }
   }
 
   // For AR. Check if right controller(pointer) is touched with left controller(tablet)
