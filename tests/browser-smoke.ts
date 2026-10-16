@@ -1,4 +1,5 @@
 import {runConformance} from './conformance';
+import {runDOMOverlayPrototype} from './dom-overlay-prototype';
 import ConfigurationManager from '../src/ConfigurationManager';
 import type { DeviceDefinitions } from '../src/types/contracts';
 import { readTabletPixels } from './ar-pixels';
@@ -61,6 +62,7 @@ const context = await chromium.launchPersistentContext(profile, {
 }).catch(async error => { server.close(); await rm(profile, {recursive: true, force: true}); throw error; });
 await context.addInitScript(installThreeProbe);
 const attached: Awaited<ReturnType<typeof attachTarget>>[] = [];
+const overlayPrototypes: Awaited<ReturnType<typeof runDOMOverlayPrototype>>[] = [];
 try {
   context.setDefaultTimeout(20000);
   console.log('Checking MV3 installation and synchronous injection');
@@ -339,16 +341,19 @@ try {
   }
   console.log('Checking MR eye alignment at DPR 2 and active-session resizing');
   await assertMRAlignment(1280, 720, 2);
+  overlayPrototypes.push(await runDOMOverlayPrototype(page, false, 'dpr2'));
   // Capture through CDP so Playwright does not restore its default viewport metrics.
   const mrDPR2Screenshot = await cdp.send('Page.captureScreenshot', {format: 'png'});
   await writeFile(path.join(root, 'test-results/quest-mr-dpr2.png'), Buffer.from(mrDPR2Screenshot.data, 'base64'));
   // Resize the same active session from a wide display to a square display.
   await cdp.send('Emulation.setDeviceMetricsOverride', {width: 900, height: 900, deviceScaleFactor: 2, mobile: false});
   await assertMRAlignment(900, 900, 2);
+  overlayPrototypes.push(await runDOMOverlayPrototype(page, false, 'resized-dpr2'));
   const mrResizedScreenshot = await cdp.send('Page.captureScreenshot', {format: 'png'});
   await writeFile(path.join(root, 'test-results/quest-mr-resized.png'), Buffer.from(mrResizedScreenshot.data, 'base64'));
   await cdp.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 720, deviceScaleFactor: 1, mobile: false});
   await assertMRAlignment(1280, 720, 1);
+  overlayPrototypes.push(await runDOMOverlayPrototype(page, false, 'dpr1'));
   await page.screenshot({path: path.join(root, 'test-results/quest-mr.png')});
   await panel.evaluate(() => { (document.querySelector('#resetPoseButton') as HTMLButtonElement).click(); });
   await page.waitForFunction(() => Math.abs((window as unknown as SmokeWindow).smoke.state.inputPositions.right?.[0] - 0.5) < 0.01);
@@ -431,6 +436,15 @@ try {
   for (const [name, texture] of Object.entries(roomTextures)) {
     assert.deepEqual(texture, {loaded: true, flipY: false, colorSpace: 'srgb'}, `${name} texture loads under connect-src self with glTF orientation and color space`);
   }
+  console.log('Checking projected live DOM phone prototype and stereo feasibility');
+  overlayPrototypes.push(await runDOMOverlayPrototype(page, true, 'dpr1'));
+  await cdp.send('Emulation.setDeviceMetricsOverride', {width: 900, height: 900, deviceScaleFactor: 2, mobile: false});
+  overlayPrototypes.push(await runDOMOverlayPrototype(page, true, 'resized-dpr2'));
+  await cdp.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 720, deviceScaleFactor: 1, mobile: false});
+  await page.waitForFunction(() => {
+    const canvas = (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!.renderer.domElement;
+    return canvas.width === 1280 && canvas.height === 720 && canvas.getBoundingClientRect().width === 1280;
+  });
   assert.equal(await page.locator('canvas').count(), 1, 'AR renderer uses the application canvas as a texture');
   const canvasBox = await page.locator('canvas').boundingBox();
   assert(canvasBox);
@@ -535,6 +549,7 @@ try {
   await eventually(() => panel.evaluate(() => (document.querySelector('#deviceSelect') as HTMLSelectElement).value), value => value === 'Generic Android Phone (ARCore)', 'phone conformance profile');
   console.log('Checking Android AR API conformance');
   conformance.push(await runConformance(page, 'immersive-ar', true));
+  await writeFile(path.join(root, 'test-results/dom-overlay-feasibility.json'), JSON.stringify({browser: await context.browser()!.version(), overlayPrototypes}, null, 2));
   await writeFile(path.join(root, 'test-results/webxr-conformance.json'), JSON.stringify({browser: await context.browser()!.version(), conformance}, null, 2));
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(panel.errors, [], 'no panel runtime or WebGL errors');

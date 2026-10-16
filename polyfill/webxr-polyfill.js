@@ -1929,8 +1929,10 @@ function WebXRPolyfillInjection() {
       async requestSession(mode, options = {}) {
           var _a, _b, _c, _d;
           validateMode(mode);
-          if (options.domOverlay && !(options.domOverlay.root instanceof Element))
-              throw new TypeError('domOverlay.root must be an Element.');
+          const domOverlay = options.domOverlay;
+          if (domOverlay !== undefined && domOverlay !== null) {
+              Element.prototype.hasAttribute.call(domOverlay.root, '');
+          }
           const needsActivation = mode !== 'inline' || [...((_a = options.requiredFeatures) !== null && _a !== void 0 ? _a : []), ...((_b = options.optionalFeatures) !== null && _b !== void 0 ? _b : [])].some(feature => feature !== 'inline-stereo');
           if (needsActivation && !navigator.userActivation.isActive)
               throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
@@ -29765,13 +29767,11 @@ void main() {
   const DEFAULT_MODES = ['inline'];
   const DEFAULT_HEADSET_POSITION = [0, 1.6, 0];
   const DIV_Z_INDEX = '9999';
-  const DOM_OVERLAY_Z_INDEX = '10001';
   const DEFAULT_RESOLUTION = { width: 1024, height: 2048 };
   const DEFAULT_DEVICE_SIZE = { width: 0.05, height: 0.1, depth: 0.005 };
   class EmulatedXRDevice extends DeviceAdapter {
       constructor(global, config = {}) {
           super(global);
-          this.originalOverlayZIndex = undefined;
           this.sessions = new Map();
           this.modes = config.modes || DEFAULT_MODES;
           this.features = config.features || [];
@@ -29800,7 +29800,6 @@ void main() {
               width: 0,
               height: 0
           };
-          this.domOverlayRoot = null;
           this.handheld = config.formFactor === 'handheld';
           this.emulationMode = config.emulationMode || (this.handheld ? 'immersive-ar' : 'immersive-vr');
           this.resolution = config.resolution !== undefined ? config.resolution : DEFAULT_RESOLUTION;
@@ -29848,6 +29847,8 @@ void main() {
           return this.modes.includes(mode) && (mode === 'inline' || mode === this.emulationMode);
       }
       isFeatureSupported(featureDescriptor, mode = this.emulationMode) {
+          if (featureDescriptor === 'dom-overlay')
+              return false;
           if (featureDescriptor === 'viewer')
               return true;
           if (featureDescriptor === 'local' || featureDescriptor === 'local-floor')
@@ -30107,7 +30108,6 @@ void main() {
           if (session.immersive) {
               if (session.baseLayer)
                   this._removeBaseLayerCanvasFromDiv(sessionId);
-              this.domOverlayRoot = null;
               if (session.ar && this.arScene) {
                   this.arScene.eject();
                   this.arScene.releaseCanvas();
@@ -30209,9 +30209,6 @@ void main() {
       }
       onWindowResize() {
       }
-      setDomOverlayRoot(root) {
-          this.domOverlayRoot = root;
-      }
       addHitTestSource(source) {
           this.hitTestSources.push(source);
       }
@@ -30237,16 +30234,6 @@ void main() {
           canvas.width = window.innerWidth;
           canvas.height = window.innerHeight;
           this.div.appendChild(canvas);
-          if (this.domOverlayRoot) {
-              const el = this.domOverlayRoot;
-              this.originalOverlayZIndex = el.style.zIndex;
-              if (this.domOverlayRoot.contains(this.div)) {
-                  this.div.style.zIndex = '';
-              }
-              else {
-                  el.style.zIndex = DOM_OVERLAY_Z_INDEX;
-              }
-          }
       }
       _removeBaseLayerCanvasFromDiv(sessionId) {
           const session = this.sessions.get(sessionId);
@@ -30266,12 +30253,6 @@ void main() {
               this.originalCanvasParams.parentElement.appendChild(canvas);
           }
           this.originalCanvasParams.parentElement = null;
-          if (this.domOverlayRoot) {
-              const el = this.domOverlayRoot;
-              el.style.zIndex = this.originalOverlayZIndex;
-              this.originalOverlayZIndex = undefined;
-              this.div.style.zIndex = DIV_Z_INDEX;
-          }
       }
       _isPointerCloseEnoughToTablet() {
           const pose = this.gamepads[0].pose;

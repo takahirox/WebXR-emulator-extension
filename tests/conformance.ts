@@ -124,6 +124,38 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         }
       }
     }
+    // The rendering research fixture is deliberately not a negotiated feature.
+    // Validate nullable WebIDL dictionaries and cross-realm Element brands even
+    // while dom-overlay is unsupported, without changing the supplied DOM.
+    for (const invalidRoot of [undefined, null, {}, document, document.createTextNode('not an Element'), Object.create(Element.prototype)]) {
+      for (const featureList of ['requiredFeatures', 'optionalFeatures'] as const) {
+        await rejects(() => xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root: invalidRoot as Element}}), 'TypeError', `${featureList}: invalid overlay root ${String(invalidRoot)}`);
+      }
+    }
+    let overlayReads = 0, rootReads = 0;
+    const getterSession = await xr.navigator.xr.requestSession(mode, {
+      optionalFeatures: ['dom-overlay'],
+      get domOverlay() { overlayReads++; return {get root() { rootReads++; return document.body; }}; },
+    });
+    try { check(overlayReads === 1 && rootReads === 1, 'overlay dictionary getters are read once during argument conversion'); }
+    finally { await getterSession.end(); }
+    const foreignFrame = document.createElement('iframe'); foreignFrame.hidden = true; document.body.append(foreignFrame);
+    try {
+      const foreignRoot = foreignFrame.contentDocument!.body;
+      check(!(foreignRoot instanceof Element), 'overlay validation exercises another realm');
+      await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: foreignRoot}}), 'NotSupportedError', 'valid foreign-realm root reaches feature negotiation');
+    } finally { foreignFrame.remove(); }
+    for (const overlayMode of ['inline', mode] as const) {
+      for (const domOverlay of [undefined, null, {root: document.createElementNS('http://www.w3.org/2000/svg', 'svg')}, {root: document.createElement('div')}]) {
+        await rejects(() => xr.navigator.xr.requestSession(overlayMode, {requiredFeatures: ['dom-overlay'], domOverlay}), 'NotSupportedError', `${overlayMode}: required unsupported overlay (${domOverlay === null ? 'null' : domOverlay === undefined ? 'omitted' : domOverlay.root.tagName})`);
+        const optionalOverlay = await xr.navigator.xr.requestSession(overlayMode, {optionalFeatures: ['dom-overlay'], domOverlay});
+        try {
+          check(optionalOverlay.domOverlayState === null && !optionalOverlay.enabledFeatures.includes('dom-overlay'), `${overlayMode}: optional overlay omitted with valid/absent configuration`);
+          if (domOverlay) check(!domOverlay.root.isConnected && !domOverlay.root.hasAttribute('style'), 'unsupported optional overlay does not adopt or style a disconnected root');
+        } finally { await optionalOverlay.end(); }
+        check(optionalOverlay.domOverlayState === null, 'ended unsupported session retains null overlay state');
+      }
+    }
     await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: document.body}}), 'NotSupportedError', 'DOM overlay compositor unavailable');
     const inline = await xr.navigator.xr.requestSession('inline', {optionalFeatures: ['anchors', 'layers', 'hand-tracking', 'hit-test', 'dom-overlay']});
     const inlineSpace = await inline.requestReferenceSpace('viewer');
@@ -813,9 +845,21 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       const buttonIndex = shutdownHandler.startsWith('squeeze') ? 1 : 0;
       const press = (pressed: boolean) => {
         if (handheld) {
-          const screen = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)!;
-          const rect = screen.getBoundingClientRect();
-          screen.dispatchEvent(new MouseEvent(pressed ? 'mousedown' : 'mouseup', {button: 2, clientX: rect.x + rect.width / 2, clientY: rect.y + rect.height / 2}));
+          // The simulated phone can move independently of the desktop viewport.
+          // Target its actual projected screen, not an assumed desktop center.
+          const {renderer, scene, camera} = (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!;
+          let phoneScreen: import('three').Mesh | undefined;
+          scene.traverse(object => {
+            const mesh = object as import('three').Mesh<import('three').BufferGeometry, import('three').Material>;
+            if (mesh.material?.customProgramCacheKey() === 'ar-screen-composite-v1') phoneScreen = mesh;
+          });
+          check(phoneScreen, 'phone input uses the visible simulated screen');
+          const point = camera.position.clone().set(0, 0, 0);
+          phoneScreen.localToWorld(point).project(camera);
+          const rect = renderer.domElement.getBoundingClientRect();
+          const clientX = rect.x + (point.x + 1) * rect.width / 2, clientY = rect.y + (1 - point.y) * rect.height / 2;
+          check(document.elementFromPoint(clientX, clientY) === renderer.domElement, 'phone input screen is the topmost desktop target');
+          renderer.domElement.dispatchEvent(new MouseEvent(pressed ? 'mousedown' : 'mouseup', {button: 2, clientX, clientY}));
         } else window.dispatchEvent(new CustomEvent('webxr-input-button', {detail: {objectName: 'rightController', buttonIndex, pressed}}));
       };
       let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -825,6 +869,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         inputSession.requestAnimationFrame(render);
         if (shutdownHandler !== 'added' || handheld) {
           await new Promise<void>(resolve => inputSession.requestAnimationFrame(() => resolve()));
+          if (handheld) await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
           press(true);
           if (shutdownHandler !== 'added') {
             await Promise.race([started, deadline]);

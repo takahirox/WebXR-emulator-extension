@@ -59,7 +59,12 @@ export class XRSystem extends XREventTarget {
   async isSessionSupported(mode: SessionMode) { validateMode(mode); return (await this.devicePromise).isSessionSupported(mode); }
   async requestSession(mode: SessionMode, options: SessionOptions = {}) {
     validateMode(mode);
-    if (options.domOverlay && !(options.domOverlay.root instanceof Element)) throw new TypeError('domOverlay.root must be an Element.');
+    const domOverlay = options.domOverlay;
+    if (domOverlay !== undefined && domOverlay !== null) {
+      // WebIDL interface conversion uses the Element brand, not instanceof:
+      // a same-origin iframe's Element has a different realm's prototype.
+      Element.prototype.hasAttribute.call(domOverlay.root, '');
+    }
     const needsActivation = mode !== 'inline' || [...(options.requiredFeatures ?? []), ...(options.optionalFeatures ?? [])].some(feature => feature !== 'inline-stereo');
     if (needsActivation && !navigator.userActivation.isActive) throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
     if (mode !== 'inline' && (this.immersive || this.requesting)) invalidState('An immersive session is already pending or active.');
