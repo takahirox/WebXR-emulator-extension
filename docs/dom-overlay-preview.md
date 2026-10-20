@@ -25,7 +25,7 @@ Both controls persist in local extension storage. Missing/invalid values default
 | --- | --- |
 | Opt-in + eligible AR mode/root + optional or required `dom-overlay` | Feature in `enabledFeatures`; frozen `{type: 'screen'}` state |
 | Opt-in off, inline/Quest VR, unsupported root or unavailable popover API | Optional omission/null state; required `NotSupportedError`; no root mutation |
-| Application cancels `beforetoggle` / root cannot enter popover top layer | Restore root; optional omission/null state or required `NotSupportedError` |
+| Application cancels `beforetoggle` / root cannot enter popover top layer / root still has no layout box (e.g. a `display:none` ancestor) | Restore root; optional omission/null state or required `NotSupportedError` |
 | Malformed dictionary root, including a non-Element | `TypeError` during conversion, even if optional or opt-in off |
 | `domOverlay` supplied but feature not requested | No preview |
 
@@ -35,7 +35,7 @@ Roots must be connected HTML Elements in the current document's body/light tree.
 
 ## Presentation, input and cleanup
 
-`DOMOverlay.ts` uses a manual native popover on the original root. This gives top-layer painting without reparenting, serialization, capture permissions or duplicate form state. Temporary inline rules size, position and clip the root; its original display layout, color and background are retained where possible. Initially hidden/boxless roots receive a visible box. Phone projection uses the actual screen world matrix, observer camera and canvas CSS viewport; display DPR updates its logical dimensions. Back-facing/behind-camera screens remove the whole subtree from painting/hit testing. A native wheel listener keeps perspective scrolling on the main thread without canceling the browser default action. Flat layout uses a maximum 560-CSS-pixel-wide panel inset 24 pixels from the viewport, with native overflow scrolling.
+`DOMOverlay.ts` uses a manual native popover on the original root. This gives top-layer painting without reparenting, serialization, capture permissions or duplicate form state. Temporary inline rules size, position and clip the root; its original display layout, color and background are retained where possible. Roots hidden by their own display style receive a visible box. If an ancestor still suppresses that box (for example with `display:none`), startup restores the root and declines the preview. Phone projection uses the actual screen world matrix, observer camera and canvas CSS viewport; display DPR updates its logical dimensions. Back-facing/behind-camera screens remove the whole subtree from painting/hit testing. A native wheel listener keeps perspective scrolling on the main thread without canceling the browser default action. Flat layout uses a maximum 560-CSS-pixel-wide panel inset 24 pixels from the viewport, with native overflow scrolling.
 
 The previous pointer-to-XR touch queue, DOM hit-target ray mapping, frame style blocking and synthesized `beforexrselect` path were removed. Preview code has **no pointer listener that creates XR input**. The session dispatches ordinary XR actions only through its existing device input path. Desktop DOM actions and XR device controls are independent. In particular, there is no claim of the specification's cross-origin XR forwarding guarantees: this preview does not perform that forwarding at all. No global shadow API patches, privileged message bridge, browser permissions, remote code or experimental flags were added.
 

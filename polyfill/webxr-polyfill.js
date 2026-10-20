@@ -29854,6 +29854,8 @@ void main() {
                   focused.focus({ preventScroll: true });
               if (!this.valid() || !root.matches(':popover-open'))
                   throw new DOMException('The overlay root could not enter the top layer.', 'NotSupportedError');
+              if (!root.offsetWidth || !root.offsetHeight)
+                  throw new DOMException('The overlay root has no layout box.', 'NotSupportedError');
               this.observer.observe(document, { subtree: true, childList: true });
               root.addEventListener('wheel', () => { }, { passive: false, signal: this.events.signal });
               window.addEventListener('pagehide', this.invalidate, { signal: this.events.signal });

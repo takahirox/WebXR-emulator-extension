@@ -53,6 +53,9 @@ export default class DOMOverlay {
       root.showPopover();
       if (focused instanceof HTMLElement && focused.isConnected) focused.focus({preventScroll: true});
       if (!this.valid() || !root.matches(':popover-open')) throw new DOMException('The overlay root could not enter the top layer.', 'NotSupportedError');
+      // The top layer still cannot create a box under a display:none ancestor.
+      // Check after applying preview styles so a hidden root itself can be shown.
+      if (!root.offsetWidth || !root.offsetHeight) throw new DOMException('The overlay root has no layout box.', 'NotSupportedError');
       this.observer.observe(document, {subtree: true, childList: true});
       // Keep wheel default actions native, including perspective hit testing.
       root.addEventListener('wheel', () => {}, {passive: false, signal: this.events.signal});

@@ -130,12 +130,19 @@ export async function runDOMOverlayPreview(page: Page, phone: boolean, stopWorke
     const popover = document.createElement('section'); popover.setAttribute('popover', 'manual'); document.body.append(popover);
     const inert = document.createElement('section'); inert.inert = true; document.body.append(inert);
     const iframe = document.createElement('iframe'); document.body.append(iframe);
+    const hiddenAncestor = document.createElement('main'); hiddenAncestor.style.display = 'none';
+    const hiddenRoot = document.createElement('section'); hiddenRoot.style.setProperty('--original-style', 'preserved');
+    const hiddenButton = document.createElement('button'); hiddenButton.textContent = 'Action';
+    hiddenRoot.append(hiddenButton); hiddenAncestor.append(hiddenRoot); document.body.append(hiddenAncestor);
+    const ancestorStyle = hiddenAncestor.getAttribute('style');
     try {
       for (const [name, root] of [
         ['missing', undefined], ['disconnected', document.createElement('section')], ['document', document.documentElement],
         ['SVG', document.createElementNS('http://www.w3.org/2000/svg', 'svg')], ['shadow-root', shadowRoot],
         ['popover', popover], ['inert', inert], ['iframe', iframe], ['foreign', iframe.contentDocument!.body],
+        ['hidden-ancestor', hiddenRoot],
       ] as const) {
+        const original = {style: root?.getAttribute('style'), popover: root?.getAttribute('popover'), parent: root?.parentNode};
         for (const required of [true, false]) {
           let session: Runtime.XRSession | undefined;
           try {
@@ -145,9 +152,11 @@ export async function runDOMOverlayPreview(page: Page, phone: boolean, stopWorke
             if (required || session.domOverlayState !== null || session.enabledFeatures.includes('dom-overlay')) throw new Error(`${name}: enabled unsupported root`);
           } catch (error) { if (!required || (error as Error).name !== 'NotSupportedError') throw error; }
           finally { if (session) await session.end(); }
+          if (root?.getAttribute('style') !== original.style || root?.getAttribute('popover') !== original.popover || root?.parentNode !== original.parent) throw new Error(`${name}: unsupported root was not restored`);
         }
         results.push(name);
       }
+      if (hiddenAncestor.getAttribute('style') !== ancestorStyle || hiddenRoot.offsetWidth !== 0 || hiddenButton.getClientRects().length !== 0) throw new Error('Hidden ancestor presentation was modified');
       // Presentation can be canceled by application beforetoggle listeners.
       const canceled = document.createElement('section'); document.body.append(canceled);
       canceled.addEventListener('beforetoggle', event => event.preventDefault());
@@ -165,7 +174,7 @@ export async function runDOMOverlayPreview(page: Page, phone: boolean, stopWorke
       const inline = await w.navigator.xr.requestSession('inline', {optionalFeatures: ['dom-overlay'], domOverlay: {root: document.body}});
       if (inline.domOverlayState !== null || inline.enabledFeatures.includes('dom-overlay')) throw new Error('Inline preview enabled');
       await inline.end();
-    } finally { host.remove(); popover.remove(); inert.remove(); iframe.remove(); }
+    } finally { host.remove(); popover.remove(); inert.remove(); iframe.remove(); hiddenAncestor.remove(); }
     return results;
   });
   evidence.push({unsupportedRootPolicy: policy});
