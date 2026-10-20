@@ -52,7 +52,7 @@ The device picker exposes exactly two profiles. **Meta Quest 3** is the default.
 | Meta Quest 3 | 6DoF headset and two tracked 6DoF controllers with select/squeeze; VR or MR in one profile |
 | Generic Android Phone (ARCore) | 6DoF handheld AR camera, virtual phone screen, transient touch input, and virtual-room hit tests |
 
-These profiles represent development targets, not physical-device fidelity or a claim of complete Quest 3/ARCore API support. Quest sessions can request simulated hand tracking. AR/MR sessions can request hit tests, session anchors, CPU depth and virtual lighting; immersive sessions can use WebGL2 projection and quad layers. Feature availability and unsupported combinations are listed in the [versioned inventory](docs/webxr-conformance.md).
+These profiles represent development targets, not physical-device fidelity or a claim of complete Quest 3/ARCore API support. Quest sessions can request simulated hand tracking. AR/MR sessions can request hit tests, room-backed plane/mesh detection, session anchors, CPU depth (float32 or 16-bit) and virtual lighting. Immersive sessions can request a fixed-origin `unbounded` space and use WebGL2 projection and quad layers with depth or packed depth/stencil textures. Feature availability and unsupported combinations are listed in the [versioned inventory](docs/webxr-conformance.md).
 
 ### Quest mode
 
@@ -139,6 +139,14 @@ Chrome uses a service worker and two manifest-declared `document_start` content 
 ### Browser regression checks
 
 `npm run test:browser` loads the actual unpacked extension in a fresh, temporary desktop Chromium profile, opens its real DevTools panel, and checks legacy profile migration, Quest VR/MR selection and persistence, session switching/restart, stereo and monoscopic views, configuration persistence, synchronous injection under a restrictive script CSP, service-worker shutdown/recovery, matching same-origin and cross-origin frames, tab isolation, VR pose messages and select/squeeze, AR room rendering, persistent/transient hit testing, and mouse input. It serves a local TypeScript regression sample and deletes the profile afterward; no personal browser profile is used.
+
+### Simulated room geometry and navigation
+
+Quest MR and Android AR can request `plane-detection` and `mesh-detection` together or separately. On active XR frames, iterate `frame.detectedPlanes` / `frame.detectedMeshes` and use `frame.getPose(plane.planeSpace, referenceSpace)` / `frame.getPose(mesh.meshSpace, referenceSpace)`. They expose real indexed triangular patches from the same hall used by Hit Test and depth, with stable identities, change timestamps, transforms and removal tracking. The decorative sky is excluded. No extra panel setup, camera, sensor, permission or browser flag is needed. Patches are not merged/recognized walls; semantic labels are null. Sets start empty while the asset loads. `session.initiateRoomCapture()` completes automatically once; it does not scan a room.
+
+All immersive modes can explicitly request `unbounded`: a fixed virtual local origin with unrestricted pose movement and offset reference spaces. The virtual hall remains finite. `bounded-floor` has no authored safe-play polygon and remains unavailable.
+
+CPU `depth-sensing` accepts `float32`, `unsigned-short` and `luminance-alpha`, choosing the first supported requested format. Sixteen-bit buffers contain millimeters (`rawValueToMeters=0.001`); zero means unknown, including distances outside the 16-bit range. GPU depth, marker/image tracking, persistent anchors, reflections, extra layer/texture variants, camera access, secondary views, WebGPU XR rendering and controller haptics remain unsupported. See the [status matrix and concrete blockers](docs/webxr-conformance.md#consolidated-triage-and-decisions-issue-19) for exact rejection/omission behavior and future prerequisites. `npm run test:environment` checks deterministic room fixtures; the browser and external sample suites exercise the new APIs through the unpacked extension.
 
 ### Interactive DOM Overlay Preview (opt-in)
 

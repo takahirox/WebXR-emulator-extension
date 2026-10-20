@@ -3,6 +3,7 @@ import type {PolyfillGlobal} from '../types/polyfill';
 import * as geometry from './api/geometry';
 import * as layers from './api/layers';
 import * as sensing from './api/sensing';
+import * as environment from './api/environment';
 import * as runtime from './api/runtime';
 import EX_API from './api/index';
 import EmulatedXRDevice from './EmulatedXRDevice';
@@ -13,7 +14,7 @@ export default class CustomWebXRPolyfill {
   readonly xr: runtime.XRSystem;
   constructor() {
     const global = window as PolyfillGlobal;
-    for (const [name, value] of Object.entries({...geometry, ...runtime, ...sensing, ...layers, ...EX_API})) {
+    for (const [name, value] of Object.entries({...geometry, ...runtime, ...sensing, ...environment, ...layers, ...EX_API})) {
       if (name.startsWith('XR')) (global as unknown as Record<string, unknown>)[name] = value;
     }
     const device = new Promise<EmulatedXRDevice>(resolve => {

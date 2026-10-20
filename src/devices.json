@@ -39,6 +39,8 @@
       "formFactor": "headset",
       "features": [
         "hit-test",
+        "plane-detection",
+        "mesh-detection",
         "anchors",
         "layers",
         "depth-sensing",
@@ -55,6 +57,8 @@
       ],
       "features": [
         "hit-test",
+        "plane-detection",
+        "mesh-detection",
         "anchors",
         "layers",
         "depth-sensing",

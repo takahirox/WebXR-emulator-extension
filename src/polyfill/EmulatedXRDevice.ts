@@ -173,11 +173,11 @@ export default class EmulatedXRDevice extends XRDevice {
     // Explicit emulator preview only; screen state does not claim UA conformance.
     if (featureDescriptor === 'dom-overlay') return this.domOverlayPreview && mode === 'immersive-ar' && this.emulationMode === mode && DOMOverlay.available();
     if (featureDescriptor === 'viewer') return true;
-    if (featureDescriptor === 'local' || featureDescriptor === 'local-floor') return mode !== 'inline';
+    if (featureDescriptor === 'local' || featureDescriptor === 'local-floor' || featureDescriptor === 'unbounded') return mode !== 'inline';
     if (!this.features.includes(featureDescriptor)) return false;
     if (featureDescriptor === 'layers') return mode !== 'inline' && typeof WebGL2RenderingContext !== 'undefined';
     if (featureDescriptor === 'hand-tracking') return !this.handheld && mode !== 'inline';
-    return mode === 'immersive-ar' && ['hit-test', 'anchors', 'depth-sensing', 'light-estimation'].includes(featureDescriptor);
+    return mode === 'immersive-ar' && ['hit-test', 'anchors', 'depth-sensing', 'light-estimation', 'plane-detection', 'mesh-detection'].includes(featureDescriptor);
   }
 
   async requestSession(mode: SessionMode, enabledFeatures: Set<string>) {
@@ -423,17 +423,15 @@ export default class EmulatedXRDevice extends XRDevice {
     switch (type) {
       case 'viewer':
       case 'local':
+      case 'unbounded':
         matrix[13] = -DEFAULT_HEADSET_POSITION[1];
         return matrix;
 
       case 'local-floor':
         return matrix;
 
-      case 'bounded-floor':
-      case 'unbound':
       default:
-        // @TODO: Throw an error?
-        return matrix;
+        throw new DOMException('Unsupported reference space.', 'NotSupportedError');
     }
   }
 
