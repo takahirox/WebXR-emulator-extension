@@ -5,276 +5,237 @@ import type * as Runtime from '../src/polyfill/api/runtime';
 import type {XRWebGLLayer} from '../src/polyfill/api/layers';
 import type {PanelProbeWindow} from './browser-types';
 
-type OverlayWindow = Pick<PanelProbeWindow, 'panelProbe'> & typeof Runtime & {
-  navigator: {xr: Runtime.XRSystem};
-  XRWebGLLayer: typeof XRWebGLLayer;
-  productionOverlay: {
-    session: Runtime.XRSession; root: HTMLElement; button: HTMLButtonElement; input: HTMLInputElement;
-    ancestor: HTMLElement; scroll: HTMLElement; frames: HTMLIFrameElement[];
-    events: string[]; rays: number[]; clicks: number; cancel: boolean; endOnBefore: boolean;
-    nativeBefore: {session: boolean; target: boolean; bubbles: boolean; composed: boolean; cancelable: boolean}[];
-  };
-  shadowOverlay: {session: Runtime.XRSession; container: HTMLElement; root: HTMLElement; button: HTMLButtonElement; canvas: HTMLCanvasElement; events: string[]; clicks: number};
+type PreviewWindow = typeof Runtime & Pick<PanelProbeWindow, 'panelProbe'> & {
+  navigator: {xr: Runtime.XRSystem}; XRWebGLLayer: typeof XRWebGLLayer;
+  preview: {session: Runtime.XRSession; root: HTMLElement; ancestor: HTMLElement; button: HTMLButtonElement;
+    input: HTMLInputElement; checkbox: HTMLInputElement; scroll: HTMLElement; canvas: HTMLCanvasElement;
+    clicks: number; events: string[]; xrEvents: string[]; style: string | null; listeners: AbortController; lateFrame?: HTMLIFrameElement};
 };
 
-/** Test-only access to the retained implementation; public negotiation stays disabled. */
-export async function runDOMOverlayImplementation(page: Page, stopWorker: () => Promise<void>) {
-  await page.evaluate('globalThis.__name = value => value');
-  await page.evaluate(async () => {
-    const w = window as unknown as OverlayWindow;
-    const ancestor = document.createElement('main');
-    // Top-layer root must escape this ancestor's transform, opacity and clipping,
-    // while retaining its inherited CSS properties and selector ancestry.
-    Object.assign(ancestor.style, {transform: 'translate(200px, 300px)', overflow: 'hidden', width: '1px', height: '1px', opacity: '0.1', color: 'rgb(10, 20, 30)'});
-    const root = document.createElement('section'); root.id = 'production-overlay'; root.style.setProperty('--original-style', 'preserved');
-    const button = document.createElement('button'); button.textContent = 'Original live button';
-    Object.assign(button.style, {position: 'absolute', left: '25%', top: '20%', width: '50%', height: '12%', border: '0', background: 'rgb(3, 241, 162)'});
-    const input = document.createElement('input'); input.setAttribute('aria-label', 'Production input');
-    Object.assign(input.style, {position: 'absolute', left: '25%', top: '40%', width: '50%', height: '8%'});
-    const scroll = document.createElement('div'); Object.assign(scroll.style, {position: 'absolute', left: '25%', top: '55%', width: '50%', height: '10%', overflow: 'auto'});
-    const tall = document.createElement('div'); tall.style.height = '2000px'; tall.textContent = 'Native scroll'; scroll.append(tall);
-    root.append(button, input, scroll); ancestor.append(root); document.body.append(ancestor);
-    const session = await w.navigator.xr.requestSession('immersive-ar');
-    // Deliberately bypass negotiation only in this implementation regression harness.
-    session._startDOMOverlay(root);
-    const state: OverlayWindow['productionOverlay'] = w.productionOverlay = {session, root, button, input, ancestor, scroll, frames: [], events: [], rays: [], clicks: 0, cancel: true, endOnBefore: false, nativeBefore: []};
-    button.addEventListener('click', () => state.clicks++);
-    root.addEventListener('beforexrselect', event => {
-      state.events.push('before');
-      state.nativeBefore.push({session: (event as unknown as Runtime.XRSessionEvent).session === session, target: event.target === button, bubbles: event.bubbles, composed: event.composed, cancelable: event.cancelable});
-      if (state.cancel) event.preventDefault();
-      if (state.endOnBefore) void session.end();
-    });
-    const viewer = await session.requestReferenceSpace('viewer');
-    session.addEventListener('selectstart', event => {
-      const input = event as Runtime.XRInputSourceEvent;
-      const m = input.frame.getPose(input.inputSource.targetRaySpace, viewer)!.transform.matrix;
-      state.rays.push(-m[9] / m[10]);
-    });
-    for (const name of ['selectstart', 'selectend', 'select']) session.addEventListener(name, () => state.events.push(name));
-    const canvas = document.createElement('canvas'); const gl = canvas.getContext('webgl')!;
-    document.body.append(canvas); await gl.makeXRCompatible();
-    session.addEventListener('end', () => canvas.remove());
-    session.updateRenderState({baseLayer: new w.XRWebGLLayer(session, gl)});
-    const frame = () => { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); if (!session.ended) session.requestAnimationFrame(frame); };
-    session.requestAnimationFrame(frame);
-  });
-  const settle = () => page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-  const sample = () => page.evaluate(() => {
-    const w = window as unknown as OverlayWindow, state = w.productionOverlay;
-    const {renderer, scene, camera} = w.panelProbe!;
-    let screen: import('three').Mesh | undefined;
-    scene.traverse(o => { const m = o as import('three').Mesh<import('three').BufferGeometry, import('three').Material>; if (m.material?.customProgramCacheKey() === 'ar-screen-composite-v1') screen = m; });
-    if (!screen) throw new Error('No production phone screen');
-    screen.geometry.computeBoundingBox(); const box = screen.geometry.boundingBox!;
-    const point = camera.position.clone().set((box.min.x + box.max.x) / 2, box.max.y - (box.max.y - box.min.y) * 0.23, 0);
-    screen.localToWorld(point).project(camera);
-    const display = renderer.domElement.getBoundingClientRect(), button = state.button.getBoundingClientRect();
-    const center = {x: button.x + button.width / 2, y: button.y + button.height / 4};
-    return {center, projectedCenter: {x: display.left + (point.x + 1) * display.width / 2, y: display.top + (1 - point.y) * display.height / 2}, error: Math.hypot(center.x - (display.left + (point.x + 1) * display.width / 2), center.y - (display.top + (1 - point.y) * display.height / 2)),
-      target: document.elementFromPoint(center.x, center.y) === state.button,
-      identity: document.getElementById('production-overlay') === state.root && state.root.parentNode === state.ancestor,
-      inheritedColor: getComputedStyle(state.root).color, clicks: state.clicks, events: state.events.slice(), before: state.nativeBefore.slice(),
-      state: state.session.domOverlayState, width: state.root.offsetWidth, height: state.root.offsetHeight};
-  });
+/** Real public negotiation and native desktop input; no internal overlay access. */
+export async function runDOMOverlayPreview(page: Page, phone: boolean, stopWorker: () => Promise<void>) {
+  await page.mouse.click(10, 10); // Real transient activation after page reload.
+  const label = phone ? 'android' : 'quest';
   const evidence: object[] = [];
-  async function capture(label: string) {
-    await settle(); const current = await sample();
-    assert(current.target && current.identity && current.error < 2, `${label}: live DOM pixel/hit geometry ${JSON.stringify(current)}`);
-    assert.equal(current.inheritedColor, 'rgb(10, 20, 30)', 'root retains inherited styling');
+  await page.evaluate('globalThis.__name = value => value');
+  const start = async (kind: 'projected' | 'fixed' | 'body' | 'hidden' = 'projected', required = true) => {
+    await page.evaluate(async ({kind, required}) => {
+      const w = window as unknown as PreviewWindow;
+      const ancestor = document.createElement('main');
+      Object.assign(ancestor.style, {transform: 'translate(200px, 300px)', overflow: 'hidden', width: '1px', height: '1px', opacity: '0.1', color: 'rgb(10, 20, 30)'});
+      const root = kind === 'body' ? document.body : document.createElement('section'); root.id = 'preview-root';
+      if (kind !== 'body') { root.style.setProperty('--original-style', 'preserved'); ancestor.append(root); document.body.append(ancestor); }
+      if (kind === 'hidden') root.style.display = 'none';
+      const initialStyle = root.getAttribute('style');
+      const button = document.createElement('button'); button.textContent = 'Original live button';
+      Object.assign(button.style, {position: kind === 'fixed' ? 'fixed' : 'absolute', left: '25%', top: '20%', width: '50%', height: '12%', border: '0', background: 'rgb(3, 241, 162)'});
+      const input = document.createElement('input'); input.setAttribute('aria-label', 'Preview input'); input.value = 'original mutable state';
+      Object.assign(input.style, {position: 'absolute', left: '25%', top: '40%', width: '50%', height: '8%'});
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.setAttribute('aria-label', 'Preview checkbox');
+      Object.assign(checkbox.style, {position: 'absolute', left: '25%', top: '50%', width: '24px', height: '24px'});
+      const scroll = document.createElement('div'); scroll.id = 'preview-scroll';
+      Object.assign(scroll.style, {position: 'absolute', left: '25%', top: '60%', width: '50%', height: '15%', overflow: 'auto'});
+      const tall = document.createElement('div'); tall.style.height = '2000px'; tall.textContent = 'Native scroll'; scroll.append(tall);
+      root.append(button, input, checkbox, scroll);
+      const events: string[] = [], xrEvents: string[] = []; let clicks = 0;
+      const listeners = new AbortController();
+      // Existing listeners are installed BEFORE requestSession, as in an ordinary app.
+      button.addEventListener('click', () => { clicks++; button.textContent = `App clicked ${clicks}`; w.preview.clicks = clicks; });
+      for (const name of ['input', 'change', 'focusin', 'click']) root.addEventListener(name, event => { events.push(`${name}:${event.isTrusted}`); }, {signal: listeners.signal});
+      root.addEventListener('beforexrselect', () => xrEvents.push('beforexrselect'), {signal: listeners.signal});
+      input.focus({preventScroll: true});
+      const session = await w.navigator.xr.requestSession('immersive-ar', {
+        [required ? 'requiredFeatures' : 'optionalFeatures']: ['dom-overlay'], domOverlay: {root},
+      });
+      const canvas = document.createElement('canvas'); document.body.append(canvas);
+      const gl = canvas.getContext('webgl')!; await gl.makeXRCompatible();
+      session.updateRenderState({baseLayer: new w.XRWebGLLayer(session, gl)});
+      for (const name of ['selectstart', 'select', 'selectend']) session.addEventListener(name, () => xrEvents.push(name));
+      const frame = () => { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); if (!session.ended) session.requestAnimationFrame(frame); };
+      session.requestAnimationFrame(frame);
+      w.preview = {session, root, ancestor, button, input, checkbox, scroll, canvas, clicks, events, xrEvents, listeners,
+        style: initialStyle};
+    }, {kind, required});
+  };
+  const settle = () => page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  async function capture(name: string, projected = phone) {
+    await settle();
+    const geometry = await page.evaluate(projected => {
+      const w = window as unknown as PreviewWindow, s = w.preview;
+      const button = s.button.getBoundingClientRect();
+      // Sample away from text, but inside the colored button.
+      const point = {x: button.x + button.width / 2, y: button.y + button.height / 4};
+      let error = 0;
+      if (projected) {
+        const {scene, camera, renderer} = w.panelProbe!;
+        let screen: import('three').Mesh | undefined;
+        scene.traverse(o => { const m = o as import('three').Mesh<import('three').BufferGeometry, import('three').Material>; if (m.material?.customProgramCacheKey() === 'ar-screen-composite-v1') screen = m; });
+        if (!screen) throw new Error('No phone screen');
+        screen.geometry.computeBoundingBox(); const box = screen.geometry.boundingBox!;
+        const p = camera.position.clone().set((box.min.x + box.max.x) / 2, box.max.y - (box.max.y - box.min.y) * 0.23, 0);
+        screen.localToWorld(p).project(camera); const r = renderer.domElement.getBoundingClientRect();
+        error = Math.hypot(point.x - (r.left + (p.x + 1) * r.width / 2), point.y - (r.top + (1 - p.y) * r.height / 2));
+      }
+      return {point, error, sameRoot: document.getElementById('preview-root') === s.root,
+        sameParent: s.root === document.body || s.root.parentNode === s.ancestor,
+        target: document.elementFromPoint(point.x, point.y) === s.button, state: s.session.domOverlayState,
+        enabled: s.session.enabledFeatures.includes('dom-overlay'), width: s.root.offsetWidth, height: s.root.offsetHeight};
+    }, projected);
+    assert(geometry.sameRoot && geometry.sameParent && geometry.target && geometry.error < 2, `${label} ${name}: ${JSON.stringify(geometry)}`);
+    assert(geometry.enabled); assert.deepEqual(geometry.state, {type: 'screen'});
     const cdp = await page.context().newCDPSession(page);
     const shot = await cdp.send('Page.captureScreenshot', {format: 'png'}); await cdp.detach();
-    await writeFile(`test-results/dom-overlay-production-${label}.png`, Buffer.from(shot.data, 'base64'));
-    const pixel = await page.evaluate(async ({data, center}) => {
+    await writeFile(`test-results/dom-overlay-preview-${label}-${name}.png`, Buffer.from(shot.data, 'base64'));
+    const pixel = await page.evaluate(async ({data, point}) => {
       const img = new Image(); img.src = `data:image/png;base64,${data}`; await img.decode();
       const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
       const ctx = canvas.getContext('2d')!; ctx.drawImage(img, 0, 0);
-      return Array.from(ctx.getImageData(Math.floor(center.x * img.width / innerWidth), Math.floor(center.y * img.height / innerHeight), 1, 1).data);
-    }, {data: shot.data, center: current.center});
-    [3, 241, 162, 255].forEach((value, i) => assert(Math.abs(pixel[i] - value) <= 2, `${label}: original live button pixel ${pixel}`));
-    evidence.push({label, error: current.error, pixel, viewport: {width: current.width, height: current.height}});
-    return current;
+      return Array.from(ctx.getImageData(Math.floor(point.x * img.width / innerWidth), Math.floor(point.y * img.height / innerHeight), 1, 1).data);
+    }, {data: shot.data, point: geometry.point});
+    [3, 241, 162, 255].forEach((value, i) => assert(Math.abs(pixel[i] - value) <= 2, `${label} ${name}: visible button pixel ${pixel}`));
+    evidence.push({name, ...geometry, pixel}); return geometry;
   }
+  async function interact() {
+    const checkedBefore = await page.evaluate(() => (window as unknown as PreviewWindow).preview.checkbox.checked);
+    const geometry = await capture(`interaction-${evidence.length}`);
+    await page.mouse.click(geometry.point.x, geometry.point.y);
+    await page.getByLabel('Preview checkbox', {exact: true}).click();
+    await page.getByLabel('Preview input', {exact: true}).click();
+    await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.type('native edit'); await page.keyboard.press('Tab');
+    await page.evaluate(() => { (window as unknown as PreviewWindow).preview.scroll.scrollTop = 0; });
+    const scroll = await page.locator('#preview-scroll').boundingBox(); assert(scroll);
+    await page.mouse.move(scroll.x + scroll.width / 2, scroll.y + scroll.height / 2); await page.mouse.wheel(0, 150);
+    await page.waitForFunction(() => (window as unknown as PreviewWindow).preview.scroll.scrollTop > 0);
+    const result = await page.evaluate(() => { const s = (window as unknown as PreviewWindow).preview; return {clicks: s.clicks, value: s.input.value, checked: s.checkbox.checked, events: s.events, xrEvents: s.xrEvents}; });
+    assert(result.clicks > 0); assert.equal(result.value, 'native edit');
+    assert.equal(result.checked, !checkedBefore, 'native checkbox changes original mutable state');
+    assert(result.events.includes('input:true') && result.events.includes('change:true') && result.events.includes('focusin:true') && result.events.includes('click:true'));
+    assert.deepEqual(result.xrEvents, [], 'DOM actions never generate XR input or beforexrselect');
+    evidence.push({nativeInteraction: result});
+  }
+  async function clean() {
+    await page.evaluate(async () => {
+      const s = (window as unknown as PreviewWindow).preview;
+      if (!s.session.ended) await s.session.end();
+      if (s.root.hasAttribute('popover') || s.root.getAttribute('style') !== s.style) throw new Error(`Root attributes were not restored: ${JSON.stringify({id: s.root.id, expected: s.style, actual: s.root.getAttribute('style'), popover: s.root.getAttribute('popover')})}`);
+      if (s.root === document.body) { s.root.removeAttribute('id'); s.button.remove(); s.input.remove(); s.checkbox.remove(); s.scroll.remove(); }
+      else s.ancestor.remove();
+      s.listeners.abort(); s.canvas.remove();
+    });
+  }
+  const policy = await page.evaluate(async () => {
+    const w = window as unknown as PreviewWindow, results: string[] = [];
+    const host = document.createElement('div'); document.body.append(host);
+    const shadowRoot = document.createElement('section'); host.attachShadow({mode: 'closed'}).append(shadowRoot);
+    const popover = document.createElement('section'); popover.setAttribute('popover', 'manual'); document.body.append(popover);
+    const inert = document.createElement('section'); inert.inert = true; document.body.append(inert);
+    const iframe = document.createElement('iframe'); document.body.append(iframe);
+    try {
+      for (const [name, root] of [
+        ['missing', undefined], ['disconnected', document.createElement('section')], ['document', document.documentElement],
+        ['SVG', document.createElementNS('http://www.w3.org/2000/svg', 'svg')], ['shadow-root', shadowRoot],
+        ['popover', popover], ['inert', inert], ['iframe', iframe], ['foreign', iframe.contentDocument!.body],
+      ] as const) {
+        for (const required of [true, false]) {
+          let session: Runtime.XRSession | undefined;
+          try {
+            session = await w.navigator.xr.requestSession('immersive-ar', {
+              [required ? 'requiredFeatures' : 'optionalFeatures']: ['dom-overlay'], ...(root ? {domOverlay: {root}} : {}),
+            });
+            if (required || session.domOverlayState !== null || session.enabledFeatures.includes('dom-overlay')) throw new Error(`${name}: enabled unsupported root`);
+          } catch (error) { if (!required || (error as Error).name !== 'NotSupportedError') throw error; }
+          finally { if (session) await session.end(); }
+        }
+        results.push(name);
+      }
+      // Presentation can be canceled by application beforetoggle listeners.
+      const canceled = document.createElement('section'); document.body.append(canceled);
+      canceled.addEventListener('beforetoggle', event => event.preventDefault());
+      try {
+        for (const required of [false, true]) {
+          let session: Runtime.XRSession | undefined;
+          try {
+            session = await w.navigator.xr.requestSession('immersive-ar', {[required ? 'requiredFeatures' : 'optionalFeatures']: ['dom-overlay'], domOverlay: {root: canceled}});
+            if (required || session.domOverlayState !== null || session.enabledFeatures.includes('dom-overlay')) throw new Error('Canceled preview was enabled');
+          } catch (error) { if (!required || (error as Error).name !== 'NotSupportedError') throw error; }
+          finally { if (session) await session.end(); }
+          if (canceled.hasAttribute('popover') || canceled.getAttribute('style') !== null) throw new Error('Canceled preview root was not restored');
+        }
+      } finally { canceled.remove(); }
+      const inline = await w.navigator.xr.requestSession('inline', {optionalFeatures: ['dom-overlay'], domOverlay: {root: document.body}});
+      if (inline.domOverlayState !== null || inline.enabledFeatures.includes('dom-overlay')) throw new Error('Inline preview enabled');
+      await inline.end();
+    } finally { host.remove(); popover.remove(); inert.remove(); iframe.remove(); }
+    return results;
+  });
+  evidence.push({unsupportedRootPolicy: policy});
   try {
-    let current = await capture('initial');
-    await stopWorker();
-    await page.mouse.click(current.center.x, current.center.y);
-    await page.waitForFunction(() => (window as unknown as OverlayWindow).productionOverlay.events.includes('before'));
-    await settle();
-    current = await sample();
-    assert.equal(current.clicks, 1, 'native click reaches original listener');
-    assert.deepEqual(current.events, ['before'], 'canceling beforexrselect suppresses the entire XR action');
-    assert.deepEqual(current.before[0], {session: true, target: true, bubbles: true, composed: true, cancelable: true});
-    await page.locator('#production-overlay input').fill('retained live input');
-    assert(await page.evaluate(() => { const s = (window as unknown as OverlayWindow).productionOverlay; return document.activeElement === s.input && s.input.value === 'retained live input'; }), 'native edit/focus retained');
-    await page.evaluate(() => { const s = (window as unknown as OverlayWindow).productionOverlay; s.cancel = false; s.events.length = 0; });
-    await page.mouse.move(current.center.x, current.center.y); await page.mouse.down();
-    await page.waitForFunction(() => (window as unknown as OverlayWindow).productionOverlay.events.includes('selectstart'));
-    // Leaving the initial hit target while held must retain the action decision.
-    await page.mouse.move(current.center.x + 1, current.center.y + 1); await page.mouse.up();
-    await page.waitForFunction(() => (window as unknown as OverlayWindow).productionOverlay.events.includes('selectend'));
-    assert.deepEqual((await sample()).events, ['before', 'selectstart', 'select', 'selectend']);
-    const targetRayY = await page.evaluate(() => (window as unknown as OverlayWindow).productionOverlay.rays[0]);
-    assert(Math.abs(targetRayY - 0.54) < 0.01, `XR target ray uses the visible inner screen coordinates: ${targetRayY}`);
-    const sessionState = await page.evaluate(() => (window as unknown as OverlayWindow).productionOverlay.session.domOverlayState);
-    assert.deepEqual(sessionState, {type: 'screen'});
-    // Verify native scrolling before display/DPR transitions. Post-transition
-    // Chromium wheel routing remains a recorded limitation of this disabled path.
-    const scroll = await page.locator('#production-overlay > div').boundingBox(); assert(scroll);
-    const scrollPoint = {x: scroll.x + scroll.width / 2, y: scroll.y + scroll.height / 2};
-    const scrollGeometry = await page.evaluate(p => { const s = (window as unknown as OverlayWindow).productionOverlay; return {point: p, target: s.scroll.contains(document.elementFromPoint(p.x, p.y)), height: s.scroll.clientHeight, total: s.scroll.scrollHeight, css: getComputedStyle(s.scroll).overflow, rootScroll: s.root.scrollTop, ended: s.session.ended}; }, scrollPoint);
-    assert(scrollGeometry.target && scrollGeometry.total > scrollGeometry.height, 'native wheel targets the displayed scrollable content');
-    await page.mouse.move(scrollPoint.x, scrollPoint.y); await settle();
-    await page.mouse.wheel(0, 150);
-    await page.waitForFunction(() => (window as unknown as OverlayWindow).productionOverlay.scroll.scrollTop > 0).catch(async error => { console.log('scroll failure', await page.evaluate(p => { const s = (window as unknown as OverlayWindow).productionOverlay; return {rootScroll: s.root.scrollTop, scrollTop: s.scroll.scrollTop, target: document.elementFromPoint(p.x,p.y)?.outerHTML.slice(0,120)}; }, scrollPoint)); throw error; });
-    evidence.push({nativeScroll: true, nativeClickFocus: true, cancelableBeforeXRSelect: true, workerSuspension: true});
-    // Move through the same production bridge used by the DevTools panel.
-    await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0.015, 1.6, -0.2], quaternion: [0, Math.sin(0.08), 0, Math.cos(0.08)]}})));
-    current = await capture('phone-moved');
-    await page.mouse.click(current.center.x, current.center.y); await settle();
-    assert((await sample()).clicks >= 3, 'native hit testing follows translated/rotated phone');
-    await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-pose', {detail: {position: [0.008, 1.6, 0], quaternion: [0, 0, 0, 1]}})));
-    await capture('camera-moved');
-    await page.evaluate(() => {
-      (window as unknown as OverlayWindow).productionOverlay.button.style.visibility = 'visible';
-      // Catch clicks below the hidden top-layer root so this assertion does not
-      // also operate the emulator's exposed phone/camera transform gizmos.
-      const guard = document.createElement('div'); guard.id = 'hidden-overlay-click-guard';
-      Object.assign(guard.style, {position: 'fixed', inset: '0', zIndex: '10000'}); document.body.append(guard);
-    });
-    for (const pose of [
-      {position: [0.015, 1.6, -0.2], quaternion: [0, 1, 0, 0]},
-      {position: [0.015, 1.6, 0.2], quaternion: [0, 0, 0, 1]},
-    ]) {
-      await page.evaluate(pose => window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', ...pose}})), pose);
+    await start(); await capture('initial');
+    assert(await page.evaluate(() => { const s = (window as unknown as PreviewWindow).preview; return document.activeElement === s.input && s.input.value === 'original mutable state'; }), 'startup preserves focus and mutable state');
+    await stopWorker(); await interact();
+    if (phone) {
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0.015, 1.6, -0.2], quaternion: [0, Math.sin(0.08), 0, Math.cos(0.08)]}})));
+      await capture('phone-moved');
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-pose', {detail: {position: [0.008, 1.6, 0], quaternion: [0, 0, 0, 1]}})));
+      await capture('camera-moved');
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0, 1.6, -0.2], quaternion: [0, 1, 0, 0]}})));
       await settle();
-      const hidden = await sample();
-      assert(await page.evaluate(point => {
-        const s = (window as unknown as OverlayWindow).productionOverlay;
-        return getComputedStyle(s.root).display === 'none' && getComputedStyle(s.button).visibility === 'visible' &&
-          s.button.getClientRects().length === 0 && !s.root.contains(document.elementFromPoint(point.x, point.y));
-      }, hidden.projectedCenter), 'back-facing/behind-camera phone removes even visibility:visible descendants from painting and native hit testing');
-      await page.mouse.click(hidden.projectedCenter.x, hidden.projectedCenter.y); await settle();
-      assert.equal((await sample()).clicks, hidden.clicks, 'hidden descendant cannot receive a native click');
+      assert(await page.evaluate(() => (window as unknown as PreviewWindow).preview.button.getClientRects().length === 0), 'back-facing phone has no stale interactive DOM');
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0, 1.6, -0.2], quaternion: [0, 0, 0, 1]}})));
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('webxr-pose', {detail: {position: [0, 1.6, 0], quaternion: [0, 0, 0, 1]}})));
     }
-    await page.evaluate(() => { document.getElementById('hidden-overlay-click-guard')?.remove();
-      window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0.015, 1.6, -0.2], quaternion: [0, Math.sin(0.08), 0, Math.cos(0.08)]}}));
-    });
-    await settle();
     const cdp = await page.context().newCDPSession(page);
     try {
       await cdp.send('Emulation.setDeviceMetricsOverride', {width: 900, height: 900, deviceScaleFactor: 2, mobile: false});
-      current = await capture('resized-dpr2');
-      await page.mouse.click(current.center.x, current.center.y); await settle();
-      assert((await sample()).clicks >= 4, 'native click after active resize/DPR change');
+      await capture('resized-dpr2'); await interact();
       await cdp.send('Emulation.setDeviceMetricsOverride', {width: 1280, height: 720, deviceScaleFactor: 1, mobile: false});
-    } finally { await cdp.detach(); }
-    await settle();
-    await page.evaluate(() => {
-      const s = (window as unknown as OverlayWindow).productionOverlay;
-      for (const [index, src] of [`${location.origin}/frame`, `${location.origin.replace('127.0.0.1', 'localhost')}/frame`, 'about:blank'].entries()) {
-        const frame = document.createElement('iframe'); frame.src = src;
-        if (index === 2) frame.setAttribute('sandbox', '');
-        Object.assign(frame.style, {position: 'absolute', left: `${10 + index * 28}%`, top: '75%', width: '25%', height: '12%'});
-        s.root.append(frame); s.frames.push(frame);
-      }
-    });
-    await settle();
-    for (let index = 0; index < 3; index++) {
-      const box = await page.locator('#production-overlay iframe').nth(index).boundingBox();
-      assert(box, `embedded frame ${index} must be rendered`);
-      assert(await page.locator('#production-overlay iframe').nth(index).evaluate(frame => getComputedStyle(frame).pointerEvents === 'none'), 'embedded documents cannot receive native pointer input');
-      const before = (await sample()).events.length;
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); await settle();
-      assert.equal((await sample()).events.length, before, 'embedded browsing context receives no XR touch sequence');
-    }
-    await page.waitForFunction(() => (window as unknown as OverlayWindow).productionOverlay.frames[0].contentDocument?.readyState === 'complete');
-    await page.evaluate(() => {
-      const s = (window as unknown as OverlayWindow).productionOverlay;
-      const nested = s.frames[0].contentDocument!.createElement('iframe'); nested.src = s.frames[1].src;
-      s.frames[0].contentDocument!.body.append(nested);
-      // Origin and sandbox changes never grant interaction to a blocked context.
-      s.frames[0].src = s.frames[1].src; s.frames[2].setAttribute('sandbox', 'allow-same-origin');
-    });
-    await settle();
-    const blockedRegion = await page.locator('#production-overlay iframe').first().boundingBox(); assert(blockedRegion);
-    const beforeFrameDrag = (await sample()).events.length;
-    await page.mouse.move(blockedRegion.x + blockedRegion.width / 2, blockedRegion.y + blockedRegion.height / 2); await page.mouse.down();
-    current = await sample(); await page.mouse.move(current.center.x, current.center.y); await page.mouse.up(); await settle();
-    assert.equal((await sample()).events.length, beforeFrameDrag, 'a blocked frame press cannot create an XR action when dragged into the overlay');
-    evidence.push({embeddedFramesBlocked: ['same-origin', 'cross-origin', 'opaque-sandbox', 'nested', 'navigation', 'sandbox mutation'], blockedPressDraggedOutside: true});
-    // Shutdown within beforexrselect must not dispatch a later action or resurrect listeners.
-    await page.evaluate(() => { const s = (window as unknown as OverlayWindow).productionOverlay; s.endOnBefore = true; s.events.length = 0; });
-    current = await sample(); await page.mouse.click(current.center.x, current.center.y);
-    await page.waitForFunction(() => (window as unknown as OverlayWindow).productionOverlay.session.ended);
-    assert.deepEqual((await sample()).events, ['before']);
-    assert(await page.evaluate(() => { const s = (window as unknown as OverlayWindow).productionOverlay; return s.root.style.cssText === '--original-style: preserved;' && !s.root.hasAttribute('popover') && s.root.parentNode === s.ancestor && s.frames.every(f => f.style.pointerEvents === ''); }), 'end restores original root/frame styles and DOM placement');
-    for (const operation of ['remove', 'reparent', 'hide'] as const) {
-      const result = await page.evaluate(async operation => {
-        const w = window as unknown as OverlayWindow;
-        const parent = document.createElement('div'), destination = document.createElement('div'), root = document.createElement('article');
-        root.style.color = 'rgb(30, 40, 50)'; const original = root.getAttribute('style');
-        parent.append(root); document.body.append(parent, destination);
-        const session = await w.navigator.xr.requestSession('immersive-ar');
-        // Test-only implementation lifecycle check.
-        session._startDOMOverlay(root);
-        if (operation === 'remove') root.remove();
-        else if (operation === 'reparent') destination.append(root);
-        else root.hidePopover();
-        await new Promise<void>(resolve => setTimeout(resolve, 20));
-        const result = {ended: session.ended, restored: root.getAttribute('style') === original && !root.hasAttribute('popover'), position: operation !== 'reparent' || root.parentNode === destination};
-        if (!session.ended) await session.end(); parent.remove(); destination.remove();
-        return result;
-      }, operation);
-      assert.deepEqual(result, {ended: true, restored: true, position: true}, `${operation} ends overlay and restores styles without resurrecting/moving the root`);
-    }
-    evidence.push({lifecycle: ['session.end', 'end inside beforexrselect', 'root removal', 'root reparenting', 'top-layer dismissal']});
-    for (const configuration of ['open-root', 'open-control'] as const) {
-      await page.evaluate(async configuration => {
-        const w = window as unknown as OverlayWindow;
-        const container = document.createElement('div'); document.body.append(container);
-        const root = document.createElement('section'), button = document.createElement('button');
-        button.id = 'shadow-overlay-button'; button.textContent = 'Live shadow control';
-        Object.assign(button.style, {position: 'absolute', left: '25%', top: '20%', width: '50%', height: '12%'});
-        if (configuration === 'open-root') {
-          const nested = document.createElement('div'); container.attachShadow({mode: 'open'}).append(nested);
-          nested.attachShadow({mode: 'open'}).append(root); root.append(button);
-        } else {
-          container.append(root); const host = document.createElement('div'); root.append(host);
-          host.attachShadow({mode: 'open'}).append(button);
-        }
-        const session = await w.navigator.xr.requestSession('immersive-ar');
-        session._startDOMOverlay(root); // Internal harness only, not public support.
-        const canvas = document.createElement('canvas'); document.body.append(canvas);
-        const gl = canvas.getContext('webgl')!; await gl.makeXRCompatible();
-        session.updateRenderState({baseLayer: new w.XRWebGLLayer(session, gl)});
-        const state = w.shadowOverlay = {session, container, root, button, canvas, events: [] as string[], clicks: 0};
-        button.addEventListener('beforexrselect', event => { state.events.push(event.target === button ? 'before' : 'wrong-target'); event.preventDefault(); });
-        button.addEventListener('click', () => state.clicks++);
-        for (const name of ['selectstart', 'select', 'selectend']) session.addEventListener(name, () => state.events.push(name));
-        const frame = () => { if (!session.ended) session.requestAnimationFrame(frame); }; session.requestAnimationFrame(frame);
-      }, configuration);
-      try {
-        await settle();
-        const box = await page.locator('#shadow-overlay-button').boundingBox(); assert(box);
-        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-        await page.waitForFunction(() => (window as unknown as OverlayWindow).shadowOverlay.events.length > 0);
-        await settle();
-        assert.deepEqual(await page.evaluate(() => { const s = (window as unknown as OverlayWindow).shadowOverlay; return {events: s.events, clicks: s.clicks, sources: s.session.inputSources.length}; }),
-          {events: ['before'], clicks: 1, sources: 0}, `${configuration}: deepest live target receives cancellation and native click, with no stranded source`);
-      } finally {
-        await page.evaluate(async () => { const s = (window as unknown as OverlayWindow).shadowOverlay; await s.session.end(); s.canvas.remove(); s.container.remove(); });
-      }
-    }
-    evidence.push({internalOpenShadowTargeting: ['nested open-root', 'open-control'], publicClosedShadowSupport: false, hiddenVisibilityOverride: true});
-    return {presentation: 'test-only internal Android implementation; public negotiation disabled', evidence, androidEnabled: false, questEnabled: false};
-  } finally {
+      await capture('restored-dpr1'); await interact();
+    } finally { await cdp.send('Emulation.clearDeviceMetricsOverride'); await cdp.detach(); }
+    // Late opaque content needs no inspection: no XR-derived event path exists.
     await page.evaluate(async () => {
-      const s = (window as unknown as OverlayWindow).productionOverlay;
-      if (!s.session.ended) await s.session.end(); s.ancestor.remove();
-      document.getElementById('hidden-overlay-click-guard')?.remove();
-      window.dispatchEvent(new CustomEvent('webxr-pose', {detail: {position: [0, 1.6, 0], quaternion: [0, 0, 0, 1]}}));
-      window.dispatchEvent(new CustomEvent('webxr-input-pose', {detail: {objectName: 'leftController', position: [0, 1.6, -0.2], quaternion: [0, 0, 0, 1]}}));
+      const s = (window as unknown as PreviewWindow).preview;
+      const host = document.createElement('div'); s.root.append(host);
+      const frame = document.createElement('iframe'); frame.src = `${location.origin.replace('127.0.0.1', 'localhost')}/frame`;
+      Object.assign(frame.style, {position: 'absolute', left: '60%', top: '80%', width: '25%', height: '12%', border: '0'});
+      const loaded = new Promise<void>(resolve => { frame.onload = () => resolve(); });
+      s.lateFrame = frame; host.attachShadow({mode: 'closed'}).append(frame);
+      await loaded;
     });
+    await settle();
+    const late = await page.evaluate(() => { const s = (window as unknown as PreviewWindow).preview;
+      const b = s.button.getBoundingClientRect(), f = s.lateFrame!.getBoundingClientRect();
+      return {button: {x: b.x + b.width / 2, y: b.y + b.height / 2}, frame: {x: f.x + f.width / 2, y: f.y + f.height / 2}, sources: s.session.inputSources.length};
+    });
+    await page.mouse.move(late.button.x, late.button.y); await page.mouse.down(); await settle();
+    await page.mouse.move(late.frame.x, late.frame.y); await page.mouse.up(); await settle();
+    assert.deepEqual(await page.evaluate(() => (window as unknown as PreviewWindow).preview.xrEvents), [], 'entry/release in a late closed-shadow cross-origin frame never forwards XR data');
+    assert.equal(await page.evaluate(() => (window as unknown as PreviewWindow).preview.session.inputSources.length), late.sources, 'no stranded XR source after iframe release');
+    evidence.push({lateClosedShadowFrameRelease: true, xrEvents: []});
+    await clean();
+    // Both optional and required public requests enable the supported preview.
+    await start('fixed', false); await capture('flat-fallback', false); await clean();
+    if (phone) { await start('body'); await capture('body-fallback', false); await clean(); }
+    await start('hidden');
+    const revealed = await capture('initially-hidden');
+    await page.mouse.click(revealed.point.x, revealed.point.y);
+    assert.equal(await page.evaluate(() => (window as unknown as PreviewWindow).preview.clicks), 1, 'initially hidden app root becomes interactive');
+    await clean();
+    for (const action of ['remove', 'reparent', 'dismiss', 'pagehide'] as const) {
+      await start();
+      await page.evaluate(action => { const s = (window as unknown as PreviewWindow).preview;
+        if (action === 'remove') s.root.remove();
+        if (action === 'reparent') document.body.append(s.root);
+        if (action === 'dismiss') s.root.hidePopover();
+        if (action === 'pagehide') window.dispatchEvent(new Event('pagehide'));
+      }, action);
+      await page.waitForFunction(() => (window as unknown as PreviewWindow).preview.session.ended);
+      if (action === 'reparent') assert(await page.evaluate(() => (window as unknown as PreviewWindow).preview.root.parentNode === document.body), 'cleanup preserves app reparenting');
+      if (action === 'remove') assert(await page.evaluate(() => !(window as unknown as PreviewWindow).preview.root.isConnected), 'cleanup never resurrects app root');
+      await page.evaluate(() => { const s = (window as unknown as PreviewWindow).preview; if (s.root.parentNode !== s.ancestor) s.root.remove(); });
+      await clean(); evidence.push({cleanup: action});
+    }
+    return {profile: label, scope: 'opt-in interactive preview, not DOM Overlay conformance', evidence};
+  } finally {
+    await page.evaluate(async () => { const s = (window as unknown as PreviewWindow).preview; if (s && !s.session.ended) await s.session.end(); });
   }
 }

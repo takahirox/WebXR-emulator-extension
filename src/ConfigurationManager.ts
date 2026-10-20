@@ -6,6 +6,8 @@ export default class ConfigurationManager {
   private _deviceDefinitions: DeviceDefinitions;
   private _deviceKey: string;
   private _stereoEffect: boolean;
+  private _domOverlayPreview = false;
+  private _domOverlayPreviewFlat = false;
   private _questMode: ImmersiveMode = 'immersive-vr';
   private _storageKey: string;
 
@@ -34,7 +36,23 @@ export default class ConfigurationManager {
 
   get deviceDefinition() {
     // @TODO: throw error if deviceKey isn't valid?
-    return {...this._deviceDefinitions.devices[this.deviceKey], emulationMode: this.emulationMode};
+    return {...this._deviceDefinitions.devices[this.deviceKey], emulationMode: this.emulationMode, domOverlayPreview: this.domOverlayPreview, domOverlayPreviewFlat: this.domOverlayPreviewFlat};
+  }
+
+  get domOverlayPreviewFlat() { return this._domOverlayPreviewFlat; }
+
+  updateDOMOverlayPreviewFlat(enabled: boolean) {
+    if (enabled === this._domOverlayPreviewFlat) return false;
+    this._domOverlayPreviewFlat = enabled;
+    return true;
+  }
+
+  get domOverlayPreview() { return this._domOverlayPreview; }
+
+  updateDOMOverlayPreview(enabled: boolean) {
+    if (enabled === this._domOverlayPreview) return false;
+    this._domOverlayPreview = enabled;
+    return true;
   }
 
   get questMode() { return this._questMode; }
@@ -75,13 +93,15 @@ export default class ConfigurationManager {
     return JSON.stringify({
       deviceKey: this.deviceKey,
       stereoEffect: this.stereoEffect,
-      questMode: this.questMode
+      questMode: this.questMode,
+      domOverlayPreview: this.domOverlayPreview,
+      domOverlayPreviewFlat: this.domOverlayPreviewFlat
     });
   }
 
   deserialize(str: string) {
     if (!str) { str = '{}'; }
-    let json: { deviceKey?: string; stereoEffect?: boolean; questMode?: ImmersiveMode };
+    let json: { deviceKey?: string; stereoEffect?: boolean; questMode?: ImmersiveMode; domOverlayPreview?: boolean; domOverlayPreviewFlat?: boolean };
     try { json = JSON.parse(str) || {}; } catch { json = {}; }
     // Preserve the old handheld selection; removed headsets and unknown IDs use Quest.
     if (json.deviceKey === 'Samsung Galaxy S8+ (AR)') json.deviceKey = 'Generic Android Phone (ARCore)';
@@ -90,6 +110,8 @@ export default class ConfigurationManager {
     const stereoEffect = typeof json.stereoEffect === 'boolean'
       ? json.stereoEffect : this.defaultStereoEffect;
 
+    this.updateDOMOverlayPreview(json.domOverlayPreview === true);
+    this.updateDOMOverlayPreviewFlat(json.domOverlayPreviewFlat === true);
     this.updateQuestMode(json.questMode === 'immersive-ar' ? 'immersive-ar' : 'immersive-vr');
     this.updateDeviceKey(deviceKey);
     this.updateStereoEffect(stereoEffect);

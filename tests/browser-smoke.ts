@@ -1,5 +1,5 @@
 import {runConformance} from './conformance';
-import {runDOMOverlayImplementation} from './dom-overlay-production';
+import {runDOMOverlayPreview} from './dom-overlay-production';
 import {runDOMOverlayNegotiation} from './dom-overlay-negotiation';
 import {runDOMOverlayPrototype} from './dom-overlay-prototype';
 import ConfigurationManager from '../src/ConfigurationManager';
@@ -29,6 +29,15 @@ assert.equal(configuration.deviceKey, 'Generic Android Phone (ARCore)');
 assert.equal(configuration.emulationMode, 'immersive-ar');
 configuration.deserialize('invalid JSON');
 assert.equal(configuration.deviceKey, 'Meta Quest 3');
+assert.equal(configuration.domOverlayPreview, false);
+configuration.updateDOMOverlayPreview(true);
+configuration.updateDOMOverlayPreviewFlat(true);
+const restoredConfiguration = new ConfigurationManager(definitions);
+restoredConfiguration.deserialize(configuration.serialize());
+assert.equal(restoredConfiguration.domOverlayPreview, true);
+assert.equal(restoredConfiguration.domOverlayPreviewFlat, true);
+restoredConfiguration.deserialize('{"domOverlayPreview":"true"}');
+assert.equal(restoredConfiguration.domOverlayPreview, false);
 const executablePath = process.env.WEBXR_CHROMIUM_EXECUTABLE;
 // Defaults to the current Playwright desktop Chromium (npx playwright install chromium).
 const root = process.cwd();
@@ -553,26 +562,103 @@ try {
   conformance.push(await runConformance(page, 'immersive-ar', true));
   console.log('Checking disabled public DOM overlay negotiation and late shadow attachment');
   const overlayNegotiation = await runDOMOverlayNegotiation(page);
-  console.log('Checking retained Android DOM overlay implementation through test-only internal access');
-  const overlayProduction = await runDOMOverlayImplementation(page, stopWorker);
-  await page.evaluate(async () => {
-    const w = window as unknown as {navigator: {xr: import('../src/polyfill/api/runtime').XRSystem}; overlaySwitch: {root: HTMLElement; session: import('../src/polyfill/api/runtime').XRSession}};
-    const root = document.createElement('section'); root.id = 'overlay-switch'; document.body.append(root);
-    const session = await w.navigator.xr.requestSession('immersive-ar');
-    session._startDOMOverlay(root); // Test-only implementation lifecycle check.
-    w.overlaySwitch = {root, session};
-  });
+  const setPreview = async (enabled: boolean) => {
+    await panel.evaluate((enabled: boolean) => {
+      const input = document.querySelector('#domOverlayPreviewCheckbox') as HTMLInputElement;
+      input.checked = enabled; input.dispatchEvent(new Event('change'));
+    }, enabled);
+    await eventually(() => panel.evaluate(async () => JSON.parse((await chrome.storage.local.get('webxr-extension'))['webxr-extension'] as string).domOverlayPreview), value => value === enabled, 'preview opt-in persisted');
+  };
+  assert.equal(await panel.evaluate(() => (document.querySelector('#domOverlayPreviewCheckbox') as HTMLInputElement).checked), false, 'preview disabled by default');
+  await setPreview(true);
+  await panel.evaluate(() => { location.reload(); });
+  await eventually(() => panel.evaluate(() => (document.querySelector('#domOverlayPreviewCheckbox') as HTMLInputElement | null)?.checked), value => value === true, 'preview opt-in restored after panel reload');
+  await page.reload();
+  assert.equal(await page.locator('[popover]').count(), 0, 'opt-in alone does not present an overlay after page reload');
+  // The Three.js probe is restored by the existing page init script.
+  console.log('Checking public Android interactive DOM overlay preview');
+  const overlayPreviews = [await runDOMOverlayPreview(page, true, stopWorker)];
+  async function startSwitchPreview() {
+    await page.evaluate(async () => {
+      const w = window as unknown as {navigator: {xr: import('../src/polyfill/api/runtime').XRSystem}; overlaySwitch: {root: HTMLElement; session: import('../src/polyfill/api/runtime').XRSession}};
+      const root = document.createElement('section'); root.id = 'overlay-switch';
+      const button = document.createElement('button'); button.textContent = 'Lifecycle action';
+      button.addEventListener('click', () => { root.dataset.clicked = 'true'; }); root.append(button);
+      document.body.append(root);
+      const session = await w.navigator.xr.requestSession('immersive-ar', {requiredFeatures: ['dom-overlay'], domOverlay: {root}});
+      w.overlaySwitch = {root, session};
+    });
+  }
+  async function checkSwitchCleanup() {
+    await page.waitForFunction(() => (window as unknown as {overlaySwitch: {session: {ended: boolean}}}).overlaySwitch.session.ended);
+    assert(await page.evaluate(() => { const s = (window as unknown as {overlaySwitch: {root: HTMLElement}}).overlaySwitch; const clean = !s.root.hasAttribute('popover') && s.root.style.length === 0; s.root.remove(); return clean; }), 'configuration change cleans up overlay');
+  }
+  await startSwitchPreview();
+  await panel.evaluate(() => { const layout = document.querySelector('#domOverlayPreviewLayout') as HTMLSelectElement; layout.value = 'screen'; layout.dispatchEvent(new Event('change')); });
+  await checkSwitchCleanup(); await startSwitchPreview();
+  const flatRoot = await page.locator('#overlay-switch').boundingBox();
+  assert(flatRoot && flatRoot.x === 24 && flatRoot.y === 24 && flatRoot.width > 300, 'manual Android fallback is a readable flat panel');
+  await page.getByRole('button', {name: 'Lifecycle action'}).click();
+  assert.equal(await page.locator('#overlay-switch').getAttribute('data-clicked'), 'true', 'manual fallback executes original app listener');
+  await panel.evaluate(() => { location.reload(); });
+  await eventually(() => panel.evaluate(() => (document.querySelector('#domOverlayPreviewLayout') as HTMLSelectElement | null)?.value), value => value === 'screen', 'Android fallback layout persists');
+  await panel.evaluate(() => { const layout = document.querySelector('#domOverlayPreviewLayout') as HTMLSelectElement; layout.value = 'auto'; layout.dispatchEvent(new Event('change')); });
+  await checkSwitchCleanup();
+  await startSwitchPreview();
   await panel.evaluate(() => {
     const device = document.querySelector('#deviceSelect') as HTMLSelectElement;
     device.value = 'Meta Quest 3'; device.dispatchEvent(new Event('change'));
   });
-  await page.waitForFunction(() => (window as unknown as {overlaySwitch: {session: {ended: boolean}}}).overlaySwitch.session.ended);
-  assert(await page.evaluate(() => { const s = (window as unknown as {overlaySwitch: {root: HTMLElement}}).overlaySwitch; const clean = !s.root.hasAttribute('popover') && s.root.style.length === 0; s.root.remove(); return clean; }), 'profile change cleans up active DOM overlay before replacing the renderer');
-  overlayProduction.evidence.push({profileSwitchCleanup: true});
+  await checkSwitchCleanup();
+  console.log('Checking public Quest MR interactive DOM overlay preview');
+  overlayPreviews.push(await runDOMOverlayPreview(page, false, stopWorker));
+  await startSwitchPreview();
+  await setPreview(false); await checkSwitchCleanup();
+  const questDisabledNegotiation = await runDOMOverlayNegotiation(page, false);
+  await setPreview(true); await startSwitchPreview();
+  await panel.evaluate(() => { const mode = document.querySelector('#questModeSelect') as HTMLSelectElement; mode.value = 'immersive-vr'; mode.dispatchEvent(new Event('change')); });
+  await checkSwitchCleanup();
+  assert.equal(await page.evaluate(async () => {
+    const xr = (window as unknown as {navigator: {xr: import('../src/polyfill/api/runtime').XRSystem}}).navigator.xr;
+    try { await xr.requestSession('immersive-vr', {requiredFeatures: ['dom-overlay'], domOverlay: {root: document.body}}); }
+    catch (error) { return (error as Error).name; }
+  }), 'NotSupportedError', 'preview never enabled in Quest VR');
   await page.reload();
-  assert.equal(await page.locator('[popover]').count(), 0, 'page reload starts without overlay resources');
-  overlayProduction.evidence.push({reloadCleanup: true});
-  await writeFile(path.join(root, 'test-results/dom-overlay-production.json'), JSON.stringify({browser: await context.browser()!.version(), negotiation: overlayNegotiation, ...overlayProduction}, null, 2));
+  assert.equal(await page.locator('[popover]').count(), 0, 'page reload starts without stale overlays');
+  await panel.evaluate(() => { const mode = document.querySelector('#questModeSelect') as HTMLSelectElement; mode.value = 'immersive-ar'; mode.dispatchEvent(new Event('change')); });
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).navigator.xr.isSessionSupported('immersive-ar'));
+  await page.mouse.click(10, 10);
+  await startSwitchPreview();
+  console.log('Checking active preview cleanup on extension reload');
+  const reloadWorker = context.serviceWorkers().find(worker => worker.url().endsWith('/dist/extension/background.js'));
+  assert(reloadWorker);
+  await reloadWorker.evaluate(() => { setTimeout(() => chrome.runtime.reload(), 0); });
+  await checkSwitchCleanup();
+  // In this command-line sideloaded Chromium, runtime.reload unloads the
+  // extension without restarting its worker. Reopen the SAME temporary profile
+  // with the unpacked extension to check stored settings and a fresh injection.
+  await context.close();
+  const restarted = await chromium.launchPersistentContext(profile, {
+    ...(executablePath ? {executablePath} : {channel: 'chromium'}),
+    headless: false, ignoreDefaultArgs: ['--disable-extensions'],
+    args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`, '--enable-unsafe-swiftshader'],
+  });
+  try {
+    const worker = restarted.serviceWorkers()[0] || await restarted.waitForEvent('serviceworker');
+    const stored = await worker.evaluate(async () => JSON.parse((await chrome.storage.local.get('webxr-extension'))['webxr-extension'] as string));
+    assert.equal(stored.domOverlayPreview, true); assert.equal(stored.domOverlayPreviewFlat, false);
+    const reloadedPage = await restarted.newPage(); await reloadedPage.goto(`${origin}/csp`);
+    assert.equal(await reloadedPage.evaluate(() => (window as unknown as SmokeWindow).smoke.state.overridesNativeXR), true, 'extension restart injects before application scripts');
+    await reloadedPage.mouse.click(10, 10);
+    assert.deepEqual(await reloadedPage.evaluate(async () => {
+      const xr = (window as unknown as {navigator: {xr: import('../src/polyfill/api/runtime').XRSystem}}).navigator.xr;
+      const root = document.createElement('section'); document.body.append(root);
+      const session = await xr.requestSession('immersive-ar', {requiredFeatures: ['dom-overlay'], domOverlay: {root}});
+      const result = {enabled: session.enabledFeatures.includes('dom-overlay'), type: session.domOverlayState?.type};
+      await session.end(); root.remove(); return result;
+    }), {enabled: true, type: 'screen'}, 'persisted opt-in enables a fresh session after extension reload/relaunch');
+  } finally { await restarted.close(); }
+  await writeFile(path.join(root, 'test-results/dom-overlay-preview.json'), JSON.stringify({browser: await context.browser()!.version(), disabledNegotiation: [overlayNegotiation, questDisabledNegotiation], previews: overlayPreviews, lifecycle: ['profile switch', 'opt-out', 'Quest MR to VR', 'page reload', 'panel reload persistence', 'extension reload cleanup', 'same-profile browser relaunch persistence']}, null, 2));
   await writeFile(path.join(root, 'test-results/dom-overlay-feasibility.json'), JSON.stringify({browser: await context.browser()!.version(), overlayPrototypes}, null, 2));
   await writeFile(path.join(root, 'test-results/webxr-conformance.json'), JSON.stringify({browser: await context.browser()!.version(), conformance}, null, 2));
   assert.deepEqual(pageErrors, []);

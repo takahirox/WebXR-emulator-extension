@@ -28153,6 +28153,8 @@ void main() {
 
 	class ConfigurationManager {
 	    constructor(deviceDefinitions) {
+	        this._domOverlayPreview = false;
+	        this._domOverlayPreviewFlat = false;
 	        this._questMode = 'immersive-vr';
 	        this._deviceDefinitions = deviceDefinitions;
 	        this._deviceKey = this.defaultDeviceKey;
@@ -28172,7 +28174,21 @@ void main() {
 	        return this._deviceKey;
 	    }
 	    get deviceDefinition() {
-	        return { ...this._deviceDefinitions.devices[this.deviceKey], emulationMode: this.emulationMode };
+	        return { ...this._deviceDefinitions.devices[this.deviceKey], emulationMode: this.emulationMode, domOverlayPreview: this.domOverlayPreview, domOverlayPreviewFlat: this.domOverlayPreviewFlat };
+	    }
+	    get domOverlayPreviewFlat() { return this._domOverlayPreviewFlat; }
+	    updateDOMOverlayPreviewFlat(enabled) {
+	        if (enabled === this._domOverlayPreviewFlat)
+	            return false;
+	        this._domOverlayPreviewFlat = enabled;
+	        return true;
+	    }
+	    get domOverlayPreview() { return this._domOverlayPreview; }
+	    updateDOMOverlayPreview(enabled) {
+	        if (enabled === this._domOverlayPreview)
+	            return false;
+	        this._domOverlayPreview = enabled;
+	        return true;
 	    }
 	    get questMode() { return this._questMode; }
 	    get emulationMode() {
@@ -28203,7 +28219,9 @@ void main() {
 	        return JSON.stringify({
 	            deviceKey: this.deviceKey,
 	            stereoEffect: this.stereoEffect,
-	            questMode: this.questMode
+	            questMode: this.questMode,
+	            domOverlayPreview: this.domOverlayPreview,
+	            domOverlayPreviewFlat: this.domOverlayPreviewFlat
 	        });
 	    }
 	    deserialize(str) {
@@ -28223,6 +28241,8 @@ void main() {
 	            ? json.deviceKey : this.defaultDeviceKey;
 	        const stereoEffect = typeof json.stereoEffect === 'boolean'
 	            ? json.stereoEffect : this.defaultStereoEffect;
+	        this.updateDOMOverlayPreview(json.domOverlayPreview === true);
+	        this.updateDOMOverlayPreviewFlat(json.domOverlayPreviewFlat === true);
 	        this.updateQuestMode(json.questMode === 'immersive-ar' ? 'immersive-ar' : 'immersive-vr');
 	        this.updateDeviceKey(deviceKey);
 	        this.updateStereoEffect(stereoEffect);
@@ -28268,6 +28288,9 @@ void main() {
 	}
 
 	function sendRuntimeMessage(envelope) {
+	    var _a;
+	    if (!((_a = chrome.runtime) === null || _a === void 0 ? void 0 : _a.id))
+	        return;
 	    chrome.runtime.sendMessage(envelope, () => {
 	        void chrome.runtime.lastError;
 	    });
@@ -28906,6 +28929,8 @@ void main() {
 	}
 	ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
 	    const deviceSelect = document.getElementById('deviceSelect');
+	    const overlayLayout = document.getElementById('domOverlayPreviewLayout');
+	    const overlayCheckbox = document.getElementById('domOverlayPreviewCheckbox');
 	    const stereoCheckbox = document.getElementById('stereoCheckbox');
 	    const questModeSelect = document.getElementById('questModeSelect');
 	    const devices = manager.devices;
@@ -28926,12 +28951,14 @@ void main() {
 	        const stereoEffect = stereoCheckbox.checked;
 	        const deviceKeyIsUpdated = manager.updateDeviceKey(deviceKey);
 	        const stereoEffectIsUpdated = manager.updateStereoEffect(stereoEffect);
+	        const overlayLayoutIsUpdated = manager.updateDOMOverlayPreviewFlat(overlayLayout.value === 'screen');
+	        const overlayIsUpdated = manager.updateDOMOverlayPreview(overlayCheckbox.checked);
 	        const modeIsUpdated = manager.updateQuestMode(questModeSelect.value);
-	        if (deviceKeyIsUpdated || modeIsUpdated || stereoEffectIsUpdated) {
+	        if (deviceKeyIsUpdated || modeIsUpdated || stereoEffectIsUpdated || overlayIsUpdated || overlayLayoutIsUpdated) {
 	            manager.storeToStorage().then(storedValues => {
 	            });
 	        }
-	        if (deviceKeyIsUpdated || modeIsUpdated) {
+	        if (deviceKeyIsUpdated || modeIsUpdated || overlayIsUpdated || overlayLayoutIsUpdated) {
 	            notifyDeviceChange(manager.deviceDefinition);
 	            updateAssetNodes(manager.deviceDefinition);
 	        }
@@ -28942,6 +28969,8 @@ void main() {
 	    deviceSelect.addEventListener('change', onChange);
 	    questModeSelect.addEventListener('change', onChange);
 	    stereoCheckbox.addEventListener('change', onChange);
+	    overlayCheckbox.addEventListener('change', onChange);
+	    overlayLayout.addEventListener('change', onChange);
 	    manager.loadFromStorage().then(result => {
 	        const deviceKey = manager.deviceKey;
 	        const stereoEffect = manager.stereoEffect;
@@ -28952,6 +28981,8 @@ void main() {
 	                break;
 	            }
 	        }
+	        overlayCheckbox.checked = manager.domOverlayPreview;
+	        overlayLayout.value = manager.domOverlayPreviewFlat ? 'screen' : 'auto';
 	        questModeSelect.value = manager.questMode;
 	        stereoCheckbox.checked = stereoEffect;
 	        updateAssetNodes(manager.deviceDefinition);

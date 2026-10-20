@@ -146,7 +146,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         const adopted = foreignFrame.contentDocument!.createElement('section');
         document.body.append(document.adoptNode(adopted));
         check(!HTMLElement.prototype.isPrototypeOf(adopted), 'adopted root retains its foreign realm prototype');
-        await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: adopted}}), 'NotSupportedError', 'adopted HTML root cannot bypass the overlay security gate');
+        await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay'], domOverlay: {root: adopted}}), 'NotSupportedError', 'adopted HTML root cannot bypass disabled preview opt-in');
         adopted.remove();
       }
     } finally { foreignFrame.remove(); }
@@ -165,7 +165,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       const root = document.createElement('section'); document.body.append(root);
       try {
         if (featureList === 'requiredFeatures') {
-          await rejects(() => xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root}}), 'NotSupportedError', 'overlay disabled until lifetime shadow security and targeting are guaranteed');
+          await rejects(() => xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root}}), 'NotSupportedError', 'overlay preview is disabled by default');
         } else {
           const unsupported = await xr.navigator.xr.requestSession(mode, {[featureList]: ['dom-overlay'], domOverlay: {root}});
           check(unsupported.domOverlayState === null && !unsupported.enabledFeatures.includes('dom-overlay'), 'optional connected HTML overlay omitted');
@@ -359,7 +359,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       throws(() => savedFrame.getViewerPose(reference), 'InvalidStateError', 'inactive frame viewer pose');
       throws(() => savedFrame.getPose(viewer, reference), 'InvalidStateError', 'inactive frame pose');
       if (mode === 'immersive-ar') {
-        check(session.domOverlayState === null && !session.enabledFeatures.includes('dom-overlay'), 'overlay stays disabled while shadow-tree security is incomplete');
+        check(session.domOverlayState === null && !session.enabledFeatures.includes('dom-overlay'), 'overlay preview stays disabled without opt-in');
         check(session.depthUsage === 'cpu-optimized' && session.depthDataFormat === 'float32', 'CPU depth format negotiation');
         await rejects(() => session.requestHitTestSource({space: inlineSpace}), 'InvalidStateError', 'foreign hit test space');
         await rejects(() => session.requestHitTestSource({space: viewer, entityTypes: ['point']}), 'NotSupportedError', 'point-cloud entity unsupported');

@@ -1979,9 +1979,13 @@ function WebXRPolyfillInjection() {
                   try {
                       session._startDOMOverlay(overlayRoot);
                   }
-                  catch (error) {
-                      await session.end();
-                      throw error;
+                  catch (_e) {
+                      if (required.has('dom-overlay')) {
+                          await session.end();
+                          unsupported('The DOM Overlay Preview root could not be presented.');
+                      }
+                      enabled.delete('dom-overlay');
+                      session._omitDOMOverlay();
                   }
               }
               this.sessions.add(session);
@@ -2008,6 +2012,7 @@ function WebXRPolyfillInjection() {
               void this.end(); });
           this.overlayState = Object.freeze({ type: 'screen' });
       }
+      _omitDOMOverlay() { this.features = Object.freeze(this.features.filter(feature => feature !== 'dom-overlay')); }
       constructor(_device, _mode, _id, enabled, onShutdown) {
           super();
           this._device = _device;
@@ -2035,7 +2040,6 @@ function WebXRPolyfillInjection() {
           this.depthRunning = true;
           this.overlay = null;
           this.overlayState = null;
-          this.suppressedSelect = new Set();
           this.isSystemKeyboardSupported = false;
           this._hitSources = new Set();
           this._transientSources = new Set();
@@ -2093,23 +2097,6 @@ function WebXRPolyfillInjection() {
                       continue;
                   const prefix = signal.type.startsWith('squeeze') ? 'squeeze' : 'select';
                   const starting = signal.type.endsWith('start');
-                  if (prefix === 'select' && this.overlay) {
-                      if (starting) {
-                          const target = this.overlay.targetForTouch(this._device.gamepads[0].pose.position);
-                          if (target) {
-                              const event = new XRSessionEvent('beforexrselect', { session: this, bubbles: true, composed: true, cancelable: true });
-                              if (!target.dispatchEvent(event))
-                                  this.suppressedSelect.add(signal.source);
-                              if (this.ended)
-                                  break;
-                          }
-                      }
-                      if (this.suppressedSelect.has(signal.source)) {
-                          if (!starting)
-                              this.suppressedSelect.delete(signal.source);
-                          continue;
-                      }
-                  }
                   if (!starting)
                       this.emitInput(prefix, source, time);
                   this.emitInput(`${prefix}${starting ? 'start' : 'end'}`, source, time);
@@ -2293,7 +2280,6 @@ function WebXRPolyfillInjection() {
               return;
           (_a = this.overlay) === null || _a === void 0 ? void 0 : _a.dispose();
           this.overlay = null;
-          this.suppressedSelect.clear();
           this.endedValue = true;
           this._device.cancelAnimationFrame(this.frameHandle);
           for (const [type, listener] of this.listeners)
@@ -29813,25 +29799,21 @@ void main() {
 
   class DOMOverlay {
       static available() {
-          return false;
+          return typeof HTMLElement.prototype.showPopover === 'function';
       }
       static accepts(root) {
+          var _a;
           return (root === null || root === void 0 ? void 0 : root.namespaceURI) === 'http://www.w3.org/1999/xhtml' && root.ownerDocument === document && root.isConnected &&
-              root !== document.documentElement && !root.matches('iframe, frame, object, embed, :modal') && !root.hasAttribute('popover') &&
+              root.getRootNode() === document && ((_a = document.body) === null || _a === void 0 ? void 0 : _a.contains(root)) && !document.querySelector(':modal') && !root.matches('canvas, video, audio, img, input, select, textarea') && root !== document.documentElement && !root.closest('[inert]') && !root.matches('iframe, frame, object, embed, :modal') && !root.hasAttribute('popover') &&
               typeof root.showPopover === 'function';
       }
-      constructor(root, scene, width, height, invalidate) {
+      constructor(root, scene, width, height, invalidate, flat = false) {
           this.root = root;
           this.scene = scene;
           this.width = width;
           this.height = height;
           this.invalidate = invalidate;
           this.events = new AbortController();
-          this.ray = new Raycaster();
-          this.frames = new Map();
-          this.queued = [];
-          this.currentTouch = null;
-          this.pointer = null;
           this.disposed = false;
           this.toggleTimer = 0;
           this.visible = false;
@@ -29843,75 +29825,37 @@ void main() {
                   this.toggleTimer = window.setTimeout(() => { if (!this.disposed)
                       this.invalidate(); }, 0);
           };
-          this.visibility = () => { if (document.hidden)
-              this.cancel(); this.update(); };
-          this.cancel = () => { if (this.pointer !== null) {
-              this.pointer = null;
-              this.queued.push(null);
-          } };
-          this.down = (event) => {
-              if (!event.isPrimary || event.button !== 0 || this.pointer !== null || !this.visible)
-                  return;
-              if (this.blocked(event.clientX, event.clientY)) {
-                  event.preventDefault();
-                  event.stopImmediatePropagation();
-                  return;
-              }
-              this.pointer = event.pointerId;
-              this.queued.push({ x: event.clientX, y: event.clientY, start: true });
-          };
-          this.move = (event) => {
-              if (event.pointerId !== this.pointer)
-                  return;
-              if (!this.targetAt(event.clientX, event.clientY)) {
-                  this.cancel();
-                  return;
-              }
-              const point = { x: event.clientX, y: event.clientY, start: false };
-              const last = this.queued[this.queued.length - 1];
-              if (last && !last.start)
-                  this.queued[this.queued.length - 1] = point;
-              else
-                  this.queued.push(point);
-          };
-          this.up = (event) => { if (event.pointerId === this.pointer)
-              this.cancel(); };
+          this.visibility = () => { this.update(); };
           this.style = root.getAttribute('style');
           this.parent = root.parentNode;
-          this.display = root.style.getPropertyValue('display');
-          this.displayPriority = root.style.getPropertyPriority('display');
-          const originalColor = getComputedStyle(root).color;
+          this.flat = flat || root === document.body || Array.from(root.querySelectorAll('*')).some(node => getComputedStyle(node).position === 'fixed');
+          const computed = getComputedStyle(root);
+          const originalColor = computed.color;
+          const originalBackground = computed.background;
+          this.display = ['none', 'contents'].includes(computed.display) ? 'block' : computed.display;
           root.setAttribute('popover', 'manual');
           const styles = {
-              position: 'fixed', inset: 'auto', left: '0', top: '0', margin: '0', padding: '0', border: '0',
+              display: this.display, visibility: 'visible', 'content-visibility': 'visible', opacity: '1', position: 'fixed', inset: 'auto', left: '0', top: '0', margin: '0', padding: '0', border: '0',
               'box-sizing': 'border-box', 'min-width': '0', 'min-height': '0', 'max-width': 'none', 'max-height': 'none',
-              color: originalColor, width: `${width}px`, height: `${height}px`, background: 'transparent', contain: 'paint',
+              color: originalColor, width: `${width}px`, height: `${height}px`, background: originalBackground, contain: 'paint',
               'transform-origin': '0 0', 'pointer-events': 'auto', overflow: 'auto', isolation: 'isolate',
               transition: 'none', animation: 'none', 'offset-path': 'none', translate: 'none', rotate: 'none', scale: 'none',
           };
           for (const [property, value] of Object.entries(styles))
               root.style.setProperty(property, value, 'important');
-          this.observer = new MutationObserver(records => {
-              if (records.every(record => record.type === 'attributes' && record.target === root))
-                  return;
+          this.observer = new MutationObserver(() => {
               if (!this.valid())
                   this.invalidate();
-              else
-                  this.blockFrames();
           });
           try {
+              const focused = document.activeElement;
               root.showPopover();
+              if (focused instanceof HTMLElement && focused.isConnected)
+                  focused.focus({ preventScroll: true });
               if (!this.valid() || !root.matches(':popover-open'))
                   throw new DOMException('The overlay root could not enter the top layer.', 'NotSupportedError');
-              this.blockFrames();
-              this.observer.observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
-              const options = { capture: true, signal: this.events.signal };
-              root.addEventListener('pointerdown', this.down, options);
+              this.observer.observe(document, { subtree: true, childList: true });
               root.addEventListener('wheel', () => { }, { passive: false, signal: this.events.signal });
-              window.addEventListener('pointermove', this.move, options);
-              window.addEventListener('pointerup', this.up, options);
-              window.addEventListener('pointercancel', this.up, options);
-              window.addEventListener('blur', this.cancel, { signal: this.events.signal });
               window.addEventListener('pagehide', this.invalidate, { signal: this.events.signal });
               document.addEventListener('visibilitychange', this.visibility, { signal: this.events.signal });
               root.addEventListener('beforetoggle', this.toggle, { signal: this.events.signal });
@@ -29925,101 +29869,18 @@ void main() {
       valid() {
           return this.root.isConnected && this.root.ownerDocument === document && this.root.parentNode === this.parent;
       }
-      blocked(x, y) {
-          for (const frame of this.frames.keys()) {
-              const r = frame.getBoundingClientRect();
-              if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
-                  return true;
-          }
-          return false;
-      }
-      blockFrames() {
-          const visit = (tree) => {
-              for (const node of tree.querySelectorAll('*')) {
-                  if (node.namespaceURI === 'http://www.w3.org/1999/xhtml' && node.matches('iframe, frame, object, embed')) {
-                      const frame = node;
-                      if (!this.frames.has(frame))
-                          this.frames.set(frame, frame.getAttribute('style'));
-                      if (frame.style.getPropertyValue('pointer-events') !== 'none' || frame.style.getPropertyPriority('pointer-events') !== 'important')
-                          frame.style.setProperty('pointer-events', 'none', 'important');
-                  }
-                  if (node.shadowRoot) {
-                      this.observer.observe(node.shadowRoot, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
-                      visit(node.shadowRoot);
-                  }
-              }
-          };
-          visit(this.root);
-          if (this.root.shadowRoot)
-              visit(this.root.shadowRoot);
-      }
-      advanceTouch() {
-          var _a, _b, _c, _d, _e, _f, _g;
-          if (this.queued.length) {
-              this.currentTouch = (_a = this.queued.shift()) !== null && _a !== void 0 ? _a : null;
-              if (!this.currentTouch) {
-                  (_c = (_b = this.scene).onRelease) === null || _c === void 0 ? void 0 : _c.call(_b);
-                  return;
-              }
-          }
-          if (!this.currentTouch)
-              return;
-          const { x, y } = this.currentTouch;
-          const world = this.targetAt(x, y) ? this.screenPoint(x, y) : null;
-          if (world)
-              (_e = (_d = this.scene).onTouch) === null || _e === void 0 ? void 0 : _e.call(_d, world.toArray());
-          else {
-              this.currentTouch = null;
-              this.cancel();
-              (_g = (_f = this.scene).onRelease) === null || _g === void 0 ? void 0 : _g.call(_f);
-          }
-      }
-      screenPoint(x, y) {
-          var _a;
-          const rect = this.scene.renderer.domElement.getBoundingClientRect();
-          this.ray.setFromCamera(new Vector2((x - rect.left) / rect.width * 2 - 1, 1 - (y - rect.top) / rect.height * 2), this.scene.camera);
-          return (_a = this.ray.intersectObject(this.scene.screen, false)[0]) === null || _a === void 0 ? void 0 : _a.point;
-      }
-      targetAt(x, y) {
-          if (!this.visible || this.blocked(x, y))
-              return null;
-          let target = document.elementFromPoint(x, y);
-          if (!target)
-              return null;
-          while (target.shadowRoot) {
-              const inner = target.shadowRoot.elementFromPoint(x, y);
-              if (!inner || inner === target)
-                  break;
-              target = inner;
-          }
-          let ancestor = target;
-          while (ancestor && ancestor !== this.root) {
-              ancestor = ancestor instanceof ShadowRoot ? ancestor.host : ancestor.parentNode;
-          }
-          if (ancestor !== this.root)
-              return null;
-          if (target.matches('iframe, frame, object, embed'))
-              return null;
-          return target;
-      }
-      touchCoordinates(position) {
-          const screen = this.scene.screen;
-          const point = screen.worldToLocal(new Vector3().fromArray(position));
-          screen.geometry.computeBoundingBox();
-          const box = screen.geometry.boundingBox;
-          return [2 * (point.x - box.min.x) / (box.max.x - box.min.x) - 1,
-              2 * (point.y - box.min.y) / (box.max.y - box.min.y) - 1];
-      }
-      targetForTouch(position) {
-          const p = new Vector3().fromArray(position).project(this.scene.camera);
-          const rect = this.scene.renderer.domElement.getBoundingClientRect();
-          return this.targetAt(rect.left + (p.x + 1) * rect.width / 2, rect.top + (1 - p.y) * rect.height / 2);
-      }
       update() {
           if (this.disposed)
               return;
           if (!this.valid()) {
               this.invalidate();
+              return;
+          }
+          if (this.flat) {
+              this.root.style.setProperty('width', `${Math.max(1, Math.min(560, innerWidth - 48))}px`, 'important');
+              this.root.style.setProperty('height', `${Math.max(1, innerHeight - 48)}px`, 'important');
+              this.root.style.setProperty('transform', 'translate(24px, 24px)', 'important');
+              this.root.style.setProperty('display', document.hidden ? 'none' : this.display, 'important');
               return;
           }
           if (this.dpr !== window.devicePixelRatio) {
@@ -30049,42 +29910,24 @@ void main() {
               this.corners[i].set(x, y, 0).applyMatrix4(screen.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
               return this.corners[i].z < -camera.near;
           });
-          const display = this.visible ? this.display : 'none';
-          const priority = this.visible ? this.displayPriority : 'important';
-          if (this.root.style.getPropertyValue('display') !== display || this.root.style.getPropertyPriority('display') !== priority) {
-              if (display)
-                  this.root.style.setProperty('display', display, priority);
-              else
-                  this.root.style.removeProperty('display');
-          }
-          if (!this.visible)
-              this.cancel();
+          this.root.style.setProperty('display', this.visible ? this.display : 'none', 'important');
       }
       dispose() {
-          var _a, _b;
           if (this.disposed)
               return;
           this.disposed = true;
           window.clearTimeout(this.toggleTimer);
           this.events.abort();
           this.observer.disconnect();
-          this.queued.length = 0;
-          this.currentTouch = null;
-          (_b = (_a = this.scene).onRelease) === null || _b === void 0 ? void 0 : _b.call(_a);
           if (this.root.matches(':popover-open'))
               this.root.hidePopover();
           this.root.removeAttribute('popover');
+          this.root.style.cssText = '';
+          void this.root.getAttribute('style');
           if (this.style === null)
               this.root.removeAttribute('style');
           else
               this.root.setAttribute('style', this.style);
-          for (const [frame, style] of this.frames) {
-              if (style === null)
-                  frame.removeAttribute('style');
-              else
-                  frame.setAttribute('style', style);
-          }
-          this.frames.clear();
       }
   }
 
@@ -30096,6 +29939,8 @@ void main() {
   class EmulatedXRDevice extends DeviceAdapter {
       constructor(global, config = {}) {
           super(global);
+          this.domOverlayPreview = false;
+          this.domOverlayPreviewFlat = false;
           this.sessions = new Map();
           this.modes = config.modes || DEFAULT_MODES;
           this.features = config.features || [];
@@ -30124,6 +29969,8 @@ void main() {
               width: 0,
               height: 0
           };
+          this.domOverlayPreview = config.domOverlayPreview === true;
+          this.domOverlayPreviewFlat = config.domOverlayPreviewFlat === true;
           this.handheld = config.formFactor === 'handheld';
           this.emulationMode = config.emulationMode || (this.handheld ? 'immersive-ar' : 'immersive-vr');
           this.resolution = config.resolution !== undefined ? config.resolution : DEFAULT_RESOLUTION;
@@ -30172,7 +30019,7 @@ void main() {
       }
       isFeatureSupported(featureDescriptor, mode = this.emulationMode) {
           if (featureDescriptor === 'dom-overlay')
-              return this.handheld && mode === 'immersive-ar' && DOMOverlay.available();
+              return this.domOverlayPreview && mode === 'immersive-ar' && this.emulationMode === mode && DOMOverlay.available();
           if (featureDescriptor === 'viewer')
               return true;
           if (featureDescriptor === 'local' || featureDescriptor === 'local-floor')
@@ -30247,7 +30094,7 @@ void main() {
       canPresentDOMOverlay(root) { return DOMOverlay.accepts(root); }
       startDOMOverlay(root, invalidate) {
           document.documentElement.appendChild(this.div);
-          const overlay = new DOMOverlay(root, this.arScene, this.resolution.width / window.devicePixelRatio, this.resolution.height / window.devicePixelRatio, invalidate);
+          const overlay = new DOMOverlay(root, this.arScene, this.resolution.width / window.devicePixelRatio, this.resolution.height / window.devicePixelRatio, invalidate, !this.handheld || this.domOverlayPreviewFlat);
           this.arScene.domOverlay = overlay;
           return overlay;
       }
@@ -30258,9 +30105,7 @@ void main() {
           this.global.cancelAnimationFrame(handle);
       }
       onFrameStart(sessionId, renderState) {
-          var _a, _b;
           const session = this.sessions.get(sessionId);
-          (_b = (_a = this.arScene) === null || _a === void 0 ? void 0 : _a.domOverlay) === null || _b === void 0 ? void 0 : _b.advanceTouch();
           const context = session.baseLayer.context;
           const canvas = context.canvas;
           if (session.ar && !this.handheld && this.arScene) {
@@ -30598,9 +30443,6 @@ void main() {
               dz <= 0.01 && dz >= 0.0;
       }
       _getTouchCoordinates() {
-          var _a;
-          if ((_a = this.arScene) === null || _a === void 0 ? void 0 : _a.domOverlay)
-              return this.arScene.domOverlay.touchCoordinates(this.gamepads[0].pose.position);
           const pose = this.gamepads[0].pose;
           const matrix = fromRotationTranslation(create$3(), pose.orientation, pose.position);
           multiply(matrix, this.viewMatrix, matrix);
@@ -30762,6 +30604,8 @@ void main() {
               const wasHandheld = this.handheld;
               this.modes = config.modes || DEFAULT_MODES;
               this.features = config.features || [];
+              this.domOverlayPreview = config.domOverlayPreview === true;
+              this.domOverlayPreviewFlat = config.domOverlayPreviewFlat === true;
               this.handheld = config.formFactor === 'handheld';
               this.emulationMode = config.emulationMode || (this.handheld ? 'immersive-ar' : 'immersive-vr');
               this.resolution = config.resolution || DEFAULT_RESOLUTION;

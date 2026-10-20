@@ -9,6 +9,7 @@ export interface ControllerDefinition extends Capabilities {
 export interface DeviceSize { width: number; height: number; depth: number }
 export interface DeviceDefinition {
   id: string; name: string; modes: SessionMode[]; features?: string[];
+  domOverlayPreview?: boolean; domOverlayPreviewFlat?: boolean;
   formFactor?: 'headset' | 'handheld'; emulationMode?: ImmersiveMode;
   headset?: Capabilities; controllers?: ControllerDefinition[];
   resolution?: { width: number; height: number }; size?: DeviceSize;

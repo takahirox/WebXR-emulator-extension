@@ -1,0 +1,654 @@
+{
+  "issue": "https://github.com/takahirox/WebXR-emulator-extension/issues/17",
+  "date": "2026-10-20",
+  "scope": "Opt-in interactive desktop DOM Overlay Preview; not native DOM Overlay conformance",
+  "browser": "156.0.8078.4",
+  "platform": "macOS, Playwright desktop Chromium, unpacked Manifest V3 extension, temporary profiles",
+  "commands": {
+    "npm ci": {
+      "exit_code": 0,
+      "result": "passed"
+    },
+    "npm run typecheck": {
+      "exit_code": 0,
+      "result": "passed"
+    },
+    "npm run build": {
+      "exit_code": 0,
+      "result": "passed",
+      "note": "Also executed by the final npm run build:firefox, including strict typecheck and regenerated packaged bundles."
+    },
+    "npm run build:firefox": {
+      "exit_code": 0,
+      "result": "passed"
+    },
+    "npm run test:browser": {
+      "exit_code": 0,
+      "result": "passed"
+    },
+    "npm run test:wpt": {
+      "exit_code": 0,
+      "result": "passed"
+    },
+    "npm run test:samples": {
+      "exit_code": 0,
+      "result": "passed"
+    },
+    "npx tsx tests/dom-overlay-preview.ts": {
+      "exit_code": 0,
+      "result": "passed"
+    },
+    "git diff --check": {
+      "exit_code": 0,
+      "result": "passed"
+    }
+  },
+  "default_off_negotiation": {
+    "android": {
+      "enabled": false,
+      "configurations": [
+        "light",
+        "open-root",
+        "closed-root",
+        "open-button",
+        "closed-button"
+      ],
+      "lateShadowFrameEntryRelease": true
+    },
+    "quest": {
+      "enabled": false,
+      "configurations": [
+        "light",
+        "open-root",
+        "closed-root",
+        "open-button",
+        "closed-button"
+      ],
+      "lateShadowFrameEntryRelease": true
+    }
+  },
+  "public_previews": [
+    {
+      "profile": "android",
+      "negotiated_state": {
+        "type": "screen"
+      },
+      "unsupported_roots": [
+        "missing",
+        "disconnected",
+        "document",
+        "SVG",
+        "shadow-root",
+        "popover",
+        "inert",
+        "iframe",
+        "foreign"
+      ],
+      "visible_screenshot_checks": 11,
+      "maximum_projection_error_css_pixels": 0.7904723211034032,
+      "captures": [
+        {
+          "name": "initial",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0.0002916351522387406,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            1080,
+            1920
+          ]
+        },
+        {
+          "name": "interaction-2",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0.0002916351522387406,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            1080,
+            1920
+          ]
+        },
+        {
+          "name": "phone-moved",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0.7884369287856837,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            1080,
+            1920
+          ]
+        },
+        {
+          "name": "camera-moved",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0.7904723211034032,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            1080,
+            1920
+          ]
+        },
+        {
+          "name": "resized-dpr2",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0.0004514386624862458,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            540,
+            960
+          ]
+        },
+        {
+          "name": "interaction-7",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0.0004514386624862458,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            540,
+            960
+          ]
+        },
+        {
+          "name": "restored-dpr1",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0.0002916351522387406,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            1080,
+            1920
+          ]
+        },
+        {
+          "name": "interaction-10",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0.0002916351522387406,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            1080,
+            1920
+          ]
+        },
+        {
+          "name": "flat-fallback",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        },
+        {
+          "name": "body-fallback",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        },
+        {
+          "name": "initially-hidden",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0.0003631145073856846,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            540,
+            960
+          ]
+        }
+      ],
+      "native_interactions": [
+        {
+          "click_count": 1,
+          "input_value": "native edit",
+          "checkbox": true,
+          "trusted_event_types": [
+            "change:true",
+            "click:true",
+            "focusin:true",
+            "input:true"
+          ],
+          "xr_events": []
+        },
+        {
+          "click_count": 2,
+          "input_value": "native edit",
+          "checkbox": false,
+          "trusted_event_types": [
+            "change:true",
+            "click:true",
+            "focusin:true",
+            "input:true"
+          ],
+          "xr_events": []
+        },
+        {
+          "click_count": 3,
+          "input_value": "native edit",
+          "checkbox": true,
+          "trusted_event_types": [
+            "change:true",
+            "click:true",
+            "focusin:true",
+            "input:true"
+          ],
+          "xr_events": []
+        }
+      ],
+      "cleanup_actions": [
+        "remove",
+        "reparent",
+        "dismiss",
+        "pagehide"
+      ],
+      "late_closed_shadow_cross_origin_frame_entry_release": true,
+      "screenshot": {
+        "path": "images/dom-overlay-preview-android.png",
+        "sha256": "4244c447360b4f5d1928b72102d0ea178e9ae05738a17b6d2eb34e080bb97a68"
+      }
+    },
+    {
+      "profile": "quest",
+      "negotiated_state": {
+        "type": "screen"
+      },
+      "unsupported_roots": [
+        "missing",
+        "disconnected",
+        "document",
+        "SVG",
+        "shadow-root",
+        "popover",
+        "inert",
+        "iframe",
+        "foreign"
+      ],
+      "visible_screenshot_checks": 8,
+      "maximum_projection_error_css_pixels": 0,
+      "captures": [
+        {
+          "name": "initial",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        },
+        {
+          "name": "interaction-2",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        },
+        {
+          "name": "resized-dpr2",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        },
+        {
+          "name": "interaction-5",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        },
+        {
+          "name": "restored-dpr1",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        },
+        {
+          "name": "interaction-8",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        },
+        {
+          "name": "flat-fallback",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        },
+        {
+          "name": "initially-hidden",
+          "pixel": [
+            3,
+            241,
+            162,
+            255
+          ],
+          "projection_error": 0,
+          "identity_and_native_hit_test": true,
+          "logical_size": [
+            560,
+            711
+          ]
+        }
+      ],
+      "native_interactions": [
+        {
+          "click_count": 1,
+          "input_value": "native edit",
+          "checkbox": true,
+          "trusted_event_types": [
+            "change:true",
+            "click:true",
+            "focusin:true",
+            "input:true"
+          ],
+          "xr_events": []
+        },
+        {
+          "click_count": 2,
+          "input_value": "native edit",
+          "checkbox": false,
+          "trusted_event_types": [
+            "change:true",
+            "click:true",
+            "focusin:true",
+            "input:true"
+          ],
+          "xr_events": []
+        },
+        {
+          "click_count": 3,
+          "input_value": "native edit",
+          "checkbox": true,
+          "trusted_event_types": [
+            "change:true",
+            "click:true",
+            "focusin:true",
+            "input:true"
+          ],
+          "xr_events": []
+        }
+      ],
+      "cleanup_actions": [
+        "remove",
+        "reparent",
+        "dismiss",
+        "pagehide"
+      ],
+      "late_closed_shadow_cross_origin_frame_entry_release": true,
+      "screenshot": {
+        "path": "images/dom-overlay-preview-quest.png",
+        "sha256": "55b67a9adbf416b4a9d2af86f6790c7a75d395961beb19b34c87f6340bc4acdf"
+      }
+    }
+  ],
+  "lifecycle": [
+    "profile switch",
+    "opt-out",
+    "Quest MR to VR",
+    "page reload",
+    "panel reload persistence",
+    "extension reload cleanup",
+    "same-profile browser relaunch persistence",
+    "Android manual fallback selection, native click and panel reload persistence"
+  ],
+  "extension_reload_harness": "chrome.runtime.reload() verified active preview cleanup. Command-line sideloading unloads the extension without restarting its worker; the test relaunches the SAME temporary profile with the unpacked extension, checks persisted options, synchronous injection and a fresh required preview session.",
+  "existing_api_checks": [
+    {
+      "mode": "immersive-vr",
+      "handheld": false,
+      "assertions": 444,
+      "passed": 444
+    },
+    {
+      "mode": "immersive-ar",
+      "handheld": false,
+      "assertions": 490,
+      "passed": 490
+    },
+    {
+      "mode": "immersive-ar",
+      "handheld": true,
+      "assertions": 380,
+      "passed": 380
+    }
+  ],
+  "wpt": {
+    "revision": "e1859580b5fcf74940a18d2f783296b4961035e3",
+    "files": 5,
+    "assertions": 5,
+    "all_passed": true,
+    "scope": "Five pinned geometry/identity files, not DOM Overlay WPT or full WebXR conformance"
+  },
+  "development_findings_resolved": [
+    "Cleared pending CSSOM serialization before removing a previously absent style attribute; verified canceled presentation and body-root teardown.",
+    "Default-off negotiation checks now expect two ordinary Quest tracked controllers and zero Android transient sources; DOM actions never create sources.",
+    "Separated runtime.reload cleanup from same-profile relaunch persistence for command-line sideloaded Chromium."
+  ],
+  "not_performed": [
+    "Firefox runtime/DevTools (Firefox MV3 package built only)",
+    "Physical headset/device certification",
+    "Full DOM Overlay WPT/native UA CSS, exact stereo or controller DOM interaction",
+    "Arbitrary custom-element/closed-shadow/iframe UI compatibility"
+  ],
+  "required_post_merge_verification": "None",
+  "publication": "Local implementation commit only; no push, pull request, merge, Issue update or comments",
+  "samples": {
+    "browser": "156.0.8078.4",
+    "scenarios": 7,
+    "all_without_runtime_errors": true,
+    "results": [
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/immersive-vr-session.html",
+        "deviceKey": "Meta Quest 3",
+        "questMode": "immersive-vr",
+        "preview": false,
+        "probe": {
+          "frames": 126,
+          "hits": 0
+        },
+        "errors": []
+      },
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/hit-test.html",
+        "deviceKey": "Meta Quest 3",
+        "questMode": "immersive-ar",
+        "preview": false,
+        "probe": {
+          "frames": 129,
+          "hits": 2
+        },
+        "errors": []
+      },
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/hit-test.html",
+        "deviceKey": "Generic Android Phone (ARCore)",
+        "questMode": "immersive-ar",
+        "preview": false,
+        "probe": {
+          "frames": 127,
+          "hits": 2
+        },
+        "errors": []
+      },
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/ar-barebones.html",
+        "deviceKey": "Generic Android Phone (ARCore)",
+        "questMode": "immersive-ar",
+        "preview": false,
+        "overlay": {
+          "enabled": false,
+          "type": null,
+          "sameRoot": true
+        },
+        "probe": {
+          "frames": 127,
+          "hits": 0
+        },
+        "errors": []
+      },
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/ar-barebones.html",
+        "deviceKey": "Meta Quest 3",
+        "questMode": "immersive-ar",
+        "preview": false,
+        "overlay": {
+          "enabled": false,
+          "type": null,
+          "sameRoot": true
+        },
+        "probe": {
+          "frames": 127,
+          "hits": 0
+        },
+        "errors": []
+      },
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/ar-barebones.html",
+        "deviceKey": "Generic Android Phone (ARCore)",
+        "questMode": "immersive-ar",
+        "preview": true,
+        "overlay": {
+          "enabled": true,
+          "type": "screen",
+          "sameRoot": true
+        },
+        "probe": {
+          "frames": 129,
+          "hits": 0
+        },
+        "errors": []
+      },
+      {
+        "url": "https://immersive-web.github.io/webxr-samples/ar-barebones.html",
+        "deviceKey": "Meta Quest 3",
+        "questMode": "immersive-ar",
+        "preview": true,
+        "overlay": {
+          "enabled": true,
+          "type": "screen",
+          "sameRoot": true
+        },
+        "probe": {
+          "frames": 129,
+          "hits": 0
+        },
+        "errors": []
+      }
+    ],
+    "unchanged_api_calls": true,
+    "preview_exit_action": "Clicked original Exit AR button; sample listener ended session and original root styles were restored."
+  }
+}
