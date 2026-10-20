@@ -24,6 +24,7 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import MyControls from './MyControls';
 import type DOMOverlay from './DOMOverlay';
+import {roomMeshes} from './api/environment';
 import type {DeviceSize} from '../types/contracts';
 
 // @TODO: These default values should be imported from somewhere common place
@@ -442,11 +443,8 @@ export default class ARScene {
   // Raycasting for AR hit testing API
   getHitTestResults(origin: ArrayLike<number>, direction: ArrayLike<number>) {
     raycaster.set(new Vector3().fromArray(origin), new Vector3().fromArray(direction));
-    const targets = [];
-    if (this.room) {
-      targets.push(this.room);
-    }
-    return raycaster.intersectObjects(targets, true);
+    this.room?.updateWorldMatrix(true, true);
+    return raycaster.intersectObjects(roomMeshes(this.room), false);
   }
 
   loadVirtualRoomAsset(buffer: ArrayBuffer) {

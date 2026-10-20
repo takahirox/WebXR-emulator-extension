@@ -15,6 +15,10 @@ try {
   for (const [sample, deviceKey, questMode, preview = false] of [
     ['immersive-vr-session.html', 'Meta Quest 3', 'immersive-vr'],
     ['hit-test.html', 'Meta Quest 3', 'immersive-ar'],
+    ['proposals/plane-detection.html', 'Meta Quest 3', 'immersive-ar'],
+    ['proposals/plane-detection.html', 'Generic Android Phone (ARCore)', 'immersive-ar'],
+    ['proposals/mesh-detection.html', 'Meta Quest 3', 'immersive-ar'],
+    ['proposals/mesh-detection.html', 'Generic Android Phone (ARCore)', 'immersive-ar'],
     ['hit-test.html', 'Generic Android Phone (ARCore)', 'immersive-ar'],
     ['ar-barebones.html', 'Generic Android Phone (ARCore)', 'immersive-ar'],
     ['ar-barebones.html', 'Meta Quest 3', 'immersive-ar'],
@@ -27,7 +31,7 @@ try {
     await page.goto(url, {waitUntil: 'networkidle', timeout: 60000});
     // Observe the real sample's request/frames; the sample and extension files are unmodified.
     await page.evaluate(`(() => {
-      window.sampleProbe = {frames: 0, hits: 0, ended: false};
+      window.sampleProbe = {frames: 0, hits: 0, planes: 0, meshes: 0, ended: false};
       const request = navigator.xr.requestSession.bind(navigator.xr);
       navigator.xr.requestSession = (...args) => {
         const originalStyle = args[1]?.domOverlay?.root?.style.cssText;
@@ -40,6 +44,8 @@ try {
           const raf = session.requestAnimationFrame.bind(session);
           session.requestAnimationFrame = callback => raf((time, frame) => {
             window.sampleProbe.frames++;
+            window.sampleProbe.planes = Math.max(window.sampleProbe.planes, frame.detectedPlanes.size);
+            window.sampleProbe.meshes = Math.max(window.sampleProbe.meshes, frame.detectedMeshes.size);
             const hits = frame.getHitTestResults.bind(frame);
             frame.getHitTestResults = source => { const results = hits(source); window.sampleProbe.hits = Math.max(window.sampleProbe.hits, results.length); return results; };
             callback(time, frame);
@@ -53,7 +59,9 @@ try {
     await button.click({timeout: 20000});
     await page.waitForFunction(() => (window as unknown as {sampleProbe: {frames: number}}).sampleProbe.frames >= 120, undefined, {timeout: 30000}).catch(async error => { console.log(JSON.stringify({url, deviceKey, errors, probe: await page.evaluate('({frames: window.sampleProbe.frames, session: !!window.sampleProbe.session, text: document.body.innerText.slice(-700), ended: window.sampleProbe.session.ended, visibility: window.sampleProbe.session.visibilityState, layer: !!window.sampleProbe.session.renderState.baseLayer, contextLost: window.sampleProbe.session.renderState.baseLayer?.context.isContextLost(), attributes: window.sampleProbe.session.renderState.baseLayer?.context.getContextAttributes()})')}, null, 2)); throw error; });
     if (sample === 'hit-test.html') await page.waitForFunction(() => (window as unknown as {sampleProbe: {hits: number}}).sampleProbe.hits > 0);
-    await page.screenshot({path: `test-results/sample-${deviceKey.startsWith('Meta') ? 'quest' : 'phone'}-${questMode}-${sample.replace('.html', '')}-${preview ? 'preview' : 'default'}.png`});
+    if (sample.includes('plane-detection')) assert(await page.evaluate('window.sampleProbe.planes > 0'), 'published plane sample receives room geometry');
+    if (sample.includes('mesh-detection')) assert(await page.evaluate('window.sampleProbe.meshes > 0'), 'published mesh sample receives room geometry');
+    await page.screenshot({path: `test-results/sample-${deviceKey.startsWith('Meta') ? 'quest' : 'phone'}-${questMode}-${sample.replace('.html', '').replace(/\//g, '-')}-${preview ? 'preview' : 'default'}.png`});
     let overlay: unknown;
     if (sample === 'ar-barebones.html') {
       overlay = await page.evaluate(`({enabled: window.sampleProbe.session.enabledFeatures.includes('dom-overlay'), type: window.sampleProbe.session.domOverlayState?.type ?? null, sameRoot: window.sampleProbe.overlayRoot === document.getElementById('overlay')})`);
@@ -71,7 +79,7 @@ try {
       assert(await page.evaluate(`!window.sampleProbe.overlayRoot.hasAttribute('popover') && window.sampleProbe.overlayRoot.style.cssText === window.sampleProbe.originalStyle`), 'sample root is restored on end');
     } else await page.evaluate(`window.sampleProbe.session.end()`);
     assert.deepEqual(errors, [], `${deviceKey} ${sample} runtime errors`);
-    results.push({url, deviceKey, questMode, preview, overlay, probe: await page.evaluate(() => { const probe = (window as unknown as {sampleProbe: {frames: number; hits: number}}).sampleProbe; return {frames: probe.frames, hits: probe.hits}; }), errors});
+    results.push({url, deviceKey, questMode, preview, overlay, probe: await page.evaluate(() => { const probe = (window as unknown as {sampleProbe: {frames: number; hits: number; planes: number; meshes: number}}).sampleProbe; return {frames: probe.frames, hits: probe.hits, planes: probe.planes, meshes: probe.meshes}; }), errors});
     await page.close();
   }
   const report = {browser: await context.browser()!.version(), results}; await writeFile('test-results/webxr-samples.json', JSON.stringify(report, null, 2)); console.log(JSON.stringify(report, null, 2));

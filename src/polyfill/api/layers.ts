@@ -49,6 +49,7 @@ export class XRCompositionLayer extends XRLayer {
   opacity = 1;
   readonly _color: WebGLTexture;
   readonly _depth: WebGLTexture | null;
+  readonly _hasStencil: boolean;
   _width = 0; _height = 0; _destroyed = false;
   readonly _clearOnAccess: boolean;
   _needsClear = true;
@@ -59,6 +60,7 @@ export class XRCompositionLayer extends XRLayer {
     this._clearOnAccess = _init.clearOnAccess === undefined || Boolean(_init.clearOnAccess);
     const gl = _binding._gl2(); this._color = gl.createTexture()!;
     this._depth = _init.depthFormat === 0 ? null : gl.createTexture();
+    this._hasStencil = _init.depthFormat === gl.DEPTH_STENCIL || _init.depthFormat === gl.DEPTH24_STENCIL8;
   }
   get needsRedraw() { return this._needsRedraw; }
   get textureWidth() { return this._width; }
@@ -85,7 +87,7 @@ export class XRCompositionLayer extends XRLayer {
       for (const parameter of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, parameter, gl.CLAMP_TO_EDGE);
       if (this._depth) {
         gl.bindTexture(gl.TEXTURE_2D, this._depth);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, width, height, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+        gl.texImage2D(gl.TEXTURE_2D, 0, this._hasStencil ? gl.DEPTH24_STENCIL8 : gl.DEPTH_COMPONENT24, width, height, 0, this._hasStencil ? gl.DEPTH_STENCIL : gl.DEPTH_COMPONENT, this._hasStencil ? gl.UNSIGNED_INT_24_8 : gl.UNSIGNED_INT, null);
         for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, parameter, gl.NEAREST);
       }
     } finally {
@@ -148,7 +150,7 @@ export class XRWebGLBinding {
     if (init.textureType && !['texture', 'texture-array'].includes(init.textureType)) throw new TypeError('Invalid XRTextureType.');
     if (init.textureType === 'texture-array') unsupported('Only 2D textures are implemented.');
     if (init.colorFormat !== undefined && !([gl.RGBA, gl.RGBA8] as number[]).includes(init.colorFormat)) unsupported('Only RGBA8 color textures are implemented.');
-    if (init.depthFormat != null && ![0, gl.DEPTH_COMPONENT, gl.DEPTH_COMPONENT24].includes(init.depthFormat)) unsupported('Only DEPTH_COMPONENT24 depth textures are implemented.');
+    if (init.depthFormat != null && ![0, gl.DEPTH_COMPONENT, gl.DEPTH_COMPONENT24, gl.DEPTH_STENCIL, gl.DEPTH24_STENCIL8].includes(init.depthFormat)) unsupported('Only DEPTH_COMPONENT24 and DEPTH24_STENCIL8 depth textures are implemented.');
     if (init.mipLevels !== undefined && init.mipLevels !== 1) unsupported('Mipmapped layers are not implemented.');
     if (init.isStatic) unsupported('Static layers are not implemented.');
   }
@@ -224,8 +226,11 @@ export class XRWebGLBinding {
       this.framebuffer ??= gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
       gl.disable(gl.RASTERIZER_DISCARD); gl.disable(gl.SCISSOR_TEST); gl.colorMask(true, true, true, true); gl.depthMask(true); gl.clearColor(0, 0, 0, 0); gl.clearDepth(1);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, layer._color, 0);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, layer._depth, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT | (layer._depth ? gl.DEPTH_BUFFER_BIT : 0));
+      // Detach both aspects when the shared FBO switches depth formats.
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, null, 0);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, layer._hasStencil ? gl.DEPTH_STENCIL_ATTACHMENT : gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, layer._depth, 0);
+      gl.stencilMaskSeparate(gl.FRONT, 0xffffffff); gl.stencilMaskSeparate(gl.BACK, 0xffffffff); gl.clearStencil(0);
+      gl.clear(gl.COLOR_BUFFER_BIT | (layer._depth ? gl.DEPTH_BUFFER_BIT : 0) | (layer._hasStencil ? gl.STENCIL_BUFFER_BIT : 0));
     });
   }
   _compose(frame: XRFrame, layers: readonly XRCompositionLayer[]) {
@@ -287,7 +292,7 @@ export class XRWebGLBinding {
     for (const parameter of [gl.DRAW_FRAMEBUFFER_BINDING, gl.READ_FRAMEBUFFER_BINDING, gl.CURRENT_PROGRAM, gl.VERTEX_ARRAY_BINDING, gl.ACTIVE_TEXTURE,
       gl.VIEWPORT, gl.SCISSOR_BOX, gl.COLOR_WRITEMASK, gl.DEPTH_WRITEMASK, gl.COLOR_CLEAR_VALUE, gl.DEPTH_CLEAR_VALUE,
       gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB, gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA, gl.BLEND_EQUATION_RGB, gl.BLEND_EQUATION_ALPHA,
-      gl.CULL_FACE_MODE, gl.FRONT_FACE]) saved.set(parameter, gl.getParameter(parameter));
+      gl.CULL_FACE_MODE, gl.FRONT_FACE, gl.STENCIL_WRITEMASK, gl.STENCIL_BACK_WRITEMASK, gl.STENCIL_CLEAR_VALUE]) saved.set(parameter, gl.getParameter(parameter));
     const enabled = [gl.BLEND, gl.DEPTH_TEST, gl.SCISSOR_TEST, gl.CULL_FACE, gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE].map(cap => [cap, gl.isEnabled(cap)] as const);
     gl.activeTexture(gl.TEXTURE0); const texture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
     const sampler = gl.getParameter(gl.SAMPLER_BINDING) as WebGLSampler | null;
@@ -302,6 +307,7 @@ export class XRWebGLBinding {
       const color = saved.get(gl.COLOR_CLEAR_VALUE) as Float32Array; gl.clearColor(color[0], color[1], color[2], color[3]); gl.clearDepth(saved.get(gl.DEPTH_CLEAR_VALUE) as number);
       gl.blendFuncSeparate(saved.get(gl.BLEND_SRC_RGB) as number, saved.get(gl.BLEND_DST_RGB) as number, saved.get(gl.BLEND_SRC_ALPHA) as number, saved.get(gl.BLEND_DST_ALPHA) as number);
       gl.blendEquationSeparate(saved.get(gl.BLEND_EQUATION_RGB) as number, saved.get(gl.BLEND_EQUATION_ALPHA) as number);
+      gl.stencilMaskSeparate(gl.FRONT, saved.get(gl.STENCIL_WRITEMASK) as number); gl.stencilMaskSeparate(gl.BACK, saved.get(gl.STENCIL_BACK_WRITEMASK) as number); gl.clearStencil(saved.get(gl.STENCIL_CLEAR_VALUE) as number);
       gl.cullFace(saved.get(gl.CULL_FACE_MODE) as number); gl.frontFace(saved.get(gl.FRONT_FACE) as number);
       for (const [cap, value] of enabled) value ? gl.enable(cap) : gl.disable(cap);
     }

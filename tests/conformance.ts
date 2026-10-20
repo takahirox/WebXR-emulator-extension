@@ -3,10 +3,11 @@ import type {SessionMode} from '../src/types/contracts';
 import type * as Runtime from '../src/polyfill/api/runtime';
 import type * as Geometry from '../src/polyfill/api/geometry';
 import type * as Sensing from '../src/polyfill/api/sensing';
+import type * as Environment from '../src/polyfill/api/environment';
 import type * as Layers from '../src/polyfill/api/layers';
 import type XRRay from '../src/polyfill/api/XRRay';
 
-type TestWindow = typeof Runtime & typeof Geometry & typeof Sensing & typeof Layers & {
+type TestWindow = typeof Runtime & typeof Geometry & typeof Sensing & typeof Environment & typeof Layers & {
   navigator: {xr: Runtime.XRSystem}; XRRay: typeof XRRay;
 };
 
@@ -99,14 +100,21 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     }
     check(['XRSystem', 'XRSession', 'XRFrame', 'XRSpace', 'XRReferenceSpace', 'XRRigidTransform', 'XRWebGLLayer', 'XRWebGLBinding', 'XRAnchor', 'XRHand', 'XRJointPose', 'XRCPUDepthInformation', 'XRLightProbe'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'), 'public constructors installed');
     await rejects(() => xr.navigator.xr.isSessionSupported('invalid' as SessionMode), 'TypeError', 'invalid support mode');
-    await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['unbounded']}), 'NotSupportedError', 'unimplemented reference space required');
+    await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['bounded-floor']}), 'NotSupportedError', 'unimplemented reference space required');
     await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['not-a-real-feature']}), 'NotSupportedError', 'unknown required feature');
     if (handheld) await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['hand-tracking']}), 'NotSupportedError', 'phone hand tracking required');
+    for (const feature of ['plane-detection', 'mesh-detection', 'marker-tracking', 'image-tracking', 'camera-access', 'secondary-views', 'webgpu']) {
+      if (mode === 'immersive-ar' && ['plane-detection', 'mesh-detection'].includes(feature)) continue;
+      await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: [feature]}), 'NotSupportedError', `${feature} unavailable required`);
+      const omitted = await xr.navigator.xr.requestSession(mode, {optionalFeatures: [feature]});
+      check(!omitted.enabledFeatures.includes(feature), `${feature} unavailable optional omitted`);
+      await omitted.end();
+    }
     if (mode === 'immersive-vr') await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['hit-test']}), 'NotSupportedError', 'VR hit test required');
     if (mode === 'immersive-ar') {
       await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['dom-overlay']}), 'NotSupportedError', 'required overlay missing root');
       await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['depth-sensing'], depthSensing: {usagePreference: ['gpu-optimized'], dataFormatPreference: ['float32']}}), 'NotSupportedError', 'GPU depth required');
-      await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['depth-sensing'], depthSensing: {usagePreference: ['cpu-optimized'], dataFormatPreference: ['luminance-alpha']}}), 'NotSupportedError', 'unsupported depth format required');
+      await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['depth-sensing'], depthSensing: {usagePreference: ['cpu-optimized'], dataFormatPreference: ['invalid']}}), 'TypeError', 'invalid depth format required');
       for (const requirement of ['requiredFeatures', 'optionalFeatures'] as const) {
         for (const depthSensing of [
           {usagePreference: [], dataFormatPreference: []},
@@ -123,6 +131,43 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
           try { check(!incompatible.enabledFeatures.includes('depth-sensing'), 'optional incompatible depth is omitted with an empty format preference'); } finally { await incompatible.end(); }
         }
       }
+    }
+    if (mode === 'immersive-ar') for (const format of ['unsigned-short', 'luminance-alpha']) {
+      const depthSession = await xr.navigator.xr.requestSession(mode, {requiredFeatures: ['depth-sensing'], depthSensing: {usagePreference: ['cpu-optimized'], dataFormatPreference: [format, 'float32']}});
+      const canvas = document.createElement('canvas'); document.body.append(canvas);
+      let retained: Sensing.XRCPUDepthInformation | null = null;
+      try {
+        const context = canvas.getContext('webgl2')!; await context.makeXRCompatible();
+        depthSession.updateRenderState({baseLayer: new xr.XRWebGLLayer(depthSession, context)});
+        const space = await depthSession.requestReferenceSpace('local');
+        check(depthSession.depthDataFormat === format, `${format}: honors first supported preference`);
+        await new Promise<void>((resolve, reject) => {
+          let frames = 0;
+          const render = (_time: number, frame: Runtime.XRFrame) => {
+            try {
+              const views = frame.getViewerPose(space)!.views;
+              const infos = views.map(view => frame.getDepthInformation(view));
+              if (!infos.every(info => info && new Uint16Array(info.data).some(value => value > 0))) {
+                if (++frames > 300) throw new Error('16-bit depth room did not load');
+                depthSession.requestAnimationFrame(render); return;
+              }
+              for (const info of infos) {
+                check(!!info && info.rawValueToMeters === 0.001 && info.data.byteLength === info.width * info.height * 2, `${format}: millimeter buffer for every eye`);
+                const raw = new Uint16Array(info.data);
+                check(Math.abs(info.getDepthInMeters(0.5, 0.5) - raw[16 * info.width + 16] * 0.001) < 1e-6, `${format}: decoded meters match typed buffer`);
+                const hit = depthSession._device.arScene!.getHitTestResults([0, 1.6, 0], [0, 0, -1])[0];
+                check(!!hit && raw.some(value => value > 0 && value < 65535), `${format}: actual room depth is represented`);
+                retained = info;
+              }
+              depthSession.pauseDepthSensing();
+              check(frame.getDepthInformation(views[0]) === null, `${format}: paused depth is null`);
+              resolve();
+            } catch (error) { reject(error); }
+          };
+          depthSession.requestAnimationFrame(render);
+        });
+        throws(() => retained!.data, 'InvalidStateError', `${format}: inactive data access`);
+      } finally { await depthSession.end(); canvas.remove(); }
     }
     // Interface conversion precedes per-mode and per-root presentation checks.
     for (const invalidRoot of [undefined, null, {}, document, document.createTextNode('not an Element'), Object.create(Element.prototype)]) {
@@ -174,12 +219,12 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         check(!root.hasAttribute('popover') && root.style.length === 0 && root.parentNode === document.body, 'disabled negotiation leaves the original root untouched');
       } finally { root.remove(); }
     }
-    const inline = await xr.navigator.xr.requestSession('inline', {optionalFeatures: ['anchors', 'layers', 'hand-tracking', 'hit-test', 'dom-overlay']});
+    const inline = await xr.navigator.xr.requestSession('inline', {optionalFeatures: ['anchors', 'layers', 'hand-tracking', 'hit-test', 'dom-overlay', 'plane-detection', 'mesh-detection', 'unbounded']});
     const inlineSpace = await inline.requestReferenceSpace('viewer');
     check(inline.enabledFeatures.join(',') === 'viewer', 'inline excludes immersive features');
     await rejects(() => inline.requestHitTestSource({space: inlineSpace}), 'NotSupportedError', 'hit source without feature');
     const overlay = document.createElement('div'); const overlayButton = document.createElement('button'); overlayButton.textContent = 'Conformance overlay'; Object.assign(overlayButton.style, {width: '100%', height: '100%', backgroundColor: 'transparent'}); overlay.append(overlayButton); document.body.append(overlay);
-    const features = ['layers', ...(!handheld ? ['hand-tracking'] : []), ...(mode === 'immersive-ar' ? ['anchors', 'hit-test', 'depth-sensing', 'light-estimation'] : [])];
+    const features = ['layers', 'unbounded', ...(!handheld ? ['hand-tracking'] : []), ...(mode === 'immersive-ar' ? ['anchors', 'hit-test', 'depth-sensing', 'light-estimation', 'plane-detection', 'mesh-detection'] : [])];
     const session = await xr.navigator.xr.requestSession(mode, {requiredFeatures: features, optionalFeatures: ['not-a-real-feature', 'bounded-floor', 'unbounded', 'dom-overlay'], domOverlay: {root: overlay}, depthSensing: {usagePreference: ['cpu-optimized'], dataFormatPreference: ['float32']}});
     const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 480; document.body.append(canvas);
     try {
@@ -216,6 +261,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       await rejects(() => session.requestReferenceSpace('invalid'), 'TypeError', 'invalid reference space enum');
       const reference = await session.requestReferenceSpace('local');
       const viewer = await session.requestReferenceSpace('viewer');
+      const unbounded = await session.requestReferenceSpace('unbounded');
       const offset = reference.getOffsetReferenceSpace(new xr.XRRigidTransform({x: 1}));
       const nested = offset.getOffsetReferenceSpace(new xr.XRRigidTransform({z: 1}));
       throws(() => new xr.XRRigidTransform({w: 0}), 'TypeError', 'non-point translation');
@@ -231,6 +277,10 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       await gl.makeXRCompatible();
       const legacy = new xr.XRWebGLLayer(session, gl); session.updateRenderState({baseLayer: legacy});
       function nextFrame<T>(callback: (frame: Runtime.XRFrame) => T): Promise<T> { return new Promise((resolve, reject) => session.requestAnimationFrame((_time, frame) => { try { resolve(callback(frame)); } catch (error) { reject(error); } })); }
+      await nextFrame(frame => {
+        check(frame.getPose(unbounded, reference)!.transform.matrix.every((value, i) => Math.abs(value - (i % 5 === 0 ? 1 : 0)) < 1e-5), 'unbounded starts at the stable local origin');
+        if (mode === 'immersive-vr') check(frame.detectedPlanes.size === 0 && frame.detectedMeshes.size === 0, 'disabled geometry exposes empty sets');
+      });
       const applicationFramebuffer = gl.createFramebuffer();
       try {
         for (const [drawNone, discard] of [[false, false], [true, false], [false, true], [true, true]]) {
@@ -385,6 +435,55 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
           });
         }
         check(!!hitResult && !!depth, 'room hit and depth available');
+        const geometry = await nextFrame(frame => {
+          check(frame.detectedPlanes instanceof xr.XRPlaneSet && frame.detectedPlanes.size > 0 && frame.detectedMeshes instanceof xr.XRMeshSet && frame.detectedMeshes.size > 0, 'room detection returns populated read-only sets');
+          check(!('add' in frame.detectedPlanes) && !('delete' in frame.detectedMeshes), 'detection sets have no mutators');
+          const planes = [...frame.detectedPlanes], meshes = [...frame.detectedMeshes];
+          check(planes.some(plane => plane.orientation === 'horizontal') && planes.some(plane => plane.orientation === 'vertical'), 'room contains horizontal and vertical patches');
+          const hitPoint = frame.getHitTestResults(hit)[0].getPose(reference)!.transform.position;
+          let matchesHit = false;
+          for (const plane of planes) {
+            check(plane instanceof xr.XRPlane && plane.polygon.length >= 3 && Object.isFrozen(plane.polygon) && plane.polygon.every(p => p.y === 0 && p.w === 1), 'plane polygon is frozen, planar and nonempty');
+            const matrix = new three.Matrix4().fromArray(frame.getPose(plane.planeSpace, reference)!.transform.matrix);
+            const points = plane.polygon.map(p => new three.Vector3(p.x, p.y, p.z).applyMatrix4(matrix));
+            const triangle = new three.Triangle(points[0], points[1], points[2]);
+            const point = new three.Vector3(hitPoint.x, hitPoint.y, hitPoint.z);
+            if (triangle.closestPointToPoint(point, new three.Vector3()).distanceTo(point) < 1e-4) matchesHit = true;
+          }
+          check(matchesHit, 'detected geometry contains the actual room hit-test point');
+          for (const mesh of meshes) check(mesh instanceof xr.XRMesh && mesh.vertices instanceof Float32Array && mesh.indices instanceof Uint32Array && mesh.vertices.length >= 9 && mesh.indices.every(index => index < mesh.vertices.length / 3) && !!frame.getPose(mesh.meshSpace, reference), 'mesh indexed triangles have a tracked pose');
+          const plane = planes[0], mesh = meshes[0];
+          const original = frame.getPose(plane.planeSpace, reference)!.transform;
+          const shifted = frame.getPose(plane.planeSpace, offset)!.transform;
+          check(Math.abs(original.position.x - shifted.position.x - 1) < 1e-5, 'detected pose follows reference-space offsets');
+          throws(() => frame.getPose(plane.planeSpace, inlineSpace), 'InvalidStateError', 'detected space cannot cross sessions');
+          return {frame, plane, mesh, planes: frame.detectedPlanes, changed: plane.lastChangedTime, meshChanged: mesh.lastChangedTime};
+        });
+        throws(() => geometry.frame.detectedPlanes, 'InvalidStateError', 'inactive plane frame');
+        throws(() => geometry.frame.detectedMeshes, 'InvalidStateError', 'inactive mesh frame');
+        await nextFrame(frame => {
+          check(frame.detectedPlanes.has(geometry.plane) && frame.detectedMeshes.has(geometry.mesh), 'detected objects retain identity between frames');
+          check(geometry.plane.lastChangedTime === geometry.changed && geometry.mesh.lastChangedTime === geometry.meshChanged, 'unchanged room retains change timestamps');
+        });
+        const scene = session._device.arScene!, room = scene.room;
+        try {
+          scene.room = null;
+          await nextFrame(frame => {
+            check(frame.detectedPlanes.size === 0 && frame.detectedMeshes.size === 0, 'room removal clears detection');
+            check(frame.getPose(geometry.plane.planeSpace, reference) === null && frame.getPose(geometry.mesh.meshSpace, reference) === null, 'removed geometry loses tracking');
+            check(geometry.planes.has(geometry.plane), 'old frame retains detection membership');
+          });
+        } finally { scene.room = room; }
+        const newPlane = await nextFrame(frame => {
+          check(frame.detectedPlanes.size > 0 && !frame.detectedPlanes.has(geometry.plane), 'room reacquisition uses new identities');
+          return [...frame.detectedPlanes][0];
+        });
+        const surfaceAnchor = await nextFrame(frame => frame.createAnchor(new xr.XRRigidTransform(), newPlane.planeSpace));
+        await nextFrame(frame => check(frame.getPose(surfaceAnchor.anchorSpace, newPlane.planeSpace)!.transform.position.x < 1e-5, 'anchor can attach at a detected surface origin'));
+        surfaceAnchor.delete();
+        await session.initiateRoomCapture();
+        await rejects(() => session.initiateRoomCapture(), 'InvalidStateError', 'automatic room capture completes once');
+
         throws(() => hitResult!.getPose(reference), 'InvalidStateError', 'inactive hit result pose');
         throws(() => depth!.getDepthInMeters(0.5, 0.5), 'InvalidStateError', 'inactive depth access');
         const depthOffsetTransform = new xr.XRRigidTransform({x: 0.7, y: -0.4, z: 1}, {y: Math.sin(Math.PI / 8), w: Math.cos(Math.PI / 8)});
@@ -418,8 +517,11 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         await nextFrame(frame => { check(!!anchor && frame.trackedAnchors.has(anchor), 'anchor tracked across frames'); check(Math.abs(frame.getPose(anchor!.anchorSpace, reference)!.transform.position.x - 0.4) < 1e-5, 'anchor reference-space transform'); });
         const originalViewer = await nextFrame(frame => frame.getPose(viewer, reference)!.transform.position);
         if (!handheld) {
-          window.dispatchEvent(new CustomEvent('webxr-pose', {detail: {position: [originalViewer.x + 0.3, originalViewer.y + 1.6, originalViewer.z], quaternion: [0, 0, 0, 1]}}));
-          await nextFrame(frame => check(Math.abs(frame.getPose(anchor!.anchorSpace, reference)!.transform.position.x - 0.4) < 1e-5, 'anchor remains world-stable when viewer moves'));
+          window.dispatchEvent(new CustomEvent('webxr-pose', {detail: {position: [originalViewer.x + 30, originalViewer.y + 1.6, originalViewer.z], quaternion: [0, 0, 0, 1]}}));
+          await nextFrame(frame => {
+            check(Math.abs(frame.getPose(anchor!.anchorSpace, reference)!.transform.position.x - 0.4) < 1e-5, 'anchor remains world-stable when viewer moves');
+            check(Math.abs(frame.getViewerPose(unbounded)!.transform.position.x - originalViewer.x - 30) < 1e-4, 'unbounded navigation permits movement beyond the room without recentering');
+          });
           window.dispatchEvent(new CustomEvent('webxr-pose', {detail: {position: [originalViewer.x, originalViewer.y + 1.6, originalViewer.z], quaternion: [0, 0, 0, 1]}}));
         }
         const anchorSpace = anchor!.anchorSpace; anchor!.delete(); anchor!.delete();
@@ -530,9 +632,11 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         ['omitted', {}], ['undefined', {depthFormat: undefined}], ['null', {depthFormat: null}],
         ['zero', {depthFormat: 0}], ['depth-component', {depthFormat: gl.DEPTH_COMPONENT}],
         ['depth-component24', {depthFormat: gl.DEPTH_COMPONENT24}],
+        ['depth-stencil', {depthFormat: gl.DEPTH_STENCIL}], ['depth-stencil24', {depthFormat: gl.DEPTH24_STENCIL8}],
       ] as const) {
         const testProjection = binding.createProjectionLayer(options);
         const testQuad = peerBinding.createQuadLayer({space: reference, viewPixelWidth: 32, viewPixelHeight: 16, ...options});
+        gl.stencilMaskSeparate(gl.FRONT, 0x12); gl.stencilMaskSeparate(gl.BACK, 0x34); gl.clearStencil(7);
         session.updateRenderState({layers: [testProjection, testQuad]});
         await nextFrame(frame => {
           for (const layer of [testProjection, testQuad]) {
@@ -540,17 +644,48 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
             const hasDepth = label.startsWith('depth-') || (projection && ['omitted', 'undefined'].includes(label));
             const image = projection ? peerBinding.getViewSubImage(layer, frame.getViewerPose(reference)!.views[0]) : binding.getSubImage(layer as Layers.XRQuadLayer, frame);
             const prefix = `${layer.constructor.name} depthFormat=${label}`;
+            check(gl.getParameter(gl.STENCIL_WRITEMASK) === 0x12 && gl.getParameter(gl.STENCIL_BACK_WRITEMASK) === 0x34 && gl.getParameter(gl.STENCIL_CLEAR_VALUE) === 7, `${prefix}: preserves stencil masks and clear value`);
             check(image.imageIndex === 0 && image.motionVectorTexture === null, `${prefix}: 2D image index and absent motion vectors`);
             check(image.colorTextureWidth === layer.textureWidth && image.colorTextureHeight === layer.textureHeight, `${prefix}: color dimensions`);
             check(hasDepth ? gl.isTexture(image.depthStencilTexture) : image.depthStencilTexture === null, `${prefix}: depth allocation`);
             check(image.depthStencilTextureWidth === (hasDepth ? layer.textureWidth : null) && image.depthStencilTextureHeight === (hasDepth ? layer.textureHeight : null), `${prefix}: depth dimensions or null`);
             gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image.colorTexture, 0);
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, image.depthStencilTexture, 0);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, null, 0);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, label.startsWith('depth-stencil') ? gl.DEPTH_STENCIL_ATTACHMENT : gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, image.depthStencilTexture, 0);
             check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE && gl.getError() === gl.NO_ERROR, `${prefix}: framebuffer complete without GL errors`);
+            if (label.startsWith('depth-stencil')) {
+              const program = gl.createProgram()!;
+              for (const [type, source] of [
+                [gl.VERTEX_SHADER, '#version 300 es\nvoid main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }'],
+                [gl.FRAGMENT_SHADER, '#version 300 es\nprecision highp float; uniform vec4 color; out vec4 result; void main() { result = color; }'],
+              ] as const) { const shader = gl.createShader(type)!; gl.shaderSource(shader, source); gl.compileShader(shader); gl.attachShader(program, shader); gl.deleteShader(shader); }
+              gl.linkProgram(program); check(gl.getProgramParameter(program, gl.LINK_STATUS), `${prefix}: stencil probe links`);
+              const previous = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram | null;
+              const viewport = gl.getParameter(gl.VIEWPORT) as Int32Array;
+              gl.useProgram(program); gl.viewport(0, 0, image.colorTextureWidth, image.colorTextureHeight);
+              gl.disable(gl.BLEND); gl.disable(gl.DEPTH_TEST); gl.enable(gl.STENCIL_TEST);
+              gl.stencilFunc(gl.EQUAL, 0, 0xff); gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP); gl.stencilMask(0xff);
+              const color = gl.getUniformLocation(program, 'color');
+              gl.uniform4f(color, 0, 1, 0, 1); gl.drawArrays(gl.TRIANGLES, 0, 3);
+              const pixel = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+              check(pixel.join(',') === '0,255,0,255', `${prefix}: stencil initially cleared to zero`);
+              gl.clearStencil(7); gl.clear(gl.STENCIL_BUFFER_BIT);
+              gl.uniform4f(color, 1, 0, 0, 1); gl.drawArrays(gl.TRIANGLES, 0, 3);
+              gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+              check(pixel.join(',') === '0,255,0,255' && gl.getError() === gl.NO_ERROR, `${prefix}: packed stencil rejects fragments`);
+              gl.disable(gl.STENCIL_TEST); gl.useProgram(previous); gl.deleteProgram(program);
+              gl.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+              gl.stencilMaskSeparate(gl.FRONT, 0x12); gl.stencilMaskSeparate(gl.BACK, 0x34); gl.clearStencil(7);
+            }
+
           }
           gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         });
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, null, 0);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.stencilMask(0xff); gl.clearStencil(0);
         testProjection.destroy(); testQuad.destroy();
       }
       const foreignCanvas = document.createElement('canvas'); const foreignGL = foreignCanvas.getContext('webgl2')!;

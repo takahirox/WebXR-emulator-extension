@@ -12,6 +12,7 @@ import XRHitTestResult from './XRHitTestResult';
 import XRTransientInputHitTestResult from './XRTransientInputHitTestResult';
 import XRInputSourceArray from './XRInputSourceArray';
 import type DOMOverlay from '../DOMOverlay';
+import {EnvironmentTracker} from './environment';
 export {XRInputSourceArray};
 
 export class XREventTarget extends EventTarget {
@@ -68,6 +69,10 @@ export class XRSystem extends XREventTarget {
       overlayRoot = domOverlay.root;
       Element.prototype.hasAttribute.call(overlayRoot, '');
     }
+    if (options.depthSensing) {
+      const {usagePreference, dataFormatPreference} = options.depthSensing;
+      if ([...usagePreference].some(value => !['cpu-optimized', 'gpu-optimized'].includes(value)) || [...dataFormatPreference].some(value => !['float32', 'unsigned-short', 'luminance-alpha'].includes(value))) throw new TypeError('Invalid depth sensing preference enum.');
+    }
     const needsActivation = mode !== 'inline' || [...(options.requiredFeatures ?? []), ...(options.optionalFeatures ?? [])].some(feature => feature !== 'inline-stereo');
     if (needsActivation && !navigator.userActivation.isActive) throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
     if (mode !== 'inline' && (this.immersive || this.requesting)) invalidState('An immersive session is already pending or active.');
@@ -84,12 +89,13 @@ export class XRSystem extends XREventTarget {
           if (!options.depthSensing) { supported = false; }
           else {
             const {usagePreference, dataFormatPreference} = options.depthSensing;
-            supported = supported && (!usagePreference.length || usagePreference.includes('cpu-optimized')) && (!dataFormatPreference.length || dataFormatPreference.includes('float32'));
+            supported = supported && (!usagePreference.length || usagePreference.includes('cpu-optimized')) && (!dataFormatPreference.length || dataFormatPreference.some(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format)));
           }
         }
         if (!supported && required.has(feature)) unsupported(`Required feature ${feature} is unavailable in ${mode}.`);
         if (supported) enabled.add(feature);
       }
+      const depthFormat = options.depthSensing?.dataFormatPreference.find(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format)) ?? 'float32';
       const id = await device.requestSession(mode, enabled);
       const session = new XRSession(device, mode, id, enabled, () => {
         this.sessions.delete(session);
@@ -98,6 +104,7 @@ export class XRSystem extends XREventTarget {
           for (const inline of this.sessions) inline._setImmersiveSuppressed(false);
         }
       });
+      session._depthFormat = depthFormat;
       if (enabled.has('dom-overlay')) {
         try { session._startDOMOverlay(overlayRoot as HTMLElement); }
         catch {
@@ -141,6 +148,9 @@ export class XRSession extends XREventTarget {
   private immersiveSuppressed = false;
   private visibilityListener = () => this._setVisibility(document.hidden || this.immersiveSuppressed ? 'hidden' : 'visible');
   readonly _anchors = new Set<XRAnchor>();
+  readonly _environment = new EnvironmentTracker(this);
+  _depthFormat = 'float32';
+  private roomCaptureCompleted = false;
   private inputWrappers = new Map<DeviceInput, XRInputSource>();
   private rawSources: DeviceInput[] = [];
   private depthRunning = true;
@@ -192,7 +202,7 @@ export class XRSession extends XREventTarget {
     this._require('depth-sensing');
   }
   get depthUsage() { this.assertDepthConfiguration(); return 'cpu-optimized'; }
-  get depthDataFormat() { this.assertDepthConfiguration(); return 'float32'; }
+  get depthDataFormat() { this.assertDepthConfiguration(); return this._depthFormat; }
   get depthType() { this.assertDepthConfiguration(); return 'smooth'; }
   get depthActive() { this.assertDepthConfiguration(); return this.depthRunning; }
   pauseDepthSensing() { this.assertDepthFrame(); this.depthRunning = false; }
@@ -221,6 +231,13 @@ export class XRSession extends XREventTarget {
   }
   _setImmersiveSuppressed(value: boolean) {
     this.immersiveSuppressed = value; this.visibilityListener();
+  }
+  async initiateRoomCapture() {
+    this._assertLive();
+    if (this.roomCaptureCompleted) invalidState('Room capture already completed.');
+    this._require('plane-detection');
+    // The packaged room loads automatically; there is no manual sensor capture.
+    this.roomCaptureCompleted = true;
   }
   async requestReferenceSpace(type: string) {
     this._assertLive();
@@ -268,6 +285,7 @@ export class XRSession extends XREventTarget {
     this._device.removeEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
     document.removeEventListener('visibilitychange', this.visibilityListener);
     for (const anchor of this._anchors) anchor.delete();
+    this._environment.clear();
     this.inputWrappers.clear();
     this.callbacks.clear(); this.currentCallbacks?.clear(); this.signals = []; this.sources = Object.freeze([]);
     for (const source of [...this._hitSources, ...this._transientSources]) source._deactivate();
@@ -331,6 +349,7 @@ export class XRSession extends XREventTarget {
     if (this.ended) return;
     for (const [raw, wrapper] of this.inputWrappers) if (removed.includes(wrapper)) this.inputWrappers.delete(raw);
     this._device.computeHitTests(this._id);
+    if (this.enabledFeatures.some(feature => feature === 'plane-detection' || feature === 'mesh-detection')) this._environment.update(time);
     const frame = new XRFrame(this, time, true);
     const layers = this.renderState.layers;
     if (layers?.length) layers[0]._binding._prepare(layers);
@@ -351,10 +370,12 @@ export class XRFrame {
   _active = false;
   private hitResults = new Map<XRHitTestSource, XRHitTestResult[]>();
   private anchorSnapshot: XRAnchorSet;
+  private environmentSnapshot: ReturnType<EnvironmentTracker['snapshot']>;
   private transientResults = new Map<XRTransientInputHitTestSource, XRTransientInputHitTestResult[]>();
   constructor(readonly session: XRSession, readonly predictedDisplayTime: number, readonly _animation: boolean) {
     frameObjects.add(this);
     this.anchorSnapshot = new XRAnchorSet(session._anchors);
+    this.environmentSnapshot = session._environment.snapshot();
     if (_animation) {
       for (const source of session._hitSources) this.hitResults.set(source, session._device.getHitTestResults(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix))));
       for (const source of session._transientSources) {
@@ -385,6 +406,8 @@ export class XRFrame {
     });
     return new XRViewerPose(pose.transform, Object.freeze(views));
   }
+  get detectedPlanes() { this._assertActive(); return this.environmentSnapshot.planes; }
+  get detectedMeshes() { this._assertActive(); return this.environmentSnapshot.meshes; }
   get trackedAnchors() { this._assertActive(); this.session._require('anchors'); return this.anchorSnapshot; }
   async createAnchor(pose: XRRigidTransform, space: XRSpace) {
     this._assertActive(); this.session._require('anchors');

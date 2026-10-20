@@ -82,18 +82,19 @@ export class XRLightEstimate {
 }
 export class XRDepthInformation extends XRViewGeometry {
   readonly width = 32; readonly height = 32;
-  readonly rawValueToMeters = 1;
+  readonly rawValueToMeters: number;
   readonly normDepthBufferFromNormView = new XRRigidTransform();
   constructor(readonly _frame: XRFrame, readonly view: XRView) {
     // The simulated depth sensor is aligned with this view, including its
     // reference-space offset. Raycasting below still uses the world-space pose.
     super(view.transform, view.projectionMatrix);
+    this.rawValueToMeters = _frame.session.depthDataFormat === 'float32' ? 1 : 0.001;
   }
 }
 export class XRCPUDepthInformation extends XRDepthInformation {
-  private samples: Float32Array;
+  private samples: Float32Array | Uint16Array;
   constructor(frame: XRFrame, view: XRView) {
-    super(frame, view); this.samples = new Float32Array(this.width * this.height);
+    super(frame, view); this.samples = this.rawValueToMeters === 1 ? new Float32Array(this.width * this.height) : new Uint16Array(this.width * this.height);
     const origin = mat4.getTranslation(vec3.create(), view._worldMatrix);
     const inverseProjection = mat4.invert(mat4.create(), view.projectionMatrix)!;
     const local = vec3.create(); const world = vec3.create();
@@ -101,7 +102,12 @@ export class XRCPUDepthInformation extends XRDepthInformation {
       vec3.transformMat4(local, [(x + 0.5) / this.width * 2 - 1, 1 - (y + 0.5) / this.height * 2, 0], inverseProjection);
       vec3.transformMat4(world, local, view._worldMatrix); vec3.subtract(world, world, origin); vec3.normalize(world, world);
       const hit = frame.session._device.arScene!.getHitTestResults(origin, world)[0];
-      if (hit) this.samples[y * this.width + x] = hit.distance * (-local[2] / vec3.length(local));
+      if (hit) {
+        const depth = hit.distance * (-local[2] / vec3.length(local));
+        // Millimeters in 16 bits; zero means unknown, including out-of-range.
+        const raw = Math.round(depth / this.rawValueToMeters);
+        this.samples[y * this.width + x] = this.rawValueToMeters === 1 ? depth : raw > 0 && raw <= 65535 ? raw : 0;
+      }
     }
   }
   get data() { this._frame._assertActive(true); return this.samples.buffer as ArrayBuffer; }
@@ -109,6 +115,6 @@ export class XRCPUDepthInformation extends XRDepthInformation {
     this._frame._assertActive(true);
     if (![x, y].every(Number.isFinite)) throw new TypeError('Coordinates must be finite.');
     if (x < 0 || x > 1 || y < 0 || y > 1) throw new RangeError('Depth coordinates must be in [0,1].');
-    return this.samples[Math.min(this.height - 1, Math.floor(y * this.height)) * this.width + Math.min(this.width - 1, Math.floor(x * this.width))];
+    return this.samples[Math.min(this.height - 1, Math.floor(y * this.height)) * this.width + Math.min(this.width - 1, Math.floor(x * this.width))] * this.rawValueToMeters;
   }
 }
