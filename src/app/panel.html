@@ -165,6 +165,15 @@
         <label id="stereoEffectLabel"><input id="stereoCheckbox" type="checkbox" checked>Stereo effect</label>
         <span id="devicePropertiesExpandIcon" class="item-left icon">&#9660;</span>
       </div>
+      <div style="padding: 6px 12px">
+        <label><input id="domOverlayPreviewCheckbox" type="checkbox">Interactive DOM Overlay Preview</label><br>
+        Emulator only: native mouse/keyboard UI in Android AR or a flat Quest MR panel.
+        No XR controller input or native DOM Overlay conformance. Changes end the session.<br>
+        <label>Android layout <select id="domOverlayPreviewLayout">
+          <option value="auto">Phone (automatic fallback)</option><option value="screen">Flat desktop panel</option>
+        </select></label> Use the flat panel for small or complex phone UI.<br>
+        Extension reload ends the preview; reload the page to restart.
+      </div>
       <div id="modeHelp" style="padding: 6px 12px"></div>
       <div id="renderComponent" class="component main-component"></div>
       <div class="title-bar border-top">

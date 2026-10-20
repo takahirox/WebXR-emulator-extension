@@ -8,8 +8,8 @@ type GateWindow = typeof Runtime & {
   overlayGate: {root: HTMLElement; host: HTMLElement; session: Runtime.XRSession; events: string[]; canvas: HTMLCanvasElement};
 };
 
-/** Public API regressions: do not bypass the production security gate here. */
-export async function runDOMOverlayNegotiation(page: Page) {
+/** Default-off public API regressions: opt-in remains disabled here. */
+export async function runDOMOverlayNegotiation(page: Page, handheld = true) {
   const configurations = await page.evaluate(async () => {
     const w = window as unknown as GateWindow, results: string[] = [];
     for (const configuration of ['light', 'open-root', 'closed-root', 'open-button', 'closed-button'] as const) {
@@ -77,7 +77,7 @@ export async function runDOMOverlayNegotiation(page: Page) {
     assert.deepEqual(await page.evaluate(() => {
       const {root, session, events} = (window as unknown as GateWindow).overlayGate;
       return {events, sources: session.inputSources.length, state: session.domOverlayState, enabled: session.enabledFeatures.includes('dom-overlay'), popover: root.hasAttribute('popover'), transform: root.style.transform};
-    }), {events: [], sources: 0, state: null, enabled: false, popover: false, transform: ''}, 'late shadow iframe entry/release cannot leak XR input or strand an XR touch');
+    }), {events: [], sources: handheld ? 0 : 2, state: null, enabled: false, popover: false, transform: ''}, 'late shadow iframe entry/release cannot leak XR input or strand an XR touch');
   } finally {
     await page.mouse.up();
     await page.evaluate(async () => { const s = (window as unknown as GateWindow).overlayGate; await s.session.end(); s.root.remove(); s.canvas.remove(); });

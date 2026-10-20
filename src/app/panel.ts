@@ -798,6 +798,8 @@ for (const field of document.querySelectorAll<HTMLElement>('.value')) {
 
 ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
   const deviceSelect = document.getElementById('deviceSelect') as HTMLSelectElement;
+  const overlayLayout = document.getElementById('domOverlayPreviewLayout') as HTMLSelectElement;
+  const overlayCheckbox = document.getElementById('domOverlayPreviewCheckbox') as HTMLInputElement;
   const stereoCheckbox = document.getElementById('stereoCheckbox') as HTMLInputElement;
 
   // set up devices select element
@@ -828,15 +830,17 @@ ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
 
     const deviceKeyIsUpdated = manager.updateDeviceKey(deviceKey);
     const stereoEffectIsUpdated = manager.updateStereoEffect(stereoEffect);
+    const overlayLayoutIsUpdated = manager.updateDOMOverlayPreviewFlat(overlayLayout.value === 'screen');
+    const overlayIsUpdated = manager.updateDOMOverlayPreview(overlayCheckbox.checked);
     const modeIsUpdated = manager.updateQuestMode(questModeSelect.value as 'immersive-vr' | 'immersive-ar');
 
-    if (deviceKeyIsUpdated || modeIsUpdated || stereoEffectIsUpdated) {
+    if (deviceKeyIsUpdated || modeIsUpdated || stereoEffectIsUpdated || overlayIsUpdated || overlayLayoutIsUpdated) {
       manager.storeToStorage().then(storedValues => {
         // console.log(storedValues);
       });
     }
 
-    if (deviceKeyIsUpdated || modeIsUpdated) {
+    if (deviceKeyIsUpdated || modeIsUpdated || overlayIsUpdated || overlayLayoutIsUpdated) {
       notifyDeviceChange(manager.deviceDefinition);
       updateAssetNodes(manager.deviceDefinition);
     }
@@ -849,6 +853,8 @@ ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
   deviceSelect.addEventListener('change', onChange);
   questModeSelect.addEventListener('change', onChange);
   stereoCheckbox.addEventListener('change', onChange);
+  overlayCheckbox.addEventListener('change', onChange);
+  overlayLayout.addEventListener('change', onChange);
 
   // load configuration and then load assets
 
@@ -864,6 +870,8 @@ ConfigurationManager.createFromJsonFile('src/devices.json').then(manager => {
       }
     }
 
+    overlayCheckbox.checked = manager.domOverlayPreview;
+    overlayLayout.value = manager.domOverlayPreviewFlat ? 'screen' : 'auto';
     questModeSelect.value = manager.questMode;
     stereoCheckbox.checked = stereoEffect;
     updateAssetNodes(manager.deviceDefinition);

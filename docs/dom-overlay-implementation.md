@@ -1,3 +1,5 @@
+> Historical Issue #15 checkpoint. Issue #15 was subsequently administratively closed with unfinished standards requirements. Its earlier instructions below to keep it open describe that historical checkpoint, not current tracker state. Issue #17 changes the product scope to an opt-in native-desktop interactive preview; see [current implementation and validation](dom-overlay-preview.md). The former XR touch/`beforexrselect` routing and frame blocking described below have been removed from the preview. Passing preview checks do not complete this report's full standards scope.
+
 # DOM Overlay implementation checkpoint (Issue #15)
 
 **Partial implementation; [Issue #15](https://github.com/takahirox/WebXR-emulator-extension/issues/15) must remain open.** Production negotiation is disabled for Android and Quest. The retained Android live-root implementation is tested only through explicit internal access; it is not production support. This is not full DOM Overlay or CSS conformance, and does not complete every Android acceptance requirement either. Issue #13 was administratively closed after the earlier investigation; it is not the current implementation tracker.

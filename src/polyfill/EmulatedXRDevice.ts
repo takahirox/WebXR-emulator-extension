@@ -42,6 +42,8 @@ export default class EmulatedXRDevice extends XRDevice {
   originalCanvasParams: {parentElement: HTMLElement | null; width: number; height: number};
   handheld: boolean;
   emulationMode: SessionMode;
+  domOverlayPreview = false;
+  domOverlayPreviewFlat = false;
   resolution: {width: number; height: number};
   deviceSize: DeviceSize;
   arScene: ARScene | null;
@@ -106,6 +108,8 @@ export default class EmulatedXRDevice extends XRDevice {
 
     // For AR
 
+    this.domOverlayPreview = config.domOverlayPreview === true;
+    this.domOverlayPreviewFlat = config.domOverlayPreviewFlat === true;
     this.handheld = config.formFactor === 'handheld';
     this.emulationMode = config.emulationMode || (this.handheld ? 'immersive-ar' : 'immersive-vr');
     this.resolution = config.resolution !== undefined ? config.resolution : DEFAULT_RESOLUTION;
@@ -166,8 +170,8 @@ export default class EmulatedXRDevice extends XRDevice {
   }
 
   isFeatureSupported(featureDescriptor: string, mode: SessionMode = this.emulationMode) {
-    // Quest has no supported same-root stereo DOM paint source.
-    if (featureDescriptor === 'dom-overlay') return this.handheld && mode === 'immersive-ar' && DOMOverlay.available();
+    // Explicit emulator preview only; screen state does not claim UA conformance.
+    if (featureDescriptor === 'dom-overlay') return this.domOverlayPreview && mode === 'immersive-ar' && this.emulationMode === mode && DOMOverlay.available();
     if (featureDescriptor === 'viewer') return true;
     if (featureDescriptor === 'local' || featureDescriptor === 'local-floor') return mode !== 'inline';
     if (!this.features.includes(featureDescriptor)) return false;
@@ -239,7 +243,7 @@ export default class EmulatedXRDevice extends XRDevice {
   startDOMOverlay(root: HTMLElement, invalidate: () => void) {
     document.documentElement.appendChild(this.div);
     const overlay = new DOMOverlay(root, this.arScene!, this.resolution.width / window.devicePixelRatio,
-      this.resolution.height / window.devicePixelRatio, invalidate);
+      this.resolution.height / window.devicePixelRatio, invalidate, !this.handheld || this.domOverlayPreviewFlat);
     this.arScene!.domOverlay = overlay;
     return overlay;
   }
@@ -254,7 +258,6 @@ export default class EmulatedXRDevice extends XRDevice {
 
   onFrameStart(sessionId: number, renderState: RenderState) {
     const session = this.sessions.get(sessionId)!;
-    this.arScene?.domOverlay?.advanceTouch();
     // guaranteed by the caller that session.baseLayer is not null
     const context = session.baseLayer!.context;
     const canvas = context.canvas as HTMLCanvasElement;
@@ -626,7 +629,6 @@ export default class EmulatedXRDevice extends XRDevice {
   }
 
   _getTouchCoordinates() {
-    if (this.arScene?.domOverlay) return this.arScene.domOverlay.touchCoordinates(this.gamepads[0].pose.position);
     // @TODO: Optimize if possible
     const pose = this.gamepads[0].pose;
     const matrix = mat4.fromRotationTranslation(mat4.create(), pose.orientation, pose.position);
@@ -809,6 +811,8 @@ export default class EmulatedXRDevice extends XRDevice {
       const wasHandheld = this.handheld;
       this.modes = config.modes || DEFAULT_MODES;
       this.features = config.features || [];
+      this.domOverlayPreview = config.domOverlayPreview === true;
+      this.domOverlayPreviewFlat = config.domOverlayPreviewFlat === true;
       this.handheld = config.formFactor === 'handheld';
       this.emulationMode = config.emulationMode || (this.handheld ? 'immersive-ar' : 'immersive-vr');
       this.resolution = config.resolution || DEFAULT_RESOLUTION;
