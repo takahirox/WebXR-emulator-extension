@@ -38,6 +38,7 @@
       ],
       "formFactor": "headset",
       "features": [
+        "bounded-floor",
         "hit-test",
         "plane-detection",
         "mesh-detection",
@@ -56,6 +57,7 @@
         "immersive-ar"
       ],
       "features": [
+        "bounded-floor",
         "hit-test",
         "plane-detection",
         "mesh-detection",

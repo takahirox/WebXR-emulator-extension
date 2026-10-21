@@ -50,7 +50,7 @@ export class XRSpace extends EventTarget {
 
 export class XRReferenceSpace extends XRSpace {
   onreset: ((event: Event) => void) | null = null;
-  constructor(session: XRSession, readonly _type: string, private nativeMatrix: () => mat4 | null, private offset = mat4.create()) {
+  constructor(session: XRSession, readonly _type: string, protected nativeMatrix: () => mat4 | null, protected offset = mat4.create()) {
     super(session, () => {
       const matrix = nativeMatrix();
       return matrix && mat4.multiply(mat4.create(), matrix, offset);
@@ -58,9 +58,32 @@ export class XRReferenceSpace extends XRSpace {
   }
   getOffsetReferenceSpace(transform: XRRigidTransform) {
     if (!(transform instanceof XRRigidTransform)) throw new TypeError('Expected XRRigidTransform.');
-    return new XRReferenceSpace(this._session, this._type, this.nativeMatrix, mat4.multiply(mat4.create(), this.offset, transform.matrix));
+    return this.createOffsetSpace(mat4.multiply(mat4.create(), this.offset, transform.matrix));
   }
+  protected createOffsetSpace(offset: mat4): XRReferenceSpace {
+    return new XRReferenceSpace(this._session, this._type, this.nativeMatrix, offset);
+  }
+}
 
+export class XRBoundedReferenceSpace extends XRReferenceSpace {
+  private readonly boundsValue: readonly DOMPointReadOnly[];
+  constructor(session: XRSession, nativeMatrix: () => mat4 | null,
+    private readonly nativeBounds: readonly (readonly [number, number, number])[], offset = mat4.create()) {
+    super(session, 'bounded-floor', nativeMatrix, offset);
+    const inverse = mat4.invert(mat4.create(), offset)!;
+    this.boundsValue = Object.freeze(nativeBounds.map(point => {
+      const p = vec3.transformMat4(vec3.create(), point, inverse);
+      return Object.freeze(new DOMPointReadOnly(p[0], p[1], p[2], 1));
+    }));
+  }
+  get boundsGeometry() { return this.boundsValue; }
+  override getOffsetReferenceSpace(transform: XRRigidTransform): XRBoundedReferenceSpace {
+    return super.getOffsetReferenceSpace(transform) as XRBoundedReferenceSpace;
+  }
+  protected override createOffsetSpace(offset: mat4) {
+    // Always transform native bounds by the inverse cumulative offset once.
+    return new XRBoundedReferenceSpace(this._session, this.nativeMatrix, this.nativeBounds, offset);
+  }
 }
 
 export class XRPose {

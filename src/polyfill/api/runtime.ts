@@ -3,7 +3,8 @@ import type EmulatedXRDevice from '../EmulatedXRDevice';
 import type {SessionMode} from '../../types/contracts';
 import type {SessionOptions, HitTestOptions, TransientHitTestOptions} from '../../types/polyfill';
 import type {DeviceInput, InputSignal} from '../device-adapter';
-import {XRSpace, XRReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, invalidState, unsupported} from './geometry';
+import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, invalidState, unsupported} from './geometry';
+import {HALL_PLAY_AREA} from '../virtual-play-area';
 import {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
 import {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation} from './sensing';
 import XRHitTestSource from './XRHitTestSource';
@@ -245,7 +246,9 @@ export class XRSession extends XREventTarget {
     if (!this.enabledFeatures.includes(type)) unsupported(`Reference space ${type} was not enabled.`);
     if (type === 'viewer') return this._viewer;
     const inverse = await this._device.requestFrameOfReferenceTransform(type, undefined);
+    this._assertLive();
     const world = mat4.invert(mat4.create(), inverse)!;
+    if (type === 'bounded-floor') return new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA);
     return new XRReferenceSpace(this, type, () => world);
   }
   updateRenderState(init: Partial<XRRenderState>) {

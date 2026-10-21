@@ -952,7 +952,28 @@ function WebXRPolyfillInjection() {
       getOffsetReferenceSpace(transform) {
           if (!(transform instanceof XRRigidTransform))
               throw new TypeError('Expected XRRigidTransform.');
-          return new XRReferenceSpace(this._session, this._type, this.nativeMatrix, multiply(create$3(), this.offset, transform.matrix));
+          return this.createOffsetSpace(multiply(create$3(), this.offset, transform.matrix));
+      }
+      createOffsetSpace(offset) {
+          return new XRReferenceSpace(this._session, this._type, this.nativeMatrix, offset);
+      }
+  }
+  class XRBoundedReferenceSpace extends XRReferenceSpace {
+      constructor(session, nativeMatrix, nativeBounds, offset = create$3()) {
+          super(session, 'bounded-floor', nativeMatrix, offset);
+          this.nativeBounds = nativeBounds;
+          const inverse = invert(create$3(), offset);
+          this.boundsValue = Object.freeze(nativeBounds.map(point => {
+              const p = transformMat4$1(create$2(), point, inverse);
+              return Object.freeze(new DOMPointReadOnly(p[0], p[1], p[2], 1));
+          }));
+      }
+      get boundsGeometry() { return this.boundsValue; }
+      getOffsetReferenceSpace(transform) {
+          return super.getOffsetReferenceSpace(transform);
+      }
+      createOffsetSpace(offset) {
+          return new XRBoundedReferenceSpace(this._session, this.nativeMatrix, this.nativeBounds, offset);
       }
   }
   class XRPose {
@@ -997,6 +1018,7 @@ function WebXRPolyfillInjection() {
 
   var geometry = /*#__PURE__*/Object.freeze({
     __proto__: null,
+    XRBoundedReferenceSpace: XRBoundedReferenceSpace,
     XRPose: XRPose,
     XRReferenceSpace: XRReferenceSpace,
     XRRigidTransform: XRRigidTransform,
@@ -24973,6 +24995,13 @@ void main() {
     roomSurfaces: roomSurfaces
   });
 
+  const HALL_PLAY_AREA = Object.freeze([
+      Object.freeze([-1, 0, -1]),
+      Object.freeze([1, 0, -1]),
+      Object.freeze([1, 0, 1]),
+      Object.freeze([-1, 0, 1]),
+  ]);
+
   const PRIVATE$4 = Symbol('@@webxr-polyfill/XRRay');
   class XRRay {
       constructor(origin, direction) {
@@ -25587,7 +25616,10 @@ void main() {
           if (type === 'viewer')
               return this._viewer;
           const inverse = await this._device.requestFrameOfReferenceTransform(type, undefined);
+          this._assertLive();
           const world = invert(create$3(), inverse);
+          if (type === 'bounded-floor')
+              return new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA);
           return new XRReferenceSpace(this, type, () => world);
       }
       updateRenderState(init) {
@@ -30204,6 +30236,8 @@ void main() {
               return true;
           if (featureDescriptor === 'local' || featureDescriptor === 'local-floor' || featureDescriptor === 'unbounded')
               return mode !== 'inline';
+          if (featureDescriptor === 'bounded-floor')
+              return this.features.includes(featureDescriptor) && mode !== 'inline' && this.isSessionSupported(mode);
           if (!this.features.includes(featureDescriptor))
               return false;
           if (featureDescriptor === 'layers')
@@ -30452,6 +30486,7 @@ void main() {
                   matrix[13] = -DEFAULT_HEADSET_POSITION[1];
                   return matrix;
               case 'local-floor':
+              case 'bounded-floor':
                   return matrix;
               default:
                   throw new DOMException('Unsupported reference space.', 'NotSupportedError');

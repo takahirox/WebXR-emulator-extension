@@ -47,9 +47,13 @@ const fixture = ts.transpileModule(await readFile(path.join(root, 'tests/fixture
 const threeModules = new Map<string, string>(await Promise.all(['three.module.js', 'three.core.js'].map(async name =>
   [`/${name}`, await readFile(path.join(root, 'node_modules/three/build', name), 'utf8')] as const)));
 const server = createServer((request, response) => {
-  if (threeModules.has(request.url!)) {
+  const moduleName = request.url?.replace('/node_modules/three/build', '');
+  if (threeModules.has(moduleName!)) {
     response.setHeader('Content-Type', 'application/javascript');
-    response.end(threeModules.get(request.url!));
+    response.end(threeModules.get(moduleName!));
+  } else if (request.url === '/examples/bounded-floor.js') {
+    response.setHeader('Content-Type', 'application/javascript');
+    void readFile(path.join(root, 'examples/bounded-floor.js'), 'utf8').then(body => response.end(body));
   } else if (request.url === '/fixture.js') {
     response.setHeader('Content-Type', 'application/javascript');
     response.end(fixture);
@@ -81,7 +85,7 @@ try {
   const page = await context.newPage();
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
-  page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('pageerror', error => { pageErrors.push(error.message); console.error(error.message); });
   page.on('console', message => { if (message.type() === 'error') { consoleErrors.push(message.text()); console.error(message.text()); } });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
   assert(worker.url().endsWith('/dist/extension/background.js'), 'MV3 service worker installed');
@@ -558,6 +562,10 @@ try {
     device.value = 'Generic Android Phone (ARCore)'; device.dispatchEvent(new Event('change'));
   });
   await eventually(() => panel.evaluate(() => (document.querySelector('#deviceSelect') as HTMLSelectElement).value), value => value === 'Generic Android Phone (ARCore)', 'phone conformance profile');
+  await eventually(() => page.evaluate(async () => {
+    const xr = (window as unknown as SmokeWindow).navigator.xr as unknown as {devicePromise: Promise<{handheld: boolean}>};
+    return (await xr.devicePromise).handheld;
+  }), Boolean, 'phone profile reaches the page runtime');
   console.log('Checking Android AR API conformance');
   conformance.push(await runConformance(page, 'immersive-ar', true));
   console.log('Checking disabled public DOM overlay negotiation and late shadow attachment');
