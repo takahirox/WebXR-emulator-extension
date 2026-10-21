@@ -174,6 +174,7 @@ export default class EmulatedXRDevice extends XRDevice {
     if (featureDescriptor === 'dom-overlay') return this.domOverlayPreview && mode === 'immersive-ar' && this.emulationMode === mode && DOMOverlay.available();
     if (featureDescriptor === 'viewer') return true;
     if (featureDescriptor === 'local' || featureDescriptor === 'local-floor' || featureDescriptor === 'unbounded') return mode !== 'inline';
+    if (featureDescriptor === 'bounded-floor') return this.features.includes(featureDescriptor) && mode !== 'inline' && this.isSessionSupported(mode);
     if (!this.features.includes(featureDescriptor)) return false;
     if (featureDescriptor === 'layers') return mode !== 'inline' && typeof WebGL2RenderingContext !== 'undefined';
     if (featureDescriptor === 'hand-tracking') return !this.handheld && mode !== 'inline';
@@ -428,6 +429,7 @@ export default class EmulatedXRDevice extends XRDevice {
         return matrix;
 
       case 'local-floor':
+      case 'bounded-floor':
         return matrix;
 
       default:

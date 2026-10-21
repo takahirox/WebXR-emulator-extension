@@ -9,7 +9,7 @@
     "build:firefox": "npm run build && tsx build-firefox.ts",
     "test:wpt": "tsx tests/wpt.ts",
     "test:samples": "tsx tests/samples.ts",
-    "test:environment": "tsx --test tests/environment.ts"
+    "test:environment": "tsx --test tests/environment.ts tests/play-area.ts"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",

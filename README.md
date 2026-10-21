@@ -49,10 +49,10 @@ The device picker exposes exactly two profiles. **Meta Quest 3** is the default.
 
 | Device | Emulated behavior |
 | ---- | ---- |
-| Meta Quest 3 | 6DoF headset and two tracked 6DoF controllers with select/squeeze; VR or MR in one profile |
-| Generic Android Phone (ARCore) | 6DoF handheld AR camera, virtual phone screen, transient touch input, and virtual-room hit tests |
+| Meta Quest 3 | 6DoF headset and two tracked 6DoF controllers with select/squeeze; VR or MR in one profile; simulated bounded-floor region |
+| Generic Android Phone (ARCore) | 6DoF handheld AR camera, virtual phone screen, transient touch input, virtual-room hit tests, and a simulated bounded-floor region |
 
-These profiles represent development targets, not physical-device fidelity or a claim of complete Quest 3/ARCore API support. Quest sessions can request simulated hand tracking. AR/MR sessions can request hit tests, room-backed plane/mesh detection, session anchors, CPU depth (float32 or 16-bit) and virtual lighting. Immersive sessions can request a fixed-origin `unbounded` space and use WebGL2 projection and quad layers with depth or packed depth/stencil textures. Feature availability and unsupported combinations are listed in the [versioned inventory](docs/webxr-conformance.md).
+These profiles represent development targets, not physical-device fidelity or a claim of complete Quest 3/ARCore API support. Quest sessions can request simulated hand tracking. AR/MR sessions can request hit tests, room-backed plane/mesh detection, session anchors, CPU depth (float32 or 16-bit) and virtual lighting. Immersive sessions can request a simulated `bounded-floor` region or a fixed-origin `unbounded` space and use WebGL2 projection and quad layers with depth or packed depth/stencil textures. Feature availability and unsupported combinations are listed in the [versioned inventory](docs/webxr-conformance.md).
 
 ### Quest mode
 
@@ -144,7 +144,24 @@ Chrome uses a service worker and two manifest-declared `document_start` content 
 
 Quest MR and Android AR can request `plane-detection` and `mesh-detection` together or separately. On active XR frames, iterate `frame.detectedPlanes` / `frame.detectedMeshes` and use `frame.getPose(plane.planeSpace, referenceSpace)` / `frame.getPose(mesh.meshSpace, referenceSpace)`. They expose real indexed triangular patches from the same hall used by Hit Test and depth, with stable identities, change timestamps, transforms and removal tracking. The decorative sky is excluded. No extra panel setup, camera, sensor, permission or browser flag is needed. Patches are not merged/recognized walls; semantic labels are null. Sets start empty while the asset loads. `session.initiateRoomCapture()` completes automatically once; it does not scan a room.
 
-All immersive modes can explicitly request `unbounded`: a fixed virtual local origin with unrestricted pose movement and offset reference spaces. The virtual hall remains finite. `bounded-floor` has no authored safe-play polygon and remains unavailable.
+All immersive modes can explicitly request `unbounded`: a fixed virtual local origin with unrestricted pose movement and offset reference spaces. The virtual hall remains finite.
+
+Quest VR, Quest MR and Android AR also support explicit `bounded-floor` requests. The emulator authors a **2 × 2 meter virtual play area** on the clear central floor of `assets/hall_empty.glb`, independent of its sensed/collision triangles. Its clockwise vertices, viewed from above, are `(-1, 0, -1)`, `(1, 0, -1)`, `(1, 0, 1)`, `(-1, 0, 1)` in meters, each with W=1. Native Y=0 is the same floor as `local-floor`; `local`/`unbounded` retain their Y=1.6 m origin. This boundary is for **developer testing only, not real guardian/chaperone safety limits**. No physical floor, guardian or tracking data is accessed, and movement outside the polygon is allowed.
+
+```js
+// Select the matching immersive mode in the WebXR DevTools panel first.
+const session = await navigator.xr.requestSession('immersive-vr', {
+  requiredFeatures: ['bounded-floor'] // optionalFeatures also works
+});
+const space = await session.requestReferenceSpace('bounded-floor');
+console.log(space instanceof XRBoundedReferenceSpace, space.boundsGeometry);
+const shifted = space.getOffsetReferenceSpace(new XRRigidTransform({x: 0.5}));
+// shifted.boundsGeometry reports the same world border in shifted coordinates.
+```
+
+`boundsGeometry` is a stable frozen array of immutable `DOMPointReadOnly` vertices. Offset spaces remain bounded and apply the inverse cumulative offset to the native polygon, including rotations, without changing the source. Inline sessions and configurations without an authored region reject required requests and omit optional requests. The region is deterministic across viewer movement, restarts and these profile/mode changes. If the room is replaced, revalidate/author its matching boundary or disable `bounded-floor` in `src/devices.json`.
+
+For a developer visualization, serve the repository root over localhost (for example `python3 -m http.server 8000` after `npm ci`) and open [the floor-outline demo](http://localhost:8000/examples/bounded-floor.html) with the unpacked extension installed. Start the matching mode; move the Quest headset or Android left-controller/tablet pose to look down at the green outline. Exit with the panel's immersive-session control. The browser suite exercises this demo's renderer in all three immersive combinations, compares its vertices with the returned polygon and checks visible green pixels. `npm run test:environment` verifies complete floor coverage and a clear 1.8 m-high prism against the actual hall asset; this is a virtual geometry check only.
 
 CPU `depth-sensing` accepts `float32`, `unsigned-short` and `luminance-alpha`, choosing the first supported requested format. Sixteen-bit buffers contain millimeters (`rawValueToMeters=0.001`); zero means unknown, including distances outside the 16-bit range. GPU depth, marker/image tracking, persistent anchors, reflections, extra layer/texture variants, camera access, secondary views, WebGPU XR rendering and controller haptics remain unsupported. See the [status matrix and concrete blockers](docs/webxr-conformance.md#consolidated-triage-and-decisions-issue-19) for exact rejection/omission behavior and future prerequisites. `npm run test:environment` checks deterministic room fixtures; the browser and external sample suites exercise the new APIs through the unpacked extension.
 

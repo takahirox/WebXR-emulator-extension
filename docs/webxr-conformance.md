@@ -1,10 +1,10 @@
-# WebXR API inventory — revision 2 (2026-10-20)
+# WebXR API inventory — revision 3 (2026-10-21)
 
-This records the consolidated simulation pass for [Issue #19](https://github.com/takahirox/WebXR-emulator-extension/issues/19) and the earlier implementation for [Issue #11](https://github.com/takahirox/WebXR-emulator-extension/issues/11). It describes **simulated capabilities**, not Quest/ARCore hardware certification or a claim of full WPT conformance. The API implementation is maintained in strict TypeScript under `src/polyfill/api/`; the former Git dependency and private `webxr-polyfill` imports have been removed. The packaged entry point remains `polyfill/webxr-polyfill.js` for manifest compatibility.
+This adds simulated bounded-floor support for [Issue #21](https://github.com/takahirox/WebXR-emulator-extension/issues/21) to the consolidated simulation pass for [Issue #19](https://github.com/takahirox/WebXR-emulator-extension/issues/19) and the earlier implementation for [Issue #11](https://github.com/takahirox/WebXR-emulator-extension/issues/11). It describes **simulated capabilities**, not Quest/ARCore hardware certification or a claim of full WPT conformance. The API implementation is maintained in strict TypeScript under `src/polyfill/api/`; the former Git dependency and private `webxr-polyfill` imports have been removed. The packaged entry point remains `polyfill/webxr-polyfill.js` for manifest compatibility.
 
 ## Specification baseline
 
-The following published revisions were checked on 2026-10-16; the Device, Layers, Depth, Anchors and Lighting references were rechecked for the 2026-10-20 pass. Working and Editor's Drafts remain proposals subject to change.
+The following published revisions were checked on 2026-10-16; the Device, Layers, Depth, Anchors and Lighting references were rechecked for the 2026-10-20 pass. The latest published [Device API](https://www.w3.org/TR/webxr/) was confirmed again on 2026-10-21 as the 9 June 2026 Candidate Recommendation Draft before bounded-floor implementation. Working and Editor's Drafts remain proposals subject to change.
 
 | API | Pinned reference | Status |
 | --- | --- | --- |
@@ -40,7 +40,7 @@ Additional drafts inspected on 2026-10-20 (source hashes pin the exact reviewed 
 | `viewer`, `local` | I | I | I |
 | `local-floor` (explicit request) | I | I | I |
 | `unbounded` (explicit request; fixed virtual origin) | I | I | I |
-| `bounded-floor` | — | — | — |
+| `bounded-floor` (explicit request; authored virtual region) | I | I | I |
 | Two stereo views, tracked controllers | I | I | — |
 | Single `none` view, transient screen input | — | — | I |
 | `hit-test` (plane/mesh room intersections) | — | I | I |
@@ -64,7 +64,7 @@ This is the single status matrix for the investigated surface. “Implemented”
 | Plane Detection | QMR, AAR | `detectedPlanes`, setlike, polygon, normal-aligned space, orientation, timestamps, lifecycle, `initiateRoomCapture()` | **Implemented** using room triangle patches; automatic capture completes once; no manual sensor capture, semantic classifier or merged room surfaces |
 | Mesh Detection | QMR, AAR | `detectedMeshes`, indexed vertices, normal-aligned space, timestamps, lifecycle | **Implemented** using the same room patches; no reconstruction/recognition |
 | `unbounded` reference space | QVR, QMR, AAR | Negotiation, fixed world origin, offset composition, unrestricted virtual viewer translation | **Implemented**; origin at initial local eye height; no drift/relocalization or promise of infinite scene geometry |
-| `bounded-floor` reference space | QVR, QMR, AAR | `XRBoundedReferenceSpace`, usable floor boundary and inverse-transformed offset bounds | **Unsupported/deferred**; hall geometry is not an authored safe-play boundary. Derive/author and validate a walkable polygon first; required rejects, optional omitted |
+| `bounded-floor` reference space | QVR, QMR, AAR | `XRBoundedReferenceSpace`, usable floor boundary and inverse-transformed offset bounds | **Implemented in Issue #21**; explicit 2 × 2 m virtual rectangle on the clear central hall floor, independent of arbitrary sensed triangles; inverse cumulative offsets preserve the bounded subclass. Developer testing only, no physical safety boundary |
 | Marker/Image Tracking | QMR, AAR | `trackedImages`, trackability, target index/width, `imageSpace`, tracked/emulated/lost states | **Unsupported/deferred**; current draft changed descriptor and trackability API, and the scene/config bridge has no target identity/pose/visibility model. A deliberate opt-in target registry plus application-image association and panel controls is prerequisite. Both `marker-tracking` and legacy `image-tracking` reject/omit |
 | Anchors / persistence | QMR, AAR | Frame/hit/surface anchor spaces; durable handle enumeration, restore/delete | **Partially implemented**; session anchors work. Persistence needs origin-scoped bounded storage, room identity/version and deletion/relocalization policy; handles reject, enumeration empty |
 | CPU Depth formats | QMR, AAR | Preference negotiation, view-aligned samples, raw scaling, access lifetime | **Implemented** float32 meters and both 16-bit millimeter formats; out-of-range 16-bit depths are unknown (zero) |
@@ -95,7 +95,26 @@ Request `plane-detection` and/or `mesh-detection` for Quest MR or Android AR. Th
 
 Objects and spaces retain identity while their source mesh/triangle is present. Each active frame gets read-only membership snapshots. Shape/orientation changes update `lastChangedTime`; pure pose/viewer changes do not. Room removal drops tracking (old spaces return null), reacquisition creates fresh objects, and session end clears identities. Frame getters require an active frame; disabled detection returns empty sets. Foreign-session spaces reject through `getPose`. Surface spaces work with offset reference spaces and anchor creation. `initiateRoomCapture()` follows the draft's automatic-capture branch: it resolves once with plane detection enabled and rejects repeated calls with `InvalidStateError`; it never triggers a camera or capture UI.
 
-`unbounded` must be requested explicitly. It shares the fixed local origin at Y=1.6 m, supports offset composition and arbitrary virtual viewer translation without clamping/recentering, and does not imply endless room geometry or physical tracking. `bounded-floor` remains unsupported because the room asset supplies no safe-play boundary.
+`unbounded` must be requested explicitly. It shares the fixed local origin at Y=1.6 m, supports offset composition and arbitrary virtual viewer translation without clamping/recentering, and does not imply endless room geometry or physical tracking.
+
+### Bounded-floor virtual play area (Issue #21)
+
+The [bounded reference-space support and geometry algorithms](https://www.w3.org/TR/2026/CRD-webxr-20260609/#xrboundedreferencespace-interface) guide this deterministic simulation. Quest VR, Quest MR and Android AR have a known virtual floor and an explicitly authored boundary; both required and optional `bounded-floor` negotiation enable it. It is never implicitly enabled. Inline requests reject required or omit optional, as do configurations that do not declare this feature. Mode availability continues to follow the selected panel mode. No empty bounded space is fabricated for an unsupported request.
+
+The [authored polygon](../src/polyfill/virtual-play-area.ts) is a 2 × 2 m rectangle centered on world `(0, 0, 0)` in `assets/hall_empty.glb`: `(-1, 0, -1) → (1, 0, -1) → (1, 0, 1) → (-1, 0, 1)`, closed back to the first vertex. These are meters, native Y=0 and W=1, clockwise viewed from +Y toward -Y. Its finite integer coordinates also fall on a 5 cm grid. The polygon is intentionally chosen as the usable central floor region, not inferred from collision triangles or the hall's outer perimeter. [Asset validation](../tests/play-area.ts) clips the hall's six floor triangles to verify complete 4 m² coverage and checks that no non-sky room triangle enters the rectangle's prism from Y=0.01 to Y=1.8 m. Replacing the asset requires revalidating/authoring a matching boundary; otherwise remove `bounded-floor` from the profile feature lists until that work is complete.
+
+```js
+const session = await navigator.xr.requestSession('immersive-ar', {
+  requiredFeatures: ['bounded-floor']
+});
+const bounds = await session.requestReferenceSpace('bounded-floor');
+// bounds instanceof XRBoundedReferenceSpace; extends XRReferenceSpace.
+for (const point of bounds.boundsGeometry) console.log(point.x, point.y, point.z);
+```
+
+Each request creates an independent bounded space with a stable frozen array of frozen `DOMPointReadOnly` vertices. `getOffsetReferenceSpace()` retains the subclass, uses the inverse cumulative origin offset exactly once and agrees with `getPose`/`getViewerPose`. Native Y=0 is shared with `local-floor`; offset translation/pitch may produce effective vertices with nonzero Y. Source bounds and previous offset spaces remain unchanged. Viewer motion never clamps or recenters the region. Ending a session leaves immutable geometry snapshots readable, but new reference-space requests and frame pose access reject; spaces from another session are rejected. New sessions/profiles use the same authored region.
+
+This is **developer testing only, not real guardian/chaperone safety limits**. It uses no physical floor, cameras or guardian data, requests no additional extension permissions, and needs no experimental WebXR browser flag. The [floor-outline demo](../examples/bounded-floor.html) visualizes returned vertices strictly as an emulator debugging aid. Serve the repository root over localhost after installing dependencies; its Three.js import uses local `node_modules`. The browser suite imports the same [demo renderer](../examples/bounded-floor.js), checks visible green pixels and exact agreement between outline vertices and runtime geometry on Quest VR/MR and Android AR. Screenshots are saved under `test-results/bounded-floor-*.png`. Representative captures are committed for [Quest VR](validation/issue-21/quest-vr.png), [Quest MR on the hall floor](validation/issue-21/quest-mr.png), and the [Android application framebuffer](validation/issue-21/android-ar-application.png).
 
 ### Hit tests and DOM interaction
 
@@ -160,7 +179,7 @@ npm run test:wpt
 npm run test:samples
 ```
 
-`test:browser` loads the unpacked MV3 extension, opens the actual DevTools panel and runs both the original rendering/bridge regressions and the new API cases on all three immersive profile/mode combinations. Deliberate required-feature rejection, optional-feature omission, input event ordering, source/frame ownership, ended sessions, default-off overlay negotiation across light/open/closed shadow configurations, opt-in public previews for Android AR/Quest MR with native UI events and screenshot pixels, anchor movement/deletion, hand joints, depth and actual layer pixels are exercised. It also tests packed depth/stencil texture allocation, stencil pixels/state preservation, geometry negotiation, real populated plane/mesh sets, Hit Test agreement, offsets, surface anchors, identity/removal/reacquisition, active-frame errors, unbounded navigation, and both 16-bit depth formats on AR/MR. `test:environment` separately checks transformed indexed/non-indexed fixtures, geometry updates, degenerate triangles, snapshot membership and cleanup. Its JSON report and screenshots are written to ignored `test-results/`. The tsx naming helper installed by the test runner is a harness-only identity function needed when Playwright serializes nested functions.
+`test:browser` loads the unpacked MV3 extension, opens the actual DevTools panel and runs both the original rendering/bridge regressions and the new API cases on all three immersive profile/mode combinations. Deliberate required-feature rejection, optional-feature omission, input event ordering, source/frame ownership, ended sessions, default-off overlay negotiation across light/open/closed shadow configurations, opt-in public previews for Android AR/Quest MR with native UI events and screenshot pixels, anchor movement/deletion, hand joints, depth and actual layer pixels are exercised. It also tests packed depth/stencil texture allocation, stencil pixels/state preservation, geometry negotiation, real populated plane/mesh sets, Hit Test agreement, offsets, surface anchors, identity/removal/reacquisition, active-frame errors, unbounded navigation, and both 16-bit depth formats on AR/MR. `test:environment` separately checks transformed indexed/non-indexed fixtures, geometry updates, degenerate triangles, snapshot membership and cleanup. The Issue #21 bounded-floor suite additionally checks immutable points/arrays, winding, native and translated/yawed/pitched/sequential bounds, source independence, bidirectional poses, movement outside bounds, explicit feature negotiation, unsupported configurations, foreign/ended sessions and an end-during-request race. It exercises the floor-outline demo on all three immersive combinations. Its JSON report and screenshots are written to ignored `test-results/`. The tsx naming helper installed by the test runner is a harness-only identity function needed when Playwright serializes nested functions.
 
 `test:wpt` downloads a pinned upstream WPT revision, **e1859580b5fcf74940a18d2f783296b4961035e3**, and runs these unchanged assertion bodies:
 
@@ -175,6 +194,8 @@ The harness replaces `testharnessreport` with a JSON collector. For the construc
 `test:samples` loads the published Immersive Web VR-session, hit-test, Plane Detection, Mesh Detection and Barebones AR DOM Overlay samples with the unpacked extension, clicks their actual entry buttons, observes at least 120 XR callbacks and nonempty hit-test results where requested, verifies default-off omission and opt-in original-root preview on phone and Quest, clicks the enabled preview’s original Exit AR button to demonstrate app behavior, checks style restoration, and captures screenshots. The pages and extension are unmodified; only a test observer wraps requests/callbacks. These externally hosted samples can change independently of this revision.
 
 ## Validation record and remaining Issue scope
+
+The [Issue #21 validation record](webxr-validation-2026-10-21.json) records the actual bounded-floor checks and their limits. Firefox package generation is separate from Firefox runtime validation; neither physical-device testing nor full WebXR/WPT conformance is claimed.
 
 The [Issue #19 validation record](webxr-validation-2026-10-20.json) records passing `npm ci`, typecheck, Chromium/Firefox builds, three focused geometry/depth fixture tests, the full unpacked-extension browser suite on Chromium **156.0.8078.4** (Quest VR: 515 distinct assertions; Quest MR: 586; Android AR: 475), the five pinned WPT files and all **11** external sample/profile combinations. Published Plane and Mesh Detection samples each ran at least 120 XR callbacks and received **100** hall patches on both AR/MR profiles. The mesh sample also exercises the added packed depth/stencil layer path through its own Three.js client. New module WPT/IDL files were not run because the existing harness only adapts the five geometry/identity cases; native fake-device geometry capture requires separate harness work.
 

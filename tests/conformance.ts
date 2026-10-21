@@ -1,3 +1,4 @@
+import {runBoundedFloor} from './bounded-floor';
 import type {Page} from 'playwright';
 import type {SessionMode} from '../src/types/contracts';
 import type * as Runtime from '../src/polyfill/api/runtime';
@@ -16,7 +17,8 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
   // tsx preserves nested function names via this helper; Playwright serializes
   // the callback without its Node module scope. It is a harness-only identity.
   await page.evaluate('globalThis.__name = value => value');
-  return page.evaluate(async ({mode, handheld}) => {
+  const boundedFloor = await runBoundedFloor(page, mode, handheld);
+  const result = await page.evaluate(async ({mode, handheld}) => {
     const xr = window as unknown as TestWindow;
     const passed: string[] = [];
     function check(condition: unknown, label: string): asserts condition { if (!condition) throw new Error(label); passed.push(label); }
@@ -98,9 +100,8 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         check(gl.getError() === gl.NO_ERROR, `Three.js projection rendering has no GL errors (layers=${withLayers}, depth=${depth})`);
       } finally { renderer.setAnimationLoop(null); if (!client.ended) await client.end(); renderer.dispose(); geometry.dispose(); material.dispose(); renderer.domElement.remove(); }
     }
-    check(['XRSystem', 'XRSession', 'XRFrame', 'XRSpace', 'XRReferenceSpace', 'XRRigidTransform', 'XRWebGLLayer', 'XRWebGLBinding', 'XRAnchor', 'XRHand', 'XRJointPose', 'XRCPUDepthInformation', 'XRLightProbe'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'), 'public constructors installed');
+    check(['XRSystem', 'XRSession', 'XRFrame', 'XRSpace', 'XRReferenceSpace', 'XRBoundedReferenceSpace', 'XRRigidTransform', 'XRWebGLLayer', 'XRWebGLBinding', 'XRAnchor', 'XRHand', 'XRJointPose', 'XRCPUDepthInformation', 'XRLightProbe'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'), 'public constructors installed');
     await rejects(() => xr.navigator.xr.isSessionSupported('invalid' as SessionMode), 'TypeError', 'invalid support mode');
-    await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['bounded-floor']}), 'NotSupportedError', 'unimplemented reference space required');
     await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['not-a-real-feature']}), 'NotSupportedError', 'unknown required feature');
     if (handheld) await rejects(() => xr.navigator.xr.requestSession(mode, {requiredFeatures: ['hand-tracking']}), 'NotSupportedError', 'phone hand tracking required');
     for (const feature of ['plane-detection', 'mesh-detection', 'marker-tracking', 'image-tracking', 'camera-access', 'secondary-views', 'webgpu']) {
@@ -1043,4 +1044,5 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     }
     return {mode, handheld, assertions: new Set(passed).size, passed: [...new Set(passed)]};
   }, {mode, handheld});
+  return {...result, boundedFloor};
 }
