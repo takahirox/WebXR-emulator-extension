@@ -152,8 +152,11 @@ export class XRSession extends interfaceBrands.SessionObject {
   private frameHandle = 0;
   private currentCallbacks: Map<number, Callback> | null = null;
   private animationFrame: XRFrame | null = null;
+  readonly _webglLayers = new Set<XRWebGLLayer>();
+  _inAnimationCallback = false;
   private pendingRenderState: XRRenderState | null = null;
   private presentation: XRWebGLLayer | null = null;
+  private presentationChanged = false;
   private activeRenderState: XRRenderState;
   private endedValue = false;
   private visibility: 'visible' | 'visible-blurred' | 'hidden' = document.hidden ? 'hidden' : 'visible';
@@ -299,7 +302,9 @@ export class XRSession extends interfaceBrands.SessionObject {
   private _finish() {
     if (this.ended) return;
     this.overlay?.dispose(); this.overlay = null;
-    this.endedValue = true; this._device.cancelAnimationFrame(this.frameHandle);
+    this.endedValue = true;
+    for (const layer of this._webglLayers) layer._dispose();
+    this._device.cancelAnimationFrame(this.frameHandle);
     for (const [type, listener] of this.listeners) this._device.removeEventListener(type, listener);
     this._device.removeEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
     document.removeEventListener('visibilitychange', this.visibilityListener);
@@ -339,7 +344,7 @@ export class XRSession extends interfaceBrands.SessionObject {
       });
       this.pendingRenderState = null;
       this.presentation = this.renderState.baseLayer ?? this.renderState.layers?.[0]?._binding._presentation ?? null;
-      if (this.presentation && this.presentation !== previous) this._device.onBaseLayerSet(this._id, this.presentation);
+      if (this.presentation && this.presentation !== previous) { this.presentationChanged = true; this._device.onBaseLayerSet(this._id, this.presentation); }
     }
     if (!this.presentation || this.presentation.context.isContextLost()) return;
     this._viewer._update();
@@ -389,13 +394,20 @@ export class XRSession extends interfaceBrands.SessionObject {
     if (layers?.length) layers[0]._binding._prepare(layers);
     const callbacks = this.currentCallbacks = this.callbacks; this.callbacks = new Map(); frame._active = true;
     this.animationFrame = frame;
+    for (const layer of this._webglLayers) layer._clear();
     try {
       for (const [id, callback] of callbacks) {
         if (this.ended) break;
         callbacks.delete(id);
+        this._inAnimationCallback = true;
+        for (const layer of this._webglLayers) layer._activate(true);
         try { callback(time, frame); } catch (error) { window.dispatchEvent(new ErrorEvent('error', {error, message: String(error)})); }
+        finally { this._inAnimationCallback = false; for (const layer of this._webglLayers) layer._activate(false); }
       }
-      if (!this.ended && layers?.length) layers[0]._binding._compose(frame, layers);
+      if (!this.ended && !this.presentation.context.isContextLost()) {
+        if (layers?.length) layers[0]._binding._compose(frame, layers);
+        this.presentation._present(this.presentationChanged); this.presentationChanged = false;
+      }
     } finally { frame._active = false; this.animationFrame = null; this.currentCallbacks = null; if (!this.ended) this._device.onFrameEnd(this._id); }
   };
 }

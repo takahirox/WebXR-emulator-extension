@@ -1,22 +1,44 @@
+import {XRFramebuffer, convertWebGLLayerOptions} from '../xr-framebuffer';
+import {compositorOperation} from '../opaque-framebuffer';
 import {mat4} from 'gl-matrix';
 import {XRSpace, XRRigidTransform, XRView, XRViewport, sessionObjects, frameObjects, compatibleContexts, invalidState, unsupported} from './geometry';
 import type {XRSession, XRFrame} from './runtime';
 import type {BaseLayer} from '../../types/polyfill';
 import type {XRLightProbe} from './sensing';
 
-export class XRWebGLLayer implements BaseLayer {
-  readonly antialias: boolean;
-  readonly ignoreDepthValues = true;
-  readonly framebuffer = null;
-  readonly fixedFoveation = null;
-  constructor(readonly _session: XRSession, readonly context: WebGLRenderingContext | WebGL2RenderingContext, init: {antialias?: boolean; framebufferScaleFactor?: number} = {}) {
-    if (!sessionObjects.has(_session)) throw new TypeError('Expected XRSession.'); _session._assertLive();
+export class XRLayer extends EventTarget {}
+const webglStorage = new WeakMap<XRWebGLLayer, XRFramebuffer>();
+export class XRWebGLLayer extends XRLayer implements BaseLayer {
+  constructor(readonly _session: XRSession, readonly context: WebGLRenderingContext | WebGL2RenderingContext, init?: unknown) {
+    super();
+    if (!sessionObjects.has(_session)) throw new TypeError('Expected XRSession.');
     if (!(context instanceof WebGLRenderingContext) && !(typeof WebGL2RenderingContext !== 'undefined' && context instanceof WebGL2RenderingContext)) throw new TypeError('Expected WebGL context.');
+    const options = convertWebGLLayerOptions(init);
+    _session._assertLive();
     if (context.isContextLost() || (_session._mode !== 'inline' && !compatibleContexts.has(context) && !(context.getContextAttributes() as (WebGLContextAttributes & {xrCompatible?: boolean}) | null)?.xrCompatible)) invalidState('WebGL context is lost or not XR compatible.');
-    this.antialias = context.getContextAttributes()?.antialias ?? init.antialias ?? false;
+    if (_session._mode !== 'inline') {
+      const storage = new XRFramebuffer(context, _session._device.getRecommendedFramebufferSize(_session._id), options, !_session._device.handheld);
+      webglStorage.set(this, storage);
+      storage.active = _session._inAnimationCallback;
+      _session._webglLayers.add(this);
+      context.canvas.addEventListener('webglcontextlost', this.lost);
+    }
   }
-  get framebufferWidth() { return this.context.drawingBufferWidth; }
-  get framebufferHeight() { return this.context.drawingBufferHeight; }
+  private lost = () => this._dispose();
+  get antialias() { return webglStorage.get(this)?.antialias ?? this.context.getContextAttributes()?.antialias ?? false; }
+  get ignoreDepthValues() { return true; }
+  get framebuffer() { return webglStorage.get(this)?.framebuffer ?? null; }
+  get fixedFoveation() { return null; }
+  get framebufferWidth() { return webglStorage.get(this)?.width ?? this.context.drawingBufferWidth; }
+  get framebufferHeight() { return webglStorage.get(this)?.height ?? this.context.drawingBufferHeight; }
+  get _presentationCanvas() { return webglStorage.get(this)?.canvas ?? this.context.canvas; }
+  _clear() { webglStorage.get(this)?.clear(); }
+  _activate(active: boolean) { const storage = webglStorage.get(this); if (storage) storage.active = active && storage.alive; }
+  _present(force = false) { webglStorage.get(this)?.present(this._session._device.handheld || this._session._device.stereoEffectEnabled, force); }
+  _dispose() {
+    webglStorage.get(this)?.dispose(); this._session._webglLayers.delete(this);
+    this.context.canvas.removeEventListener('webglcontextlost', this.lost);
+  }
   getViewport(view: XRView) {
     if (!(view instanceof XRView)) throw new TypeError('Expected XRView.');
     view._frame._assertActive(true); if (view._frame.session !== this._session) invalidState('View belongs to a different session.');
@@ -38,7 +60,6 @@ function validateLayerSpace(session: XRSession, space: XRSpace) {
   if (!(space instanceof XRSpace) || space._session !== session) throw new TypeError('Layer space must belong to the same session.');
   return space;
 }
-export class XRLayer extends EventTarget {}
 export class XRCompositionLayer extends XRLayer {
   readonly layout: string;
   blendTextureSourceAlpha = true;
@@ -136,7 +157,7 @@ export class XRWebGLBinding {
   constructor(readonly _session: XRSession, readonly _context: WebGLRenderingContext | GL) {
     if (!sessionObjects.has(_session)) throw new TypeError('Expected XRSession.');
     _session._assertLive(); if (_session._mode === 'inline') invalidState('XRWebGLBinding requires an immersive session.');
-    this._presentation = new XRWebGLLayer(_session, _context);
+    this._presentation = new XRWebGLLayer(_session, _context, {antialias: false});
     _session.addEventListener('end', () => {
       for (const layer of this.layers) layer.destroy();
       if (_context instanceof WebGL2RenderingContext) { _context.deleteFramebuffer(this.framebuffer); _context.deleteProgram(this.program); _context.deleteVertexArray(this.vao); }
@@ -192,9 +213,9 @@ export class XRWebGLBinding {
   private allocate(layer: XRCompositionLayer) {
     const gl = this._gl2(); const scale = Math.min(1, layer._init.scaleFactor ?? 1);
     const maximum = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
-    // Clients size their render targets immediately. Use the presentation size
-    // before the device has resized the application's canvas on its first frame.
-    const size = layer instanceof XRProjectionLayer && layer._width === 0 ? this._session._device.getRecommendedFramebufferSize(this._session._id) : {width: gl.drawingBufferWidth, height: gl.drawingBufferHeight};
+    // Clients size render targets immediately. Tie projection textures to the
+    // binding's fixed owned presentation target, independently of canvas writes.
+    const size = {width: this._presentation.framebufferWidth, height: this._presentation.framebufferHeight};
     const width = layer instanceof XRProjectionLayer ? Math.max(2, Math.floor(size.width * scale)) : layer._init.viewPixelWidth!;
     const height = layer instanceof XRProjectionLayer ? Math.max(1, Math.floor(size.height * scale)) : layer._init.viewPixelHeight!;
     if (width > maximum || height > maximum) unsupported('Layer exceeds MAX_TEXTURE_SIZE.');
@@ -235,10 +256,11 @@ export class XRWebGLBinding {
   }
   _compose(frame: XRFrame, layers: readonly XRCompositionLayer[]) {
     const gl = this._gl2();
+    webglStorage.get(this._presentation)!.dirty = true;
     this.preserve(() => {
-      this.setupProgram(); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+      this.setupProgram(); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this._presentation.framebuffer);
       const drawBuffer = gl.getParameter(gl.DRAW_BUFFER0) as number;
-      gl.drawBuffers([gl.BACK]);
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
       try {
         gl.useProgram(this.program); gl.bindVertexArray(this.vao);
         gl.disable(gl.DEPTH_TEST); gl.disable(gl.SCISSOR_TEST); gl.disable(gl.CULL_FACE); gl.colorMask(true, true, true, true);
@@ -255,7 +277,11 @@ export class XRWebGLBinding {
             let matrix = mat4.create(); let uv = [0, 1];
             if (layer instanceof XRProjectionLayer) {
               gl.disable(gl.CULL_FACE);
-              if (view.eye !== 'none') uv = [view.eye === 'right' && !layer.forceMonoPresentation ? 0.5 : 0, 0.5];
+              if (view.eye !== 'none') {
+                const left = Math.floor(layer._width / 2) / layer._width;
+                const right = view.eye === 'right' && !layer.forceMonoPresentation;
+                uv = [right ? left : 0, right ? 1 - left : left];
+              }
             } else if (layer instanceof XRQuadLayer) {
               gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.frontFace(gl.CCW);
               const world = frame._world(layer.space); if (!world) continue;
@@ -271,6 +297,17 @@ export class XRWebGLBinding {
           }
         }
       } finally { gl.drawBuffers([drawBuffer]); }
+      // Keep a separate default-output observation for composition clients.
+      // A draw also works when the default buffer itself is multisampled.
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+      const output = gl.getParameter(gl.DRAW_BUFFER0) as number;
+      gl.drawBuffers([gl.BACK]); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.bindTexture(gl.TEXTURE_2D, webglStorage.get(this._presentation)!.colorTexture);
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.program!, 'matrix'), false, mat4.create() as Float32Array);
+      gl.uniform2f(gl.getUniformLocation(this.program!, 'uvRange'), 0, 1);
+      gl.uniform2f(gl.getUniformLocation(this.program!, 'alphaOptions'), 1, 1);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); gl.drawBuffers([output]);
     });
   }
   private setupProgram() {
@@ -296,7 +333,7 @@ export class XRWebGLBinding {
     const enabled = [gl.BLEND, gl.DEPTH_TEST, gl.SCISSOR_TEST, gl.CULL_FACE, gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE].map(cap => [cap, gl.isEnabled(cap)] as const);
     gl.activeTexture(gl.TEXTURE0); const texture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
     const sampler = gl.getParameter(gl.SAMPLER_BINDING) as WebGLSampler | null;
-    try { action(); } finally {
+    try { compositorOperation(action); } finally {
       gl.bindSampler(0, sampler); gl.bindTexture(gl.TEXTURE_2D, texture); gl.activeTexture(saved.get(gl.ACTIVE_TEXTURE) as number);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, saved.get(gl.DRAW_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null);
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, saved.get(gl.READ_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null);

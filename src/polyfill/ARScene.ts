@@ -32,7 +32,7 @@ const DEFAULT_CAMERA_POSITION = [0, 1.6, 0];
 const DEFAULT_TABLET_POSITION = [0, 1.6, -0.2];
 const DEFAULT_POINTER_POSITION = [0, 1.6, -0.15];
 
-const dummyCanvasTexture = new CanvasTexture(document.createElement('canvas'));
+const dummyCanvasTexture = new CanvasTexture<HTMLCanvasElement | OffscreenCanvas>(document.createElement('canvas'));
 dummyCanvasTexture.colorSpace = SRGBColorSpace;
 const raycaster = new Raycaster();
 
@@ -317,19 +317,21 @@ export default class ARScene {
         const width = renderer.domElement.width;
         const height = renderer.domElement.height;
         if (renderTarget.width !== width || renderTarget.height !== height) renderTarget.setSize(width, height);
-        const eyes = this.stereoEffectEnabled ? [-0.02, 0.02] : [0];
+        const eyes = this.stereoEffectEnabled ? [-0.02, 0.02] : [-0.02];
         const eyeCamera = tabletCamera;
         eyeCamera.fov = 90;
-        eyeCamera.aspect = width / eyes.length / height;
-        eyeCamera.updateProjectionMatrix();
         renderTarget.scissorTest = true;
         for (let i = 0; i < eyes.length; i++) {
+          const leftWidth = Math.floor(width / eyes.length);
+          const eyeWidth = eyes.length === 1 ? width : i === 0 ? leftWidth : width - leftWidth;
+          eyeCamera.aspect = this.applicationAspects?.[i] ?? eyeWidth / height;
+          eyeCamera.updateProjectionMatrix();
           eyeCamera.position.copy(camera.position);
           eyeCamera.quaternion.copy(camera.quaternion);
           eyeCamera.translateX(eyes[i]);
           // Render target rectangles use physical pixels. Renderer setters use
           // logical pixels and would apply the display pixel ratio a second time.
-          renderTarget.viewport.set(i * width / eyes.length, 0, width / eyes.length, height);
+          renderTarget.viewport.set(i === 0 ? 0 : leftWidth, 0, eyeWidth, height);
           renderTarget.scissor.copy(renderTarget.viewport);
           renderer.setRenderTarget(renderTarget);
           renderer.render(scene, eyeCamera);
@@ -428,7 +430,9 @@ export default class ARScene {
     this.renderer.dispose();
   }
 
-  setCanvas(canvas: HTMLCanvasElement) {
+  applicationAspects: readonly number[] | null = null;
+
+  setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas) {
     this.releaseCanvas();
     const texture = new CanvasTexture(canvas);
     texture.colorSpace = SRGBColorSpace;

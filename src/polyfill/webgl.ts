@@ -1,9 +1,11 @@
+import {installOpaqueFramebufferGuards} from './opaque-framebuffer';
 import {compatibleContexts} from './api/geometry';
 
 /** Adapt the standard xrCompatible flag without asking native XR for hardware. */
 export function installWebGLCompatibility() {
   for (const Context of [globalThis.WebGLRenderingContext, globalThis.WebGL2RenderingContext]) {
     if (!Context) continue;
+    installOpaqueFramebufferGuards(Context);
     Context.prototype.makeXRCompatible = function() {
       if (this.isContextLost()) return Promise.reject(new DOMException('WebGL context is lost.', 'InvalidStateError'));
       compatibleContexts.add(this); return Promise.resolve();

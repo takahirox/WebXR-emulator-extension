@@ -1,3 +1,4 @@
+import {runWebGLLayer} from './webgl-layer';
 import {runBoundedFloor} from './bounded-floor';
 import {runSessionRequest} from './session-request';
 import {runRenderState} from './render-state';
@@ -23,6 +24,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
   // the callback without its Node module scope. It is a harness-only identity.
   await page.evaluate('globalThis.__name = value => value');
   const sessionRequest = await runSessionRequest(page, mode, handheld);
+  const webglLayer = await runWebGLLayer(page, mode, handheld);
   const renderState = await runRenderState(page, mode, handheld);
   const boundedFloor = await runBoundedFloor(page, mode, handheld);
   const events = await runEvents(page, mode, handheld);
@@ -287,7 +289,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       check(!!gl, 'WebGL2 available');
       check(new xr.XRWebGLLayer(session, gl) instanceof xr.XRWebGLLayer, 'xrCompatible context creation flag');
       await gl.makeXRCompatible();
-      const legacy = new xr.XRWebGLLayer(session, gl); session.updateRenderState({baseLayer: legacy});
+      const legacy = new xr.XRWebGLLayer(session, gl, {antialias: false}); session.updateRenderState({baseLayer: legacy});
       function nextFrame<T>(callback: (frame: Runtime.XRFrame) => T): Promise<T> { return new Promise((resolve, reject) => session.requestAnimationFrame((_time, frame) => { try { resolve(callback(frame)); } catch (error) { reject(error); } })); }
       await nextFrame(frame => {
         check(frame.getPose(unbounded, reference)!.transform.matrix.every((value, i) => Math.abs(value - (i % 5 === 0 ? 1 : 0)) < 1e-5), 'unbounded starts at the stable local origin');
@@ -298,12 +300,12 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         for (const [drawNone, discard] of [[false, false], [true, false], [false, true], [true, true]]) {
           const label = `legacy clearing (draw NONE=${drawNone}, rasterizer discard=${discard})`;
           await nextFrame(() => {
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            gl.drawBuffers([gl.BACK]); gl.disable(gl.RASTERIZER_DISCARD);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, legacy.framebuffer);
+            gl.drawBuffers([gl.COLOR_ATTACHMENT0]); gl.disable(gl.RASTERIZER_DISCARD);
             gl.clearColor(0, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
             const pixel = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
             check(pixel.join(',') === '0,0,255,255', `${label}: starts with blue output`);
-            gl.drawBuffers([drawNone ? gl.NONE : gl.BACK]);
+            gl.drawBuffers([drawNone ? gl.NONE : gl.COLOR_ATTACHMENT0]);
             if (discard) gl.enable(gl.RASTERIZER_DISCARD);
             // Draw buffers belong to the framebuffer: the compositor must save
             // the default framebuffer's setting, not this application's FBO.
@@ -311,8 +313,8 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
           });
           await nextFrame(() => {
             check(gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING) === applicationFramebuffer && gl.getParameter(gl.READ_FRAMEBUFFER_BINDING) === applicationFramebuffer, `${label}: restores application framebuffer bindings`);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            check(gl.getParameter(gl.DRAW_BUFFER0) === (drawNone ? gl.NONE : gl.BACK) && gl.isEnabled(gl.RASTERIZER_DISCARD) === discard, `${label}: restores default draw buffer and rasterizer discard`);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, legacy.framebuffer);
+            check(gl.getParameter(gl.DRAW_BUFFER0) === (drawNone ? gl.NONE : gl.COLOR_ATTACHMENT0) && gl.isEnabled(gl.RASTERIZER_DISCARD) === discard, `${label}: restores default draw buffer and rasterizer discard`);
             const pixel = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
             check(pixel.join(',') === '0,0,0,0', `${label}: clears previous frame to transparent black`);
             check(gl.getError() === gl.NO_ERROR, `${label}: no GL errors`);
@@ -599,7 +601,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       check(pixels.some((value, index) => index % 4 === 2 && value > 200), 'projection layer is actually composited into the output');
       check(pixels.some((value, index) => index % 4 === 0 && value > 200), 'quad layer is actually composited into the output');
       // Culling must use each eye's view and ignore the application's winding/cull mode.
-      const stereoEnabled = !handheld && await nextFrame(frame => legacy.getViewport(frame.getViewerPose(viewer)!.views[1]).width > 0);
+      const stereoEnabled = session._device.stereoEffectEnabled;
       if (!handheld) window.dispatchEvent(new CustomEvent('webxr-stereo-effect', {detail: {enabled: true}}));
       const offscreenSpace = viewer.getOffsetReferenceSpace(new xr.XRRigidTransform({x: 100}));
       for (const culling of [false, true]) for (const facing of ['front', 'back', 'edge', 'offscreen']) {
@@ -627,8 +629,10 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         });
         check(gl.isEnabled(gl.CULL_FACE) === culling && gl.getParameter(gl.CULL_FACE_MODE) === gl.FRONT_AND_BACK && gl.getParameter(gl.FRONT_FACE) === gl.CW, 'compositor restores culling enable, mode and winding');
         for (const {eye, viewport} of viewports) {
-          const output = new Uint8Array(viewport.width * viewport.height * 4);
-          gl.readPixels(viewport.x, viewport.y, viewport.width, viewport.height, gl.RGBA, gl.UNSIGNED_BYTE, output);
+          const x = Math.floor(viewport.x * gl.drawingBufferWidth / legacy.framebufferWidth);
+          const w = Math.floor(viewport.width * gl.drawingBufferWidth / legacy.framebufferWidth);
+          const output = new Uint8Array(w * gl.drawingBufferHeight * 4);
+          gl.readPixels(x, 0, w, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, output);
           const visible = facing === 'front' || (facing === 'edge' && eye === 'right');
           check(output.some((value, index) => index % 4 === 0 && value > 200) === visible, `${eye} quad ${facing} visibility (application culling=${culling})`);
           check(output.some((value, index) => index % 4 === 2 && value > 200), 'projection remains visible regardless of quad culling');
@@ -716,7 +720,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         // before getViewSubImage exercises reallocation.
         const width = projection.textureWidth; canvas.width += 2;
         const image = binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]);
-        check(projection.textureWidth !== width && image.colorTextureWidth === gl.drawingBufferWidth, 'projection resources resize with the drawing buffer');
+        check(projection.textureWidth === width && image.colorTextureWidth === width, 'projection storage is independent of application canvas writes');
         check(!projection.needsRedraw && !quad.needsRedraw, 'access acknowledges resized projection without invalidating quad');
         check(gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING) === unpackBuffer && gl.getParameter(gl.TEXTURE_BINDING_2D) === applicationTexture && gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE1, 'resize preserves application unpack buffer and texture state');
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -727,7 +731,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       });
       canvas.width -= 2;
       await nextFrame(frame => {
-        check(projection.needsRedraw && !quad.needsRedraw, 'frame-start resource resize invalidates only projection redraw');
+        check(!projection.needsRedraw && !quad.needsRedraw, 'application canvas resize preserves acknowledged layer storage');
         binding.getViewSubImage(projection, frame.getViewerPose(reference)!.views[0]);
         check(!projection.needsRedraw, 'resized projection redraw clears synchronously on access');
       });
@@ -824,7 +828,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         if (clearOnAccess === false) {
           await nextFrame(frame => {
             canvas.width += 2;
-            check(readPixel(binding.getViewSubImage(retainedProjection, frame.getViewerPose(reference)!.views[0])) === '0,0,0,0', 'resized retained projection initializes new storage');
+            check(readPixel(binding.getViewSubImage(retainedProjection, frame.getViewerPose(reference)!.views[0])) === '0,0,255,255', 'application canvas resize retains independent projection storage and pixels');
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
           });
           canvas.width -= 2;
@@ -1059,5 +1063,5 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     }
     return {mode, handheld, assertions: new Set(passed).size, passed: [...new Set(passed)]};
   }, {mode, handheld});
-  return {...result, events, boundedFloor, renderState, sessionRequest, inputLifecycle, bulkFrame, popupBulkFrame};
+  return {...result, webglLayer, events, boundedFloor, renderState, sessionRequest, inputLifecycle, bulkFrame, popupBulkFrame};
 }

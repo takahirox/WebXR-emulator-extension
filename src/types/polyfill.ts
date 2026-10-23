@@ -7,7 +7,7 @@ export type PolyfillGlobal = Window & typeof globalThis;
 export interface SessionOptions { requiredFeatures?: string[]; optionalFeatures?: string[]; domOverlay?: {root: Element} | null; depthSensing?: {usagePreference: string[]; dataFormatPreference: string[]; depthTypeRequest?: string[]; matchDepthView: boolean} }
 export interface HitTestOptions { space: XRSpace; offsetRay?: XRRay; entityTypes?: string[] }
 export interface TransientHitTestOptions { profile: string; offsetRay?: XRRay; entityTypes?: string[] }
-export interface BaseLayer { context: (WebGLRenderingContext | WebGL2RenderingContext) }
+export interface BaseLayer { context: (WebGLRenderingContext | WebGL2RenderingContext); readonly framebufferWidth: number; readonly framebufferHeight: number; readonly _presentationCanvas: HTMLCanvasElement | OffscreenCanvas }
 export interface RenderState { depthNear: number; depthFar: number; inlineVerticalFieldOfView: number }
 export interface Viewport { x: number; y: number; width: number; height: number }
 export interface HitTestState { session: XRSession; space: XRSpace; offsetRay: XRRay; active: boolean }

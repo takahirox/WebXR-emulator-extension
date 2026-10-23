@@ -73,7 +73,7 @@
       const frame: Parameters<typeof activeSession.requestAnimationFrame>[0] = (time, xrFrame) => {
         try {
           state.frames++;
-          state.framebuffer = {width: gl.drawingBufferWidth, height: gl.drawingBufferHeight};
+          state.framebuffer = {width: layer.framebufferWidth, height: layer.framebufferHeight};
           const pose = xrFrame.getViewerPose(reference);
           if (pose) state.viewerPosition = Array.from(pose.transform.matrix).slice(12, 15);
           state.views = pose?.views.map(view => {
@@ -94,6 +94,7 @@
             state.hitPosition = pose ? Array.from(pose.transform.matrix).slice(12, 15) : null;
           }
           if (transientSource) state.transientHits = xrFrame.getHitTestResultsForTransientInput(transientSource).reduce((count, result) => count + result.results.length, 0);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
           gl.disable(gl.SCISSOR_TEST);
           if (textureMode === 'default') gl.clearColor(0.3, 0.6, 0.9, 0.5);
           else gl.clearColor(0, 0, 0, 0);
@@ -101,8 +102,8 @@
           if (textureMode === 'pattern') {
             gl.enable(gl.SCISSOR_TEST);
             // Asymmetric sRGB patches detect vertical flips and double encoding.
-            const halfWidth = Math.floor(gl.drawingBufferWidth / 2);
-            const halfHeight = Math.floor(gl.drawingBufferHeight / 2);
+            const halfWidth = Math.floor(layer.framebufferWidth / 2);
+            const halfHeight = Math.floor(layer.framebufferHeight / 2);
             gl.scissor(0, halfHeight, halfWidth, halfHeight);
             gl.clearColor(0.25, 0.5, 0.75, 1);
             gl.clear(gl.COLOR_BUFFER_BIT);
@@ -110,7 +111,7 @@
             gl.clearColor(0.75, 0.25, 0.125, 1);
             gl.clear(gl.COLOR_BUFFER_BIT);
             gl.scissor(halfWidth, halfHeight, halfWidth, halfHeight);
-            gl.clearColor(0.2, 0.6, 0.8, 0.5);
+            gl.clearColor(0.1, 0.3, 0.4, 0.5);
             gl.clear(gl.COLOR_BUFFER_BIT);
             gl.disable(gl.SCISSOR_TEST);
           }
