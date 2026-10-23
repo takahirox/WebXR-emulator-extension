@@ -7,7 +7,7 @@ export interface DeviceInput {
   readonly handedness: string;
   readonly targetRayMode: string;
   readonly profiles: readonly string[];
-  readonly gamepad: XRGamepad;
+  readonly gamepad: XRGamepad | null;
 }
 export type InputSignal = {sessionId: number; inputSource: DeviceInput};
 type Listener = ((detail: InputSignal) => void) | ((id: number) => void);
@@ -61,4 +61,31 @@ export class ControllerInput {
     // The panel supplies digital presses, without independent touch sensing.
     this.buttons = Object.freeze(gamepad.buttons.map((button, index) => Object.freeze(index === 2 ? {pressed: false, touched: false, value: 0} : {...button, touched: button.pressed})));
   }
+}
+
+/** One source's exposure: sampled while active, permanently disconnected on retirement. */
+export class SourceGamepad {
+  private connected = true;
+  private timestamp = 0;
+  private axes: readonly number[] = Object.freeze([]);
+  private buttons: readonly GamepadButton[] = Object.freeze([]);
+  readonly value: XRGamepad;
+  constructor(mapping: '' | 'xr-standard') {
+    const state = this;
+    this.value = Object.freeze({
+      id: '', index: -1, mapping,
+      get connected() { return state.connected; },
+      get timestamp() { return state.timestamp; },
+      get axes() { return state.axes; },
+      get buttons() { return state.buttons; },
+      vibrationActuator: null, hapticActuators: Object.freeze([]),
+    });
+  }
+  sample(gamepad: XRGamepad) {
+    if (!this.connected) return;
+    this.timestamp = gamepad.timestamp;
+    this.axes = Object.freeze([...gamepad.axes]);
+    this.buttons = Object.freeze(gamepad.buttons.map(button => Object.freeze({pressed: button.pressed, touched: button.touched, value: button.value})));
+  }
+  retire() { this.connected = false; }
 }

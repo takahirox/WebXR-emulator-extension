@@ -31,10 +31,11 @@ export class XRJointSpace extends XRSpace {
 export class XRJointPose extends XRPose { constructor(transform: XRRigidTransform, readonly radius: number) { super(transform); } }
 export class XRHand implements Iterable<[string, XRJointSpace]> {
   private joints = new Map<string, XRJointSpace>();
-  constructor(session: XRSession, controller: number) {
+  constructor(session: XRSession, controller: number, active: () => boolean) {
     for (const [index, name] of names.entries()) {
       const radius = index === 0 ? 0.018 : name.endsWith('tip') ? 0.007 : 0.009;
       this.joints.set(name, new XRJointSpace(session, name, radius, () => {
+        if (!active()) return null;
         const gamepad = session._device.gamepads[controller]; if (!gamepad) return null;
         const matrix = mat4.fromRotationTranslation(mat4.create(), gamepad.pose.orientation, gamepad.pose.position);
         if (index === 0) return matrix;

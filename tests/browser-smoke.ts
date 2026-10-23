@@ -1,5 +1,6 @@
 import {runDeferredSessionRequest} from './session-request';
 import {runConformance} from './conformance';
+import {startProfileSwitchProbe, checkProfileSwitchProbe} from './input-lifecycle';
 import {runDOMOverlayPreview} from './dom-overlay-production';
 import {runDOMOverlayNegotiation} from './dom-overlay-negotiation';
 import {runDOMOverlayPrototype} from './dom-overlay-prototype';
@@ -558,6 +559,7 @@ try {
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.stop());
   console.log('Checking Quest MR API conformance');
   conformance.push(await runConformance(page, 'immersive-ar', false));
+  const profileSwitchProbe = await startProfileSwitchProbe(page);
   await panel.evaluate(() => {
     const device = document.querySelector('#deviceSelect') as HTMLSelectElement;
     device.value = 'Generic Android Phone (ARCore)'; device.dispatchEvent(new Event('change'));
@@ -569,6 +571,9 @@ try {
   }), Boolean, 'phone profile reaches the page runtime');
   console.log('Checking Android AR API conformance');
   conformance.push(await runConformance(page, 'immersive-ar', true));
+  await checkProfileSwitchProbe(profileSwitchProbe);
+  await profileSwitchProbe.dispose();
+  await writeFile(path.join(root, 'test-results/input-lifecycle.json'), JSON.stringify({browser: await context.browser()!.version(), profiles: conformance.map(result => result.inputLifecycle), panelProfileSwitch: 'passed: held Quest MR Gamepad remains disconnected and unchanged through Android AR inputs'}, null, 2));
   console.log('Checking session requests with deferred device initialization');
   const deferredSessionRequests = [];
   for (const [deviceKey, mode] of [

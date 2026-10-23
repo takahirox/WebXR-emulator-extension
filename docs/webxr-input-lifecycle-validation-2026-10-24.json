@@ -1,0 +1,477 @@
+{
+  "issue": 27,
+  "date": "2026-10-24",
+  "evaluation_baseline": "80dbbf7459862a3306ef51610b8d1c0db1b2de23",
+  "scope": "Stable readonly input metadata, frozen SameObject profiles, metadata replacement events and per-source Gamepad retirement. No new descriptor or hand negotiation change.",
+  "validation_stage": "Implementation node execution, not independent evaluator execution.",
+  "browser": {
+    "name": "Playwright Chromium / Google Chrome for Testing",
+    "version": "156.0.8078.4",
+    "platform": "macOS arm64",
+    "runner": "Existing unpacked MV3 extension, real DevTools panel and fresh Chromium profile; Chromium/CDP, no Manifest V2 compatibility flags"
+  },
+  "commands": {
+    "npm ci": {
+      "exit_code": 0
+    },
+    "npx playwright install chromium": {
+      "exit_code": 0
+    },
+    "npm run build": {
+      "exit_code": 0,
+      "includes": "Strict TypeScript, emission and bundles; generated polyfill inspected, other generated bundles unchanged."
+    },
+    "npm run test:browser": {
+      "exit_code": 0,
+      "result": "Full existing suite and added lifecycle cases pass."
+    },
+    "git diff --check": {
+      "exit_code": 0
+    }
+  },
+  "focused_input_lifecycle": [
+    {
+      "profile": "Meta Quest 3",
+      "mode": "immersive-vr",
+      "inline_empty_frames": 3,
+      "assertions": 164,
+      "distinct_assertion_labels": 107,
+      "passed": [
+        "inline input remains empty",
+        "Quest controller: stable frozen ordered profiles",
+        "Quest controller: profiles reject mutation",
+        "Quest controller: readonly handedness",
+        "Quest controller: readonly targetRayMode",
+        "Quest controller: readonly profiles",
+        "Quest controller: readonly gamepad",
+        "Quest controller: readonly hand",
+        "Quest controller: readonly targetRaySpace",
+        "Quest controller: readonly gripSpace",
+        "Quest controller: readonly skipRendering",
+        "Quest controller: virtual input skipRendering is false",
+        "Quest Gamepad identity, mapping and absent haptics",
+        "multiple frames preserve SameObject attributes",
+        "buttons and axes preserve input identity without change events",
+        "live digital buttons and placeholder slots",
+        "sampled axes and buttons reject mutation",
+        "handedness: metadata is a snapshot before next frame",
+        "handedness: one replacement event after live collection and connection update",
+        "handedness: replacement metadata",
+        "handedness: retired metadata remains unchanged",
+        "handedness: retired spaces return null",
+        "handedness: nontrackable modes have no grip",
+        "handedness: xr-standard mapping requires tracked-pointer",
+        "handedness: retired Gamepad retains final sample",
+        "handedness: stable replacement on next frame",
+        "target ray mode: metadata is a snapshot before next frame",
+        "target ray mode: one replacement event after live collection and connection update",
+        "target ray mode: replacement metadata",
+        "target ray mode: retired metadata remains unchanged",
+        "target ray mode: retired spaces return null",
+        "target ray mode: nontrackable modes have no grip",
+        "target ray mode: xr-standard mapping requires tracked-pointer",
+        "target ray mode: retired Gamepad retains final sample",
+        "target ray mode: stable replacement on next frame",
+        "profile contents: metadata is a snapshot before next frame",
+        "profile contents: one replacement event after live collection and connection update",
+        "profile contents: replacement metadata",
+        "profile contents: retired metadata remains unchanged",
+        "profile contents: retired spaces return null",
+        "profile contents: nontrackable modes have no grip",
+        "profile contents: xr-standard mapping requires tracked-pointer",
+        "profile contents: retired Gamepad retains final sample",
+        "profile contents: stable replacement on next frame",
+        "profile order: metadata is a snapshot before next frame",
+        "profile order: one replacement event after live collection and connection update",
+        "profile order: replacement metadata",
+        "profile order: retired metadata remains unchanged",
+        "profile order: retired spaces return null",
+        "profile order: nontrackable modes have no grip",
+        "profile order: xr-standard mapping requires tracked-pointer",
+        "profile order: retired Gamepad retains final sample",
+        "profile order: stable replacement on next frame",
+        "profile length: metadata is a snapshot before next frame",
+        "profile length: one replacement event after live collection and connection update",
+        "profile length: replacement metadata",
+        "profile length: retired metadata remains unchanged",
+        "profile length: retired spaces return null",
+        "profile length: nontrackable modes have no grip",
+        "profile length: xr-standard mapping requires tracked-pointer",
+        "profile length: retired Gamepad retains final sample",
+        "profile length: stable replacement on next frame",
+        "Gamepad removal: metadata is a snapshot before next frame",
+        "Gamepad removal: one replacement event after live collection and connection update",
+        "Gamepad removal: replacement metadata",
+        "Gamepad removal: retired metadata remains unchanged",
+        "Gamepad removal: retired spaces return null",
+        "Gamepad removal: nontrackable modes have no grip",
+        "Gamepad removal: xr-standard mapping requires tracked-pointer",
+        "Gamepad removal: retired Gamepad retains final sample",
+        "Gamepad removal: stable replacement on next frame",
+        "Gamepad return: metadata is a snapshot before next frame",
+        "Gamepad return: one replacement event after live collection and connection update",
+        "Gamepad return: replacement metadata",
+        "Gamepad return: retired metadata remains unchanged",
+        "Gamepad return: retired spaces return null",
+        "Gamepad return: nontrackable modes have no grip",
+        "Gamepad return: xr-standard mapping requires tracked-pointer",
+        "Gamepad return: retired Gamepad retains final sample",
+        "Gamepad return: stable replacement on next frame",
+        "equal profile contents preserve identity",
+        "controller removal updates live collection and disconnects before event",
+        "disconnected source pose is null",
+        "controller removal: retired Gamepad retains final sample",
+        "reconnection exposes a new active source",
+        "reconnection: retired Gamepad retains final sample",
+        "shutdown while held: retired Gamepad retains final sample",
+        "shutdown retains held buttons and axes",
+        "inactive frame still rejects retired spaces",
+        "restart exposes fresh reset controller state",
+        "foreign-session retired space throws",
+        "restart: retired Gamepad retains final sample",
+        "later-session input: retired Gamepad retains final sample",
+        "deterministic hand: stable frozen ordered profiles",
+        "deterministic hand: profiles reject mutation",
+        "deterministic hand: readonly handedness",
+        "deterministic hand: readonly targetRayMode",
+        "deterministic hand: readonly profiles",
+        "deterministic hand: readonly gamepad",
+        "deterministic hand: readonly hand",
+        "deterministic hand: readonly targetRaySpace",
+        "deterministic hand: readonly gripSpace",
+        "deterministic hand: readonly skipRendering",
+        "deterministic hand: virtual input skipRendering is false",
+        "hand metadata preserves nullability and joints",
+        "hand metadata and spaces remain stable across frames",
+        "retired hand joint returns null"
+      ]
+    },
+    {
+      "profile": "Meta Quest 3",
+      "mode": "immersive-ar",
+      "inline_empty_frames": 3,
+      "assertions": 164,
+      "distinct_assertion_labels": 107,
+      "passed": [
+        "inline input remains empty",
+        "Quest controller: stable frozen ordered profiles",
+        "Quest controller: profiles reject mutation",
+        "Quest controller: readonly handedness",
+        "Quest controller: readonly targetRayMode",
+        "Quest controller: readonly profiles",
+        "Quest controller: readonly gamepad",
+        "Quest controller: readonly hand",
+        "Quest controller: readonly targetRaySpace",
+        "Quest controller: readonly gripSpace",
+        "Quest controller: readonly skipRendering",
+        "Quest controller: virtual input skipRendering is false",
+        "Quest Gamepad identity, mapping and absent haptics",
+        "multiple frames preserve SameObject attributes",
+        "buttons and axes preserve input identity without change events",
+        "live digital buttons and placeholder slots",
+        "sampled axes and buttons reject mutation",
+        "handedness: metadata is a snapshot before next frame",
+        "handedness: one replacement event after live collection and connection update",
+        "handedness: replacement metadata",
+        "handedness: retired metadata remains unchanged",
+        "handedness: retired spaces return null",
+        "handedness: nontrackable modes have no grip",
+        "handedness: xr-standard mapping requires tracked-pointer",
+        "handedness: retired Gamepad retains final sample",
+        "handedness: stable replacement on next frame",
+        "target ray mode: metadata is a snapshot before next frame",
+        "target ray mode: one replacement event after live collection and connection update",
+        "target ray mode: replacement metadata",
+        "target ray mode: retired metadata remains unchanged",
+        "target ray mode: retired spaces return null",
+        "target ray mode: nontrackable modes have no grip",
+        "target ray mode: xr-standard mapping requires tracked-pointer",
+        "target ray mode: retired Gamepad retains final sample",
+        "target ray mode: stable replacement on next frame",
+        "profile contents: metadata is a snapshot before next frame",
+        "profile contents: one replacement event after live collection and connection update",
+        "profile contents: replacement metadata",
+        "profile contents: retired metadata remains unchanged",
+        "profile contents: retired spaces return null",
+        "profile contents: nontrackable modes have no grip",
+        "profile contents: xr-standard mapping requires tracked-pointer",
+        "profile contents: retired Gamepad retains final sample",
+        "profile contents: stable replacement on next frame",
+        "profile order: metadata is a snapshot before next frame",
+        "profile order: one replacement event after live collection and connection update",
+        "profile order: replacement metadata",
+        "profile order: retired metadata remains unchanged",
+        "profile order: retired spaces return null",
+        "profile order: nontrackable modes have no grip",
+        "profile order: xr-standard mapping requires tracked-pointer",
+        "profile order: retired Gamepad retains final sample",
+        "profile order: stable replacement on next frame",
+        "profile length: metadata is a snapshot before next frame",
+        "profile length: one replacement event after live collection and connection update",
+        "profile length: replacement metadata",
+        "profile length: retired metadata remains unchanged",
+        "profile length: retired spaces return null",
+        "profile length: nontrackable modes have no grip",
+        "profile length: xr-standard mapping requires tracked-pointer",
+        "profile length: retired Gamepad retains final sample",
+        "profile length: stable replacement on next frame",
+        "Gamepad removal: metadata is a snapshot before next frame",
+        "Gamepad removal: one replacement event after live collection and connection update",
+        "Gamepad removal: replacement metadata",
+        "Gamepad removal: retired metadata remains unchanged",
+        "Gamepad removal: retired spaces return null",
+        "Gamepad removal: nontrackable modes have no grip",
+        "Gamepad removal: xr-standard mapping requires tracked-pointer",
+        "Gamepad removal: retired Gamepad retains final sample",
+        "Gamepad removal: stable replacement on next frame",
+        "Gamepad return: metadata is a snapshot before next frame",
+        "Gamepad return: one replacement event after live collection and connection update",
+        "Gamepad return: replacement metadata",
+        "Gamepad return: retired metadata remains unchanged",
+        "Gamepad return: retired spaces return null",
+        "Gamepad return: nontrackable modes have no grip",
+        "Gamepad return: xr-standard mapping requires tracked-pointer",
+        "Gamepad return: retired Gamepad retains final sample",
+        "Gamepad return: stable replacement on next frame",
+        "equal profile contents preserve identity",
+        "controller removal updates live collection and disconnects before event",
+        "disconnected source pose is null",
+        "controller removal: retired Gamepad retains final sample",
+        "reconnection exposes a new active source",
+        "reconnection: retired Gamepad retains final sample",
+        "shutdown while held: retired Gamepad retains final sample",
+        "shutdown retains held buttons and axes",
+        "inactive frame still rejects retired spaces",
+        "restart exposes fresh reset controller state",
+        "foreign-session retired space throws",
+        "restart: retired Gamepad retains final sample",
+        "later-session input: retired Gamepad retains final sample",
+        "deterministic hand: stable frozen ordered profiles",
+        "deterministic hand: profiles reject mutation",
+        "deterministic hand: readonly handedness",
+        "deterministic hand: readonly targetRayMode",
+        "deterministic hand: readonly profiles",
+        "deterministic hand: readonly gamepad",
+        "deterministic hand: readonly hand",
+        "deterministic hand: readonly targetRaySpace",
+        "deterministic hand: readonly gripSpace",
+        "deterministic hand: readonly skipRendering",
+        "deterministic hand: virtual input skipRendering is false",
+        "hand metadata preserves nullability and joints",
+        "hand metadata and spaces remain stable across frames",
+        "retired hand joint returns null"
+      ]
+    },
+    {
+      "profile": "Generic Android Phone (ARCore)",
+      "mode": "immersive-ar",
+      "inline_empty_frames": 3,
+      "assertions": 43,
+      "distinct_assertion_labels": 32,
+      "passed": [
+        "inline input remains empty",
+        "Android idle input is empty",
+        "touch fixture locates real simulated screen",
+        "touch 0: stable frozen ordered profiles",
+        "touch 0: profiles reject mutation",
+        "touch 0: readonly handedness",
+        "touch 0: readonly targetRayMode",
+        "touch 0: readonly profiles",
+        "touch 0: readonly gamepad",
+        "touch 0: readonly hand",
+        "touch 0: readonly targetRaySpace",
+        "touch 0: readonly gripSpace",
+        "touch 0: readonly skipRendering",
+        "touch 0: virtual input skipRendering is false",
+        "touch identity and nullability",
+        "held touch preserves metadata identity",
+        "each gesture has ordered events with one identity",
+        "touch action and release events retain valid final poses",
+        "completed touch event frame is inactive",
+        "retired same-session touch space returns null",
+        "touch 1: stable frozen ordered profiles",
+        "touch 1: profiles reject mutation",
+        "touch 1: readonly handedness",
+        "touch 1: readonly targetRayMode",
+        "touch 1: readonly profiles",
+        "touch 1: readonly gamepad",
+        "touch 1: readonly hand",
+        "touch 1: readonly targetRaySpace",
+        "touch 1: readonly gripSpace",
+        "touch 1: readonly skipRendering",
+        "touch 1: virtual input skipRendering is false",
+        "later gesture cannot reactivate a retired touch space"
+      ]
+    }
+  ],
+  "panel_profile_switch": {
+    "result": "passed: held Quest MR Gamepad remains disconnected and unchanged through Android AR inputs",
+    "method": "Retain a held Quest MR source/Gamepad, switch to Android through the actual DevTools panel, capture final sample at session end, then run Android sessions and two real simulated-screen gestures; verify no reconnection/update and retained metadata identity."
+  },
+  "existing_conformance_regressions": [
+    {
+      "mode": "immersive-vr",
+      "handheld": false,
+      "distinct_core_assertions": 513,
+      "bounded_floor_assertions": 39,
+      "render_state_assertions": 360,
+      "session_request_assertions": 369
+    },
+    {
+      "mode": "immersive-ar",
+      "handheld": false,
+      "distinct_core_assertions": 584,
+      "bounded_floor_assertions": 39,
+      "render_state_assertions": 360,
+      "session_request_assertions": 369
+    },
+    {
+      "mode": "immersive-ar",
+      "handheld": true,
+      "distinct_core_assertions": 473,
+      "bounded_floor_assertions": 39,
+      "render_state_assertions": 354,
+      "session_request_assertions": 369
+    }
+  ],
+  "count_semantics": "Focused assertions count executed checks, including repeated final-state retention checks across sources/frames. Distinct labels are recorded separately. Existing core conformance uses distinct labels; suite counts are separate, not a combined total.",
+  "policy": {
+    "metadata": "Snapshot handedness, ray mode, ordered profiles and Gamepad presence. Public getters are readonly, profiles is a frozen array, spaces stay stable and skipRendering is false. Metadata changes replace source in one old/new change event after collection update; buttons/axes keep identity.",
+    "gamepad": "One live SameObject exposure per active Quest source. Empty ID, index -1, xr-standard, placeholder axes/buttons and digital touched/pressed/value preserved. Removal/replacement/end permanently disconnects and retains the final sampled axes/buttons/timestamp; later input/reconnection/session/profile cannot mutate it.",
+    "touch_and_spaces": "One source per gesture; added/selectstart/select/selectend/removed order. Release-event poses remain valid; retired target-ray/grip/joint spaces return null in their session, foreign-session spaces and inactive frames reject."
+  },
+  "wpt_adaptation": {
+    "revision": "e1859580b5fcf74940a18d2f783296b4961035e3",
+    "files": [
+      "webxr/xrInputSource_sameObject.https.html",
+      "webxr/events_input_source_recreation.https.html",
+      "webxr/xrInputSource_profiles.https.html",
+      "webxr/xrInputSource_add_remove.https.html",
+      "webxr/gamepads-module/xrInputSource_gamepad_disconnect.https.html"
+    ],
+    "execution": "Focused adapted assertions in tests/input-lifecycle.ts; not verbatim WPT execution.",
+    "substitutions": "Native fake-device connection, metadata setters, supported-button/Gamepad-presence changes and disconnect/reconnect are replaced by temporary metadata getters on the real adapter, controller activation and state updates. All getter descriptors are restored. No production testing API. Phone gestures use real simulated-screen mouse handlers; the actual panel drives profile switching.",
+    "normative_discrepancies": "Prior grip/mapping assumptions corrected for the synthetic gaze transition as recorded below. Final-sample retention is selected emulator policy, not a universal allocation requirement. No other discrepancy found in the adapted assertions."
+  },
+  "correction_provenance": [
+    {
+      "original_assumption": "Sharing adapter Gamepads proved universally distinct cross-session allocation was mandatory.",
+      "corrected_requirement": "SameObject within each source and coherent source-lifetime isolation. Per-source wrappers/permanent retirement are implementation policy, not a universally mandated allocation rule.",
+      "primary_source": "https://www.w3.org/TR/webxr-gamepads-module-1/#xrinputsource",
+      "rationale": "The 7 July 2025 WD specifies SameObject and connection/frame updates without explicitly mandating distinct allocation for every session. The published alias identifies that exact publication; dated URL was unavailable.",
+      "origin": "Preserved from Issue #27."
+    },
+    {
+      "original_assumption": "All non-screen sources have a grip and all controller Gamepads use xr-standard.",
+      "corrected_requirement": "Nontrackable gaze and screen sources have null grips. xr-standard requires tracked-pointer and a non-null grip; gaze fixture Gamepads use empty mapping.",
+      "primary_sources": [
+        "https://www.w3.org/TR/2026/CRD-webxr-20260609/#xrinputsource-interface",
+        "https://www.w3.org/TR/webxr-gamepads-module-1/#xr-standard-gamepad-mapping"
+      ],
+      "rationale": "The metadata recreation fixture exposed existing getter/mapping assumptions. Correcting them preserves supported Quest/Android mapping/nullability and acceptance. Gaze remains a test fixture, not a new selectable device. No Issue requirement was weakened.",
+      "publication": "Recorded in capability inventory and prepared PR text; no GitHub edits/comments were authorized for this node."
+    }
+  ],
+  "resolved_validation_failures": [
+    {
+      "failure": "First browser attempt failed in the new axis fixture: _updateInputAxes received arguments in the wrong order and tried to read an undefined Gamepad.",
+      "resolution": "Use the actual (controllerIndex, x, y) signature. Subsequent full runs pass."
+    },
+    {
+      "failure": "Second attempt passed Quest VR/MR focused suites, then the new panel profile-switch probe created a WebGL context without XR compatibility; XRWebGLLayer rejected with InvalidStateError.",
+      "resolution": "Create the probe context with xrCompatible: true, as in the existing runner. Subsequent full runs pass."
+    }
+  ],
+  "review_adjustments": [
+    "Capture the panel-switch Gamepad final sample in the end listener, since a live frame can advance before the panel message arrives. This prevents a timing-dependent false failure.",
+    "Inspect connection state inside inputsourceschange listeners as well as subsequent frames, adapting the WPT event-time disconnection assertions."
+  ],
+  "not_executed": [
+    {
+      "check": "Firefox runtime",
+      "reason": "Current required runner uses Chromium/CDP; no Firefox runtime claim."
+    },
+    {
+      "check": "Physical Quest/ARCore hardware",
+      "reason": "Scope is emulator/browser input lifecycle; no physical device certification claim."
+    },
+    {
+      "check": "Native fake-device WPT/full WPT or standalone npm run test:wpt",
+      "reason": "Required focused input assertions were adapted into the existing browser harness; no verbatim/full WPT claim."
+    },
+    {
+      "check": "Optional Three.js r186 controller/model connection/removal consumer exercise",
+      "reason": "Not needed for required source lifecycle assertions. Existing Three.js 0.186.1 rendering integration checks executed with the browser suite; no additional controller/model execution or source-inspection claim."
+    },
+    {
+      "check": "Firefox packaging, external samples and environment-only fixtures",
+      "reason": "No affected code requires those additional checks; required build/browser/whitespace checks executed."
+    }
+  ],
+  "remaining_goal_work": [
+    "Additional tracked-sources support",
+    "Virtual haptics",
+    "Broader/deferred compatibility modules; Issue #11 was administratively closed with unfinished scope"
+  ],
+  "required_post_merge_verification": [],
+  "artifacts": {
+    "capability_inventory": "docs/webxr-conformance.md",
+    "prepared_pr": "docs/issue-27-pr.md",
+    "ignored_runtime_reports": [
+      "test-results/input-lifecycle.json",
+      "test-results/webxr-conformance.json"
+    ]
+  },
+  "publication": "No push, pull request, merge, Issue edit or comment performed by this node.",
+  "review_fix_validation": {
+    "issue": 27,
+    "finding": "Recreated XRHands used the compacted active-source index after an earlier controller disconnected, selecting the wrong device Gamepad pose.",
+    "fix": "Resolve the controller slot from raw adapter identity when creating an input source; regenerate the shipped polyfill.",
+    "regression_before_fix": "npm run test:browser exited 1 at the new wrist/grip alignment assertion on the reviewed bundle.",
+    "browser": {
+      "name": "Playwright Chromium",
+      "version": "156.0.8078.4"
+    },
+    "commands": {
+      "npm run build": 0,
+      "npm run test:browser": 0,
+      "git diff --check": 0
+    },
+    "result": "Full existing browser suite passes, including Quest VR/MR, Android AR, empty inline input and panel profile switching. No required checks skipped.",
+    "focused_input_lifecycle": [
+      {
+        "mode": "immersive-vr",
+        "handheld": false,
+        "assertions": 168,
+        "distinct_assertion_labels": 111,
+        "new_regression_assertions": [
+          "surviving hand retains controller pose after another disconnects",
+          "surviving hand metadata change replaces its source",
+          "recreated hand wrist stays aligned with its controller grip after another disconnects",
+          "metadata replacement retires the previous hand joints"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": false,
+        "assertions": 168,
+        "distinct_assertion_labels": 111,
+        "new_regression_assertions": [
+          "surviving hand retains controller pose after another disconnects",
+          "surviving hand metadata change replaces its source",
+          "recreated hand wrist stays aligned with its controller grip after another disconnects",
+          "metadata replacement retires the previous hand joints"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": true,
+        "assertions": 43,
+        "distinct_assertion_labels": 32,
+        "new_regression_assertions": []
+      }
+    ],
+    "fixture": "Assign distinct poses to controllers 0 and 1; disconnect controller 0; change controller 1 handedness; verify source replacement, preserved wrist pose, wrist/grip alignment and retired old joints. Restore pose and handedness data afterward. Runs in both Quest immersive modes without changing hand negotiation.",
+    "limitations": "The existing not_executed list above still applies; no new Firefox, physical-device or verbatim WPT execution claim."
+  }
+}
