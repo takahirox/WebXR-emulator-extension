@@ -25285,6 +25285,44 @@ void main() {
           Object.freeze(this);
       }
   }
+  const minimumDepthNear = 0.01;
+  const maximumDepthFar = 10000;
+  const minimumInlineFov = 0.01;
+  const maximumInlineFov = 3.13;
+  function convertRenderStateInit(value) {
+      if (value == null)
+          return {};
+      if (typeof value !== 'object' && typeof value !== 'function')
+          throw new TypeError('Expected XRRenderStateInit dictionary.');
+      const dictionary = value;
+      const init = {};
+      const baseLayer = dictionary.baseLayer;
+      if (baseLayer !== undefined) {
+          if (baseLayer !== null && !(baseLayer instanceof XRWebGLLayer$1))
+              throw new TypeError('Expected XRWebGLLayer.');
+          init.baseLayer = baseLayer;
+      }
+      for (const key of ['depthFar', 'depthNear', 'inlineVerticalFieldOfView']) {
+          const member = dictionary[key];
+          if (member === undefined)
+              continue;
+          const number = +member;
+          if (!Number.isFinite(number))
+              throw new TypeError(`${key} must be a finite double.`);
+          init[key] = number;
+      }
+      const layers = dictionary.layers;
+      if (layers !== undefined) {
+          if (layers === null)
+              init.layers = null;
+          else {
+              if ((typeof layers !== 'object' && typeof layers !== 'function') || !(Symbol.iterator in layers))
+                  throw new TypeError('Expected layer sequence.');
+              init.layers = Array.from(layers);
+          }
+      }
+      return init;
+  }
   const modes = ['inline', 'immersive-vr', 'immersive-ar'];
   function validateMode(mode) { if (!modes.includes(mode))
       throw new TypeError('Invalid XRSessionMode.'); }
@@ -25445,7 +25483,12 @@ void main() {
                   return;
               if (this.pendingRenderState) {
                   const previous = this.presentation;
-                  this.activeRenderState = this.pendingRenderState;
+                  const state = this.pendingRenderState;
+                  this.activeRenderState = new XRRenderState({ ...state,
+                      depthNear: Math.max(minimumDepthNear, state.depthNear),
+                      depthFar: Math.min(maximumDepthFar, state.depthFar),
+                      inlineVerticalFieldOfView: state.inlineVerticalFieldOfView === null ? null : Math.max(minimumInlineFov, Math.min(maximumInlineFov, state.inlineVerticalFieldOfView)),
+                  });
                   this.pendingRenderState = null;
                   this.presentation = (_d = (_a = this.renderState.baseLayer) !== null && _a !== void 0 ? _a : (_c = (_b = this.renderState.layers) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c._binding._presentation) !== null && _d !== void 0 ? _d : null;
                   if (this.presentation && this.presentation !== previous)
@@ -25622,13 +25665,18 @@ void main() {
               return new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA);
           return new XRReferenceSpace(this, type, () => world);
       }
-      updateRenderState(init) {
+      updateRenderState(value = {}) {
           var _a;
+          const init = convertRenderStateInit(value);
           this._assertLive();
-          if (init.baseLayer !== undefined && init.layers !== undefined)
-              unsupported('baseLayer and layers cannot both be supplied.');
           if (init.baseLayer && (!(init.baseLayer instanceof XRWebGLLayer$1) || init.baseLayer._session !== this))
               invalidState('Layer belongs to a different session.');
+          if (init.inlineVerticalFieldOfView !== undefined && this._mode !== 'inline')
+              invalidState('Immersive sessions cannot set inlineVerticalFieldOfView.');
+          if (Object.keys(init).length === 0)
+              return;
+          if (init.baseLayer !== undefined && init.layers !== undefined)
+              unsupported('baseLayer and layers cannot both be supplied.');
           if (init.layers !== undefined && init.layers !== null) {
               if (!this.enabledFeatures.includes('layers') && (init.layers.length > 1 || init.layers.some(layer => !(layer instanceof XRProjectionLayer))))
                   unsupported('Only a single projection layer is supported without the layers feature.');
@@ -25640,17 +25688,11 @@ void main() {
               if (init.layers.some(layer => layer._binding._context !== init.layers[0]._binding._context))
                   unsupported('All layers must share one WebGL context.');
           }
-          if (init.inlineVerticalFieldOfView != null && this._mode !== 'inline')
-              invalidState('Immersive sessions cannot set inlineVerticalFieldOfView.');
           const state = { ...((_a = this.pendingRenderState) !== null && _a !== void 0 ? _a : this.renderState), ...init };
           if (init.baseLayer !== undefined)
               state.layers = null;
           if (init.layers !== undefined)
               state.baseLayer = null;
-          if (state.inlineVerticalFieldOfView != null)
-              state.inlineVerticalFieldOfView = Math.max(0.01, Math.min(3.13, state.inlineVerticalFieldOfView));
-          if (![state.depthNear, state.depthFar].every(Number.isFinite))
-              throw new TypeError('Depth values must be finite.');
           this.pendingRenderState = new XRRenderState(state);
       }
       _removeLayer(layer) {
