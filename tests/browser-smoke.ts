@@ -710,6 +710,7 @@ try {
   } finally { await restarted.close(); }
   await writeFile(path.join(root, 'test-results/dom-overlay-preview.json'), JSON.stringify({browser: await context.browser()!.version(), disabledNegotiation: [overlayNegotiation, questDisabledNegotiation], previews: overlayPreviews, lifecycle: ['profile switch', 'opt-out', 'Quest MR to VR', 'page reload', 'panel reload persistence', 'extension reload cleanup', 'same-profile browser relaunch persistence']}, null, 2));
   await writeFile(path.join(root, 'test-results/dom-overlay-feasibility.json'), JSON.stringify({browser: await context.browser()!.version(), overlayPrototypes}, null, 2));
+  await writeFile(path.join(root, 'test-results/fixed-foveation.json'), JSON.stringify({browser: await context.browser()!.version(), profiles: conformance.map(result => ({...result.fixedFoveation, threeClients: result.threeClients}))}, null, 2));
   await writeFile(path.join(root, 'test-results/webgl-layer.json'), JSON.stringify({browser: await context.browser()!.version(), profiles: conformance.map(result => result.webglLayer)}, null, 2));
   await writeFile(path.join(root, 'test-results/webxr-conformance.json'), JSON.stringify({browser: await context.browser()!.version(), conformance, sharedBulkFrame}, null, 2));
   assert.deepEqual(pageErrors, []);

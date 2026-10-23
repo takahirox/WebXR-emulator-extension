@@ -7,6 +7,13 @@ import type {EventHandler} from './event-handlers';
 function createBrands() {
   const frames = new WeakSet<object>(), spaces = new WeakSet<object>(), joints = new WeakSet<object>();
   const sessions = new WeakSet<object>(), inputSources = new WeakSet<object>();
+  const webglLayers = new WeakSet<object>(), projectionLayers = new WeakSet<object>();
+  class WebGLLayerObject extends EventTarget {
+    constructor() { super(); webglLayers.add(this); }
+  }
+  class CompositionLayerObject extends EventTarget {
+    constructor(projection: boolean) { super(); if (projection) projectionLayers.add(this); }
+  }
   class SessionObject extends EventTarget {
     constructor() { super(); sessions.add(this); }
   }
@@ -19,11 +26,15 @@ function createBrands() {
   class SpaceObject extends EventTarget {
     constructor(joint = false) { super(); spaces.add(this); if (joint) joints.add(this); }
   }
+  Object.freeze(WebGLLayerObject.prototype); Object.freeze(WebGLLayerObject);
+  Object.freeze(CompositionLayerObject.prototype); Object.freeze(CompositionLayerObject);
   Object.freeze(FrameObject.prototype); Object.freeze(FrameObject);
   Object.freeze(SpaceObject.prototype); Object.freeze(SpaceObject);
   Object.freeze(SessionObject.prototype); Object.freeze(SessionObject);
   Object.freeze(InputSourceObject.prototype); Object.freeze(InputSourceObject);
-  return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
+  return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject, WebGLLayerObject, CompositionLayerObject,
+    webglLayers: Object.freeze({has: (value: object) => webglLayers.has(value)}),
+    projectionLayers: Object.freeze({has: (value: object) => projectionLayers.has(value)}),
     // Dispatch and declared event attributes belong to the object, even when an
     // accessor from another injection is borrowed. Weak keys reject proxies and
     // prototype forgeries just as they do in an individual injection.
