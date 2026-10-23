@@ -17,27 +17,12 @@ import XRInputSourceArray from './XRInputSourceArray';
 import type DOMOverlay from '../DOMOverlay';
 import {convertSessionMode, convertSessionInit} from './session-init';
 import {EnvironmentTracker} from './environment';
-export {XRInputSourceArray};
+import {XRSessionEvent, XRInputSourceEvent, XRInputSourcesChangeEvent} from './events';
+import {installEventHandlers, type EventHandler} from './event-handlers';
+export {XRInputSourceArray, XRSessionEvent, XRInputSourceEvent, XRInputSourcesChangeEvent};
 
 export class XREventTarget extends EventTarget {
-  _emit(event: Event) {
-    this.dispatchEvent(event);
-    const handler = (this as unknown as Record<string, unknown>)[`on${event.type}`];
-    if (typeof handler === 'function') {
-      try { handler.call(this, event); } catch (error) { reportError(error); }
-    }
-  }
-}
-export class XRSessionEvent extends Event { constructor(type: string, init: EventInit & {session: XRSession}) { super(type, init); this.session = init.session; } readonly session: XRSession; }
-export class XRInputSourceEvent extends Event {
-  readonly frame: XRFrame; readonly inputSource: XRInputSource;
-  constructor(type: string, init: EventInit & {frame: XRFrame; inputSource: XRInputSource}) { super(type, init); this.frame = init.frame; this.inputSource = init.inputSource; }
-}
-export class XRInputSourcesChangeEvent extends XRSessionEvent {
-  readonly added: readonly XRInputSource[]; readonly removed: readonly XRInputSource[];
-  constructor(type: string, init: EventInit & {session: XRSession; added: XRInputSource[]; removed: XRInputSource[]}) {
-    super(type, init); this.added = Object.freeze(init.added); this.removed = Object.freeze(init.removed);
-  }
+  _emit(event: Event) { this.dispatchEvent(event); }
 }
 export class XRRenderState {
   readonly depthNear: number; readonly depthFar: number; readonly inlineVerticalFieldOfView: number | null; readonly baseLayer: XRWebGLLayer | null;
@@ -87,7 +72,7 @@ function convertRenderStateInit(value: unknown): RenderStateInit {
   return init;
 }
 export class XRSystem extends XREventTarget {
-  ondevicechange: ((event: Event) => void) | null = null;
+  declare ondevicechange: EventHandler;
   private immersive: XRSession | null = null;
   private requesting = false;
   private sessions = new Set<XRSession>();
@@ -160,7 +145,8 @@ export class XRSystem extends XREventTarget {
 
 type Callback = (time: number, frame: XRFrame) => void;
 const inputEvents = ['select-start', 'select-end', 'squeeze-start', 'squeeze-end'] as const;
-export class XRSession extends XREventTarget {
+export class XRSession extends interfaceBrands.SessionObject {
+  _emit(event: Event) { this.dispatchEvent(event); }
   private callbacks = new Map<number, Callback>();
   private nextCallback = 0;
   private frameHandle = 0;
@@ -198,17 +184,17 @@ export class XRSession extends XREventTarget {
   readonly _viewer: XRReferenceSpace;
   readonly _hitSources = new Set<XRHitTestSource>();
   readonly _transientSources = new Set<XRTransientInputHitTestSource>();
-  onend: ((event: Event) => void) | null = null;
-  onvisibilitychange: ((event: Event) => void) | null = null;
-  oninputsourceschange: ((event: Event) => void) | null = null;
-  onselectstart: ((event: Event) => void) | null = null;
-  onselect: ((event: Event) => void) | null = null;
-  onselectend: ((event: Event) => void) | null = null;
-  onsqueezestart: ((event: Event) => void) | null = null;
-  onsqueeze: ((event: Event) => void) | null = null;
-  onsqueezeend: ((event: Event) => void) | null = null;
+  declare onend: EventHandler;
+  declare onvisibilitychange: EventHandler;
+  declare oninputsourceschange: EventHandler;
+  declare onselectstart: EventHandler;
+  declare onselect: EventHandler;
+  declare onselectend: EventHandler;
+  declare onsqueezestart: EventHandler;
+  declare onsqueeze: EventHandler;
+  declare onsqueezeend: EventHandler;
   constructor(readonly _device: EmulatedXRDevice, readonly _mode: SessionMode, readonly _id: number, enabled: Set<string>, private onShutdown: () => void) {
-    super(); sessionObjects.add(this); this.features = Object.freeze([...enabled]); this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
+    super(); this.features = Object.freeze([...enabled]); this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
     this.activeRenderState = new XRRenderState({inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null});
     this._viewer = new XRReferenceSpace(this, 'viewer', () => mat4.clone(_device.getBasePoseMatrix()));
     for (const type of inputEvents) {
@@ -525,7 +511,7 @@ export class XRFrame extends interfaceBrands.FrameObject {
 Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
 
 /** Every exposed space and input identity is owned by exactly one session. */
-export class XRInputSource {
+export class XRInputSource extends interfaceBrands.InputSourceObject {
   private readonly handValue: XRHand | null;
   private readonly targetSpace: XRSpace;
   private readonly grip: XRSpace | null;
@@ -538,6 +524,7 @@ export class XRInputSource {
   private targetWorld: mat4 | null = null;
   private gripWorld: mat4 | null = null;
   constructor(private session: XRSession, private raw: DeviceInput, index: number) {
+    super();
     const active = () => Array.from(session.inputSources).includes(this);
     this.handValue = session.enabledFeatures.includes('hand-tracking') ? new XRHand(session, index, active) : null;
     this.handednessValue = raw.handedness;
@@ -574,3 +561,11 @@ export class XRInputSource {
   get gamepad() { return this.gamepadState?.value ?? null; }
   get skipRendering() { return false; }
 }
+
+// Shared allocation bases do not replace public realm-local inheritance.
+Object.setPrototypeOf(XRSession.prototype, EventTarget.prototype);
+Object.setPrototypeOf(XRInputSource.prototype, Object.prototype);
+installEventHandlers(XRSystem.prototype, ['devicechange'], value => value instanceof XRSystem);
+installEventHandlers(XRSession.prototype, [
+  'end', 'visibilitychange', 'inputsourceschange', 'selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend',
+], value => sessionObjects.has(value));

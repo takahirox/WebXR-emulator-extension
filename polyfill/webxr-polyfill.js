@@ -588,7 +588,7 @@ function WebXRPolyfillInjection() {
     out[2] = z;
     return out;
   }
-  function add(out, a, b) {
+  function add$1(out, a, b) {
     out[0] = a[0] + b[0];
     out[1] = a[1] + b[1];
     out[2] = a[2] + b[2];
@@ -894,6 +894,13 @@ function WebXRPolyfillInjection() {
 
   function createBrands() {
       const frames = new WeakSet(), spaces = new WeakSet(), joints = new WeakSet();
+      const sessions = new WeakSet(), inputSources = new WeakSet();
+      class SessionObject extends EventTarget {
+          constructor() { super(); sessions.add(this); }
+      }
+      class InputSourceObject {
+          constructor() { inputSources.add(this); }
+      }
       class FrameObject {
           constructor() { frames.add(this); }
       }
@@ -905,7 +912,17 @@ function WebXRPolyfillInjection() {
       Object.freeze(FrameObject);
       Object.freeze(SpaceObject.prototype);
       Object.freeze(SpaceObject);
-      return Object.freeze({ FrameObject, SpaceObject,
+      Object.freeze(SessionObject.prototype);
+      Object.freeze(SessionObject);
+      Object.freeze(InputSourceObject.prototype);
+      Object.freeze(InputSourceObject);
+      return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
+          eventSessions: new WeakMap(),
+          eventInputs: new WeakMap(),
+          eventChanges: new WeakMap(),
+          eventHandlers: new WeakMap(),
+          sessions: Object.freeze({ has: (value) => sessions.has(value) }),
+          inputSources: Object.freeze({ has: (value) => inputSources.has(value) }),
           frames: Object.freeze({ has: (value) => frames.has(value) }),
           spaces: Object.freeze({ has: (value) => spaces.has(value) }),
           joints: Object.freeze({ has: (value) => joints.has(value) }),
@@ -944,7 +961,7 @@ function WebXRPolyfillInjection() {
   }
   const interfaceBrands = shared[key];
 
-  const sessionObjects = new WeakSet();
+  const sessionObjects = interfaceBrands.sessions;
   const frameObjects = interfaceBrands.frames;
   const spaceObjects = interfaceBrands.spaces;
   const compatibleContexts = new WeakSet();
@@ -1628,7 +1645,7 @@ function WebXRPolyfillInjection() {
                   const curled = gamepad.buttons[0].pressed;
                   const position = (bone) => fromValues((finger - 2) * 0.019 * side, curled ? -bone * 0.009 : 0, -0.025 - bone * (curled ? 0.008 : 0.025));
                   const origin = position(joint);
-                  const target = name.endsWith('tip') ? add(create$2(), origin, subtract(create$2(), origin, position(joint - 1))) : position(joint + 1);
+                  const target = name.endsWith('tip') ? add$1(create$2(), origin, subtract(create$2(), origin, position(joint - 1))) : position(joint + 1);
                   return multiply(matrix, matrix, targetTo(create$3(), origin, target, [0, 1, 0]));
               }));
           }
@@ -25506,32 +25523,115 @@ void main() {
       return init;
   }
 
-  class XREventTarget extends EventTarget {
-      _emit(event) {
-          this.dispatchEvent(event);
-          const handler = this[`on${event.type}`];
-          if (typeof handler === 'function') {
-              try {
-                  handler.call(this, event);
-              }
-              catch (error) {
-                  reportError(error);
-              }
-          }
-      }
+  function eventArguments(count, type, value) {
+      if (count < 2)
+          throw new TypeError('Expected type and eventInitDict.');
+      const name = `${type}`;
+      if (value != null && Object(value) !== value)
+          throw new TypeError('Expected event dictionary.');
+      const dictionary = (value !== null && value !== void 0 ? value : {});
+      const init = { bubbles: Boolean(dictionary.bubbles), cancelable: Boolean(dictionary.cancelable), composed: Boolean(dictionary.composed) };
+      return { name, dictionary, init };
   }
+  function required(dictionary, key) {
+      const value = dictionary[key];
+      if (value === undefined)
+          throw new TypeError(`Missing required ${key}.`);
+      return value;
+  }
+  function data(map, receiver) {
+      const value = map.get(receiver);
+      if (!value)
+          throw new TypeError('Invalid XR event receiver.');
+      return value;
+  }
+  const { eventSessions: sessions, eventInputs: inputs, eventChanges: changes } = interfaceBrands;
   class XRSessionEvent extends Event {
-      constructor(type, init) { super(type, init); this.session = init.session; }
+      constructor(type, eventInitDict) {
+          const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
+          const session = interfaceValue(required(dictionary, 'session'), interfaceBrands.sessions, 'XRSession');
+          super(name, init);
+          sessions.set(this, { session });
+      }
+      get session() { return data(sessions, this).session; }
   }
   class XRInputSourceEvent extends Event {
-      constructor(type, init) { super(type, init); this.frame = init.frame; this.inputSource = init.inputSource; }
-  }
-  class XRInputSourcesChangeEvent extends XRSessionEvent {
-      constructor(type, init) {
-          super(type, init);
-          this.added = Object.freeze(init.added);
-          this.removed = Object.freeze(init.removed);
+      constructor(type, eventInitDict) {
+          const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
+          const frame = interfaceValue(required(dictionary, 'frame'), interfaceBrands.frames, 'XRFrame');
+          const inputSource = interfaceValue(required(dictionary, 'inputSource'), interfaceBrands.inputSources, 'XRInputSource');
+          super(name, init);
+          inputs.set(this, { frame, inputSource });
       }
+      get frame() { return data(inputs, this).frame; }
+      get inputSource() { return data(inputs, this).inputSource; }
+  }
+  class XRInputSourcesChangeEvent extends Event {
+      constructor(type, eventInitDict) {
+          const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
+          const added = interfaceSequence(required(dictionary, 'added'), interfaceBrands.inputSources, 'XRInputSource');
+          const removed = interfaceSequence(required(dictionary, 'removed'), interfaceBrands.inputSources, 'XRInputSource');
+          const session = interfaceValue(required(dictionary, 'session'), interfaceBrands.sessions, 'XRSession');
+          super(name, init);
+          changes.set(this, { session, added: Object.freeze(added), removed: Object.freeze(removed) });
+      }
+      get session() { return data(changes, this).session; }
+      get added() { return data(changes, this).added; }
+      get removed() { return data(changes, this).removed; }
+  }
+  for (const [prototype, keys] of [
+      [XRSessionEvent.prototype, ['session']],
+      [XRInputSourceEvent.prototype, ['frame', 'inputSource']],
+      [XRInputSourcesChangeEvent.prototype, ['session', 'added', 'removed']],
+  ])
+      for (const key of keys)
+          Object.defineProperty(prototype, key, { ...Object.getOwnPropertyDescriptor(prototype, key), enumerable: true });
+
+  const handlers = interfaceBrands.eventHandlers;
+  const add = EventTarget.prototype.addEventListener;
+  const remove = EventTarget.prototype.removeEventListener;
+  const preventDefault = Event.prototype.preventDefault;
+  function installEventHandlers(prototype, names, brand) {
+      for (const name of names)
+          Object.defineProperty(prototype, `on${name}`, {
+              enumerable: true, configurable: true,
+              get() {
+                  var _a, _b, _c;
+                  if (!brand(this))
+                      throw new TypeError('Invalid XR event-handler receiver.');
+                  return (_c = (_b = (_a = handlers.get(this)) === null || _a === void 0 ? void 0 : _a.get(name)) === null || _b === void 0 ? void 0 : _b.value) !== null && _c !== void 0 ? _c : null;
+              },
+              set(value) {
+                  if (!brand(this))
+                      throw new TypeError('Invalid XR event-handler receiver.');
+                  const converted = Object(value) === value ? value : null;
+                  let map = handlers.get(this);
+                  const existing = map === null || map === void 0 ? void 0 : map.get(name);
+                  if (converted === null) {
+                      if (existing) {
+                          remove.call(this, name, existing.listener);
+                          map.delete(name);
+                      }
+                  }
+                  else if (existing)
+                      existing.value = converted;
+                  else {
+                      if (!map)
+                          handlers.set(this, map = new Map());
+                      const handler = { value: converted, listener: event => {
+                              const callback = handler.value;
+                              if (typeof callback === 'function' && Reflect.apply(callback, this, [event]) === false)
+                                  preventDefault.call(event);
+                          } };
+                      map.set(name, handler);
+                      add.call(this, name, handler.listener);
+                  }
+              },
+          });
+  }
+
+  class XREventTarget extends EventTarget {
+      _emit(event) { this.dispatchEvent(event); }
   }
   class XRRenderState {
       constructor(init = {}) {
@@ -25586,7 +25686,6 @@ void main() {
       constructor(devicePromise) {
           super();
           this.devicePromise = devicePromise;
-          this.ondevicechange = null;
           this.immersive = null;
           this.requesting = false;
           this.sessions = new Set();
@@ -25675,7 +25774,8 @@ void main() {
       }
   }
   const inputEvents = ['select-start', 'select-end', 'squeeze-start', 'squeeze-end'];
-  class XRSession extends XREventTarget {
+  class XRSession extends interfaceBrands.SessionObject {
+      _emit(event) { this.dispatchEvent(event); }
       _startDOMOverlay(root) {
           this.overlay = this._device.startDOMOverlay(root, () => { if (!this.ended)
               void this.end(); });
@@ -25715,15 +25815,6 @@ void main() {
           this.isSystemKeyboardSupported = false;
           this._hitSources = new Set();
           this._transientSources = new Set();
-          this.onend = null;
-          this.onvisibilitychange = null;
-          this.oninputsourceschange = null;
-          this.onselectstart = null;
-          this.onselect = null;
-          this.onselectend = null;
-          this.onsqueezestart = null;
-          this.onsqueeze = null;
-          this.onsqueezeend = null;
           this.tick = (time) => {
               var _a, _b, _c, _d, _e;
               if (this.ended)
@@ -25832,7 +25923,6 @@ void main() {
                       this._device.onFrameEnd(this._id);
               }
           };
-          sessionObjects.add(this);
           this.features = Object.freeze([...enabled]);
           this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
           this.activeRenderState = new XRRenderState({ inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null });
@@ -26176,8 +26266,9 @@ void main() {
           invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source).slice(); }
   }
   Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
-  class XRInputSource {
+  class XRInputSource extends interfaceBrands.InputSourceObject {
       constructor(session, raw, index) {
+          super();
           this.session = session;
           this.raw = raw;
           this.targetWorld = null;
@@ -26220,6 +26311,12 @@ void main() {
       get gamepad() { var _a, _b; return (_b = (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.value) !== null && _b !== void 0 ? _b : null; }
       get skipRendering() { return false; }
   }
+  Object.setPrototypeOf(XRSession.prototype, EventTarget.prototype);
+  Object.setPrototypeOf(XRInputSource.prototype, Object.prototype);
+  installEventHandlers(XRSystem.prototype, ['devicechange'], value => value instanceof XRSystem);
+  installEventHandlers(XRSession.prototype, [
+      'end', 'visibilitychange', 'inputsourceschange', 'selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend',
+  ], value => sessionObjects.has(value));
 
   var runtime = /*#__PURE__*/Object.freeze({
     __proto__: null,

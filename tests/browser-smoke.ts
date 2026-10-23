@@ -1,4 +1,5 @@
 import {runDeferredSessionRequest} from './session-request';
+import {startDeviceChangeProbe} from './events';
 import {runConformance} from './conformance';
 import {runSharedBulkFrame} from './bulk-frame';
 import {startProfileSwitchProbe, checkProfileSwitchProbe} from './input-lifecycle';
@@ -566,6 +567,7 @@ try {
   console.log('Checking Quest MR API conformance');
   conformance.push(await runConformance(page, 'immersive-ar', false));
   const profileSwitchProbe = await startProfileSwitchProbe(page);
+  const deviceChangeProbe = await startDeviceChangeProbe(page);
   await panel.evaluate(() => {
     const device = document.querySelector('#deviceSelect') as HTMLSelectElement;
     device.value = 'Generic Android Phone (ARCore)'; device.dispatchEvent(new Event('change'));
@@ -575,6 +577,9 @@ try {
     const xr = (window as unknown as SmokeWindow).navigator.xr as unknown as {devicePromise: Promise<{handheld: boolean}>};
     return (await xr.devicePromise).handheld;
   }), Boolean, 'phone profile reaches the page runtime');
+  const deviceChange = await deviceChangeProbe.evaluate(probe => { probe.cleanup(); return probe.state; });
+  await deviceChangeProbe.dispose();
+  assert.deepEqual(deviceChange, {valid: true, order: ['listener', 'property']}, 'real devicechange reaches both styles once within native dispatch');
   console.log('Checking Android AR API conformance');
   conformance.push(await runConformance(page, 'immersive-ar', true));
   await checkProfileSwitchProbe(profileSwitchProbe);
@@ -584,6 +589,7 @@ try {
   let sharedBulkFrame: Awaited<ReturnType<typeof runSharedBulkFrame>>;
   try { await isolated.goto(`${origin}/bulk-isolated`); sharedBulkFrame = await runSharedBulkFrame(isolated); }
   finally { await isolated.close(); }
+  await writeFile(path.join(root, 'test-results/events.json'), JSON.stringify({browser: await context.browser()!.version(), deviceChange, profiles: conformance.map(result => result.events)}, null, 2));
   await writeFile(path.join(root, 'test-results/input-lifecycle.json'), JSON.stringify({browser: await context.browser()!.version(), profiles: conformance.map(result => result.inputLifecycle), panelProfileSwitch: 'passed: held Quest MR Gamepad remains disconnected and unchanged through Android AR inputs'}, null, 2));
   console.log('Checking session requests with deferred device initialization');
   const deferredSessionRequests = [];
