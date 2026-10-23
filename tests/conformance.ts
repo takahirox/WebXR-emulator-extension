@@ -1,4 +1,5 @@
 import {runBoundedFloor} from './bounded-floor';
+import {runSessionRequest} from './session-request';
 import {runRenderState} from './render-state';
 import type {Page} from 'playwright';
 import type {SessionMode} from '../src/types/contracts';
@@ -18,6 +19,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
   // tsx preserves nested function names via this helper; Playwright serializes
   // the callback without its Node module scope. It is a harness-only identity.
   await page.evaluate('globalThis.__name = value => value');
+  const sessionRequest = await runSessionRequest(page, mode, handheld);
   const renderState = await runRenderState(page, mode, handheld);
   const boundedFloor = await runBoundedFloor(page, mode, handheld);
   const result = await page.evaluate(async ({mode, handheld}) => {
@@ -1050,5 +1052,5 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     }
     return {mode, handheld, assertions: new Set(passed).size, passed: [...new Set(passed)]};
   }, {mode, handheld});
-  return {...result, boundedFloor, renderState};
+  return {...result, boundedFloor, renderState, sessionRequest};
 }

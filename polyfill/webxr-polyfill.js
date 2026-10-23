@@ -25247,6 +25247,84 @@ void main() {
       [Symbol.iterator]() { return this.values(); }
   }
 
+  function isObject(value) {
+      return Object(value) === value;
+  }
+  function dictionary(value) {
+      if (value === null || value === undefined)
+          return Object.create(null);
+      if (!isObject(value))
+          throw new TypeError('Expected session initialization dictionary.');
+      return value;
+  }
+  function domString(value) {
+      return `${value}`;
+  }
+  function enumeration(value, allowed) {
+      const string = domString(value);
+      if (!allowed.includes(string))
+          throw new TypeError('Invalid session initialization enum.');
+      return string;
+  }
+  function sequence(value, convert) {
+      if (!isObject(value))
+          throw new TypeError('Expected session initialization sequence.');
+      const method = value[Symbol.iterator];
+      if (typeof method !== 'function')
+          throw new TypeError('Expected iterable sequence.');
+      const iterator = Reflect.apply(method, value, []);
+      if (!isObject(iterator))
+          throw new TypeError('Expected iterator object.');
+      const next = iterator.next;
+      const values = [];
+      while (true) {
+          const step = Reflect.apply(next, iterator, []);
+          if (!isObject(step))
+              throw new TypeError('Expected iterator result object.');
+          if (step.done)
+              return values;
+          values.push(convert(step.value));
+      }
+  }
+  const depthFormats = ['float32', 'unsigned-short', 'luminance-alpha'];
+  function depthInit(value) {
+      const input = dictionary(value);
+      const dataFormatPreference = sequence(input.dataFormatPreference, entry => enumeration(entry, depthFormats));
+      const depthType = input.depthTypeRequest;
+      const depthTypeRequest = depthType === undefined ? undefined : sequence(depthType, entry => enumeration(entry, ['raw', 'smooth']));
+      const match = input.matchDepthView;
+      const matchDepthView = match === undefined ? true : Boolean(match);
+      const usagePreference = sequence(input.usagePreference, entry => enumeration(entry, ['cpu-optimized', 'gpu-optimized']));
+      return { dataFormatPreference, depthTypeRequest, matchDepthView, usagePreference };
+  }
+  function convertSessionMode(value) {
+      return enumeration(value, ['inline', 'immersive-vr', 'immersive-ar']);
+  }
+  function convertSessionInit(value) {
+      const input = dictionary(value);
+      const init = Object.create(null);
+      const depthSensing = input.depthSensing;
+      if (depthSensing !== undefined)
+          init.depthSensing = depthInit(depthSensing);
+      const domOverlay = input.domOverlay;
+      if (domOverlay !== undefined) {
+          if (domOverlay === null)
+              init.domOverlay = null;
+          else {
+              const root = dictionary(domOverlay).root;
+              Element.prototype.hasAttribute.call(root, '');
+              init.domOverlay = { root: root };
+          }
+      }
+      const optionalFeatures = input.optionalFeatures;
+      if (optionalFeatures !== undefined)
+          init.optionalFeatures = sequence(optionalFeatures, domString);
+      const requiredFeatures = input.requiredFeatures;
+      if (requiredFeatures !== undefined)
+          init.requiredFeatures = sequence(requiredFeatures, domString);
+      return init;
+  }
+
   class XREventTarget extends EventTarget {
       _emit(event) {
           this.dispatchEvent(event);
@@ -25323,9 +25401,6 @@ void main() {
       }
       return init;
   }
-  const modes = ['inline', 'immersive-vr', 'immersive-ar'];
-  function validateMode(mode) { if (!modes.includes(mode))
-      throw new TypeError('Invalid XRSessionMode.'); }
   class XRSystem extends XREventTarget {
       constructor(devicePromise) {
           super();
@@ -25337,22 +25412,16 @@ void main() {
           window.addEventListener('webxr-device', () => this._emit(new Event('devicechange')));
           window.addEventListener('webxr-exit-immersive', () => { var _a; void ((_a = this.immersive) === null || _a === void 0 ? void 0 : _a.end()); });
       }
-      async isSessionSupported(mode) { validateMode(mode); return (await this.devicePromise).isSessionSupported(mode); }
-      async requestSession(mode, options = {}) {
-          var _a, _b, _c, _d, _e, _f;
-          validateMode(mode);
-          const domOverlay = options.domOverlay;
-          let overlayRoot;
-          if (domOverlay !== undefined && domOverlay !== null) {
-              overlayRoot = domOverlay.root;
-              Element.prototype.hasAttribute.call(overlayRoot, '');
-          }
-          if (options.depthSensing) {
-              const { usagePreference, dataFormatPreference } = options.depthSensing;
-              if ([...usagePreference].some(value => !['cpu-optimized', 'gpu-optimized'].includes(value)) || [...dataFormatPreference].some(value => !['float32', 'unsigned-short', 'luminance-alpha'].includes(value)))
-                  throw new TypeError('Invalid depth sensing preference enum.');
-          }
-          const needsActivation = mode !== 'inline' || [...((_a = options.requiredFeatures) !== null && _a !== void 0 ? _a : []), ...((_b = options.optionalFeatures) !== null && _b !== void 0 ? _b : [])].some(feature => feature !== 'inline-stereo');
+      async isSessionSupported(value) {
+          const mode = convertSessionMode(value);
+          return (await this.devicePromise).isSessionSupported(mode);
+      }
+      async requestSession(value, dictionary) {
+          var _a, _b, _c, _d, _e, _f, _g;
+          const mode = convertSessionMode(value);
+          const options = convertSessionInit(dictionary);
+          const overlayRoot = (_a = options.domOverlay) === null || _a === void 0 ? void 0 : _a.root;
+          const needsActivation = mode !== 'inline' || [...((_b = options.requiredFeatures) !== null && _b !== void 0 ? _b : []), ...((_c = options.optionalFeatures) !== null && _c !== void 0 ? _c : [])].some(feature => feature !== 'inline-stereo');
           if (needsActivation && !navigator.userActivation.isActive)
               throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
           if (mode !== 'inline' && (this.immersive || this.requesting))
@@ -25363,9 +25432,9 @@ void main() {
               const device = await this.devicePromise;
               if (!device.isSessionSupported(mode))
                   unsupported('The selected profile/mode does not support this session mode.');
-              const required = new Set(['viewer', ...(mode === 'inline' ? [] : ['local']), ...((_c = options.requiredFeatures) !== null && _c !== void 0 ? _c : [])]);
+              const required = new Set(['viewer', ...(mode === 'inline' ? [] : ['local']), ...((_d = options.requiredFeatures) !== null && _d !== void 0 ? _d : [])]);
               const enabled = new Set();
-              for (const feature of new Set([...required, ...((_d = options.optionalFeatures) !== null && _d !== void 0 ? _d : [])])) {
+              for (const feature of new Set([...required, ...((_e = options.optionalFeatures) !== null && _e !== void 0 ? _e : [])])) {
                   let supported = device.isFeatureSupported(feature, mode);
                   if (feature === 'dom-overlay')
                       supported = supported && device.canPresentDOMOverlay(overlayRoot);
@@ -25383,7 +25452,7 @@ void main() {
                   if (supported)
                       enabled.add(feature);
               }
-              const depthFormat = (_f = (_e = options.depthSensing) === null || _e === void 0 ? void 0 : _e.dataFormatPreference.find(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format))) !== null && _f !== void 0 ? _f : 'float32';
+              const depthFormat = (_g = (_f = options.depthSensing) === null || _f === void 0 ? void 0 : _f.dataFormatPreference.find(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format))) !== null && _g !== void 0 ? _g : 'float32';
               const id = await device.requestSession(mode, enabled);
               const session = new XRSession(device, mode, id, enabled, () => {
                   this.sessions.delete(session);
@@ -25398,7 +25467,7 @@ void main() {
                   try {
                       session._startDOMOverlay(overlayRoot);
                   }
-                  catch (_g) {
+                  catch (_h) {
                       if (required.has('dom-overlay')) {
                           await session.end();
                           unsupported('The DOM Overlay Preview root could not be presented.');

@@ -1,7 +1,7 @@
 import {mat4} from 'gl-matrix';
 import type EmulatedXRDevice from '../EmulatedXRDevice';
 import type {SessionMode} from '../../types/contracts';
-import type {SessionOptions, HitTestOptions, TransientHitTestOptions} from '../../types/polyfill';
+import type {HitTestOptions, TransientHitTestOptions} from '../../types/polyfill';
 import type {DeviceInput, InputSignal} from '../device-adapter';
 import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, invalidState, unsupported} from './geometry';
 import {HALL_PLAY_AREA} from '../virtual-play-area';
@@ -13,6 +13,7 @@ import XRHitTestResult from './XRHitTestResult';
 import XRTransientInputHitTestResult from './XRTransientInputHitTestResult';
 import XRInputSourceArray from './XRInputSourceArray';
 import type DOMOverlay from '../DOMOverlay';
+import {convertSessionMode, convertSessionInit} from './session-init';
 import {EnvironmentTracker} from './environment';
 export {XRInputSourceArray};
 
@@ -83,9 +84,6 @@ function convertRenderStateInit(value: unknown): RenderStateInit {
   }
   return init;
 }
-const modes = ['inline', 'immersive-vr', 'immersive-ar'];
-function validateMode(mode: string): asserts mode is SessionMode { if (!modes.includes(mode)) throw new TypeError('Invalid XRSessionMode.'); }
-
 export class XRSystem extends XREventTarget {
   ondevicechange: ((event: Event) => void) | null = null;
   private immersive: XRSession | null = null;
@@ -96,21 +94,14 @@ export class XRSystem extends XREventTarget {
     window.addEventListener('webxr-device', () => this._emit(new Event('devicechange')));
     window.addEventListener('webxr-exit-immersive', () => { void this.immersive?.end(); });
   }
-  async isSessionSupported(mode: SessionMode) { validateMode(mode); return (await this.devicePromise).isSessionSupported(mode); }
-  async requestSession(mode: SessionMode, options: SessionOptions = {}) {
-    validateMode(mode);
-    const domOverlay = options.domOverlay;
-    let overlayRoot: Element | undefined;
-    if (domOverlay !== undefined && domOverlay !== null) {
-      // WebIDL interface conversion uses the Element brand, not instanceof:
-      // a same-origin iframe's Element has a different realm's prototype.
-      overlayRoot = domOverlay.root;
-      Element.prototype.hasAttribute.call(overlayRoot, '');
-    }
-    if (options.depthSensing) {
-      const {usagePreference, dataFormatPreference} = options.depthSensing;
-      if ([...usagePreference].some(value => !['cpu-optimized', 'gpu-optimized'].includes(value)) || [...dataFormatPreference].some(value => !['float32', 'unsigned-short', 'luminance-alpha'].includes(value))) throw new TypeError('Invalid depth sensing preference enum.');
-    }
+  async isSessionSupported(value?: unknown) {
+    const mode = convertSessionMode(value);
+    return (await this.devicePromise).isSessionSupported(mode);
+  }
+  async requestSession(value?: unknown, dictionary?: unknown) {
+    const mode = convertSessionMode(value);
+    const options = convertSessionInit(dictionary);
+    const overlayRoot = options.domOverlay?.root;
     const needsActivation = mode !== 'inline' || [...(options.requiredFeatures ?? []), ...(options.optionalFeatures ?? [])].some(feature => feature !== 'inline-stereo');
     if (needsActivation && !navigator.userActivation.isActive) throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
     if (mode !== 'inline' && (this.immersive || this.requesting)) invalidState('An immersive session is already pending or active.');

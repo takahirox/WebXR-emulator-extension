@@ -3,7 +3,8 @@ import type {XRSession} from '../polyfill/api/runtime';
 import type XRRay from '../polyfill/api/XRRay';
 
 export type PolyfillGlobal = Window & typeof globalThis;
-export interface SessionOptions { requiredFeatures?: string[]; optionalFeatures?: string[]; domOverlay?: {root: Element} | null; depthSensing?: {usagePreference: string[]; dataFormatPreference: string[]; depthTypeRequest?: string[]} }
+/** Converted XRSessionInit snapshot; caller values enter the API as unknown. */
+export interface SessionOptions { requiredFeatures?: string[]; optionalFeatures?: string[]; domOverlay?: {root: Element} | null; depthSensing?: {usagePreference: string[]; dataFormatPreference: string[]; depthTypeRequest?: string[]; matchDepthView: boolean} }
 export interface HitTestOptions { space: XRSpace; offsetRay?: XRRay; entityTypes?: string[] }
 export interface TransientHitTestOptions { profile: string; offsetRay?: XRRay; entityTypes?: string[] }
 export interface BaseLayer { context: (WebGLRenderingContext | WebGL2RenderingContext) }

@@ -1,3 +1,4 @@
+import {runDeferredSessionRequest} from './session-request';
 import {runConformance} from './conformance';
 import {runDOMOverlayPreview} from './dom-overlay-production';
 import {runDOMOverlayNegotiation} from './dom-overlay-negotiation';
@@ -568,6 +569,22 @@ try {
   }), Boolean, 'phone profile reaches the page runtime');
   console.log('Checking Android AR API conformance');
   conformance.push(await runConformance(page, 'immersive-ar', true));
+  console.log('Checking session requests with deferred device initialization');
+  const deferredSessionRequests = [];
+  for (const [deviceKey, mode] of [
+    ['Meta Quest 3', 'inline'], ['Meta Quest 3', 'immersive-vr'], ['Meta Quest 3', 'immersive-ar'],
+    ['Generic Android Phone (ARCore)', 'inline'], ['Generic Android Phone (ARCore)', 'immersive-ar'],
+  ] as const) {
+    const deferredPage = await context.newPage();
+    try {
+      await deferredPage.goto(origin);
+      await deferredPage.waitForFunction(() => !!(window as unknown as {sessionRequestStartup?: unknown}).sessionRequestStartup);
+      const startup = await deferredPage.evaluate(() => (window as unknown as {sessionRequestStartup: {passed: string[]; failures: string[]}}).sessionRequestStartup);
+      assert.deepEqual(startup.failures, [], 'session argument conversion and activation without a gesture');
+      deferredSessionRequests.push({...await runDeferredSessionRequest(deferredPage, mode, {...definitions.devices[deviceKey], emulationMode: mode === 'inline' ? 'immersive-ar' : mode, domOverlayPreview: true}), deviceKey, startup});
+    } finally { await deferredPage.close(); }
+  }
+  await writeFile(path.join(root, 'test-results/session-request.json'), JSON.stringify({browser: await context.browser()!.version(), deferredSessionRequests, conversion: conformance.map(result => result.sessionRequest)}, null, 2));
   console.log('Checking disabled public DOM overlay negotiation and late shadow attachment');
   const overlayNegotiation = await runDOMOverlayNegotiation(page);
   const setPreview = async (enabled: boolean) => {

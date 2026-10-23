@@ -10,6 +10,31 @@
   };
   // This classic script runs without a gesture, unlike Playwright evaluate calls.
   void appWindow.navigator.xr.requestSession('immersive-vr', {requiredFeatures: []}).then(session => session.end(), error => { state.startupSessionError = (error as Error).name; });
+  // Script execution has no Playwright-injected transient activation.
+  const xr = (window as unknown as {navigator: {xr: import('../src/polyfill/api/runtime').XRSystem}}).navigator.xr;
+  const startup = {passed: [] as string[], failures: [] as string[]};
+  const cases: [string, () => Promise<unknown>, string | null][] = [
+    ['ordinary inline', () => xr.requestSession('inline'), null],
+    ['null inline dictionary', () => xr.requestSession('inline', null), null],
+    ['inline-stereo optional', () => xr.requestSession('inline', {optionalFeatures: ['inline-stereo']}), null],
+    ['explicit inline viewer', () => xr.requestSession('inline', {requiredFeatures: ['viewer']}), 'SecurityError'],
+    ['one-shot inline unknown', () => xr.requestSession('inline', {requiredFeatures: (function* () { yield 'unknown'; })()}), 'SecurityError'],
+    ['immersive without gesture', () => xr.requestSession('immersive-ar'), 'SecurityError'],
+    ['conversion before activation', () => xr.requestSession('immersive-ar', {requiredFeatures: null}), 'TypeError'],
+    ['missing mode rejects promise', () => xr.requestSession(), 'TypeError'],
+  ];
+  void Promise.all(cases.map(async ([label, action, expected]) => {
+    try {
+      const promise = action();
+      if (!(promise instanceof Promise)) throw new Error('No Promise returned');
+      let error: unknown;
+      let value: unknown;
+      try { value = await promise; } catch (caught) { error = caught; }
+      if (value && typeof value === 'object' && 'end' in value) await (value as import('../src/polyfill/api/runtime').XRSession).end();
+      if (expected ? !(error instanceof Error) || error.name !== expected : error !== undefined) throw new Error(`Expected ${expected}, got ${String(error)}`);
+      startup.passed.push(label);
+    } catch (error) { startup.failures.push(`${label}: ${String(error)}`); }
+  })).then(() => { (window as unknown as {sessionRequestStartup: typeof startup}).sessionRequestStartup = startup; });
   const canvas = document.createElement('canvas');
   canvas.width = 640;
   canvas.height = 480;
