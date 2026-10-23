@@ -2,7 +2,7 @@ import {mat4} from 'gl-matrix';
 import type EmulatedXRDevice from '../EmulatedXRDevice';
 import type {SessionMode} from '../../types/contracts';
 import type {HitTestOptions, TransientHitTestOptions} from '../../types/polyfill';
-import type {DeviceInput, InputSignal} from '../device-adapter';
+import {SourceGamepad, type DeviceInput, type InputSignal} from '../device-adapter';
 import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, invalidState, unsupported} from './geometry';
 import {HALL_PLAY_AREA} from '../virtual-play-area';
 import {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
@@ -317,6 +317,7 @@ export class XRSession extends XREventTarget {
     document.removeEventListener('visibilitychange', this.visibilityListener);
     for (const anchor of this._anchors) anchor.delete();
     this._environment.clear();
+    for (const source of this.inputWrappers.values()) source._retire();
     this.inputWrappers.clear();
     this.callbacks.clear(); this.currentCallbacks?.clear(); this.signals = []; this.sources = Object.freeze([]);
     for (const source of [...this._hitSources, ...this._transientSources]) source._deactivate();
@@ -357,17 +358,22 @@ export class XRSession extends XREventTarget {
     for (const source of this._hitSources) if (source._space instanceof XRSpace) source._space._update();
     this._device.onFrameStart(this._id, {depthNear: this.renderState.depthNear, depthFar: this.renderState.depthFar, inlineVerticalFieldOfView: this.renderState.inlineVerticalFieldOfView ?? Math.PI / 2});
     this.rawSources = this._mode === 'inline' ? [] : this._device.getInputSources();
+    const replaced: XRInputSource[] = [];
     const next: XRInputSource[] = this.rawSources.map(source => {
-      if (!this.inputWrappers.has(source)) this.inputWrappers.set(source, new XRInputSource(this, source, this._device.getInputSources().indexOf(source)));
+      const previous = this.inputWrappers.get(source);
+      if (!previous || !previous._matches(source)) {
+        if (previous) { previous._retire(); replaced.push(previous); }
+        this.inputWrappers.set(source, new XRInputSource(this, source, this.rawSources.indexOf(source)));
+      }
       return this.inputWrappers.get(source)!;
     });
     const added = next.filter(source => !this.sources.includes(source));
-    const removed = this.sources.filter(source => !next.includes(source));
+    const removed = this.sources.filter(source => !next.includes(source) && !replaced.includes(source));
     // New sources precede their first action; disappearing transient sources remain
     // observable until select/selectend have been dispatched.
     this.sources = Object.freeze([...next, ...removed]);
     for (const source of next) source._updatePose();
-    if (added.length) this._emit(new XRInputSourcesChangeEvent('inputsourceschange', {session: this, added, removed: []}));
+    if (added.length || replaced.length) this._emit(new XRInputSourcesChangeEvent('inputsourceschange', {session: this, added, removed: replaced}));
     if (this.ended) return;
     for (const signal of this.signals.splice(0)) {
       if (this.ended) break;
@@ -382,6 +388,7 @@ export class XRSession extends XREventTarget {
     }
     if (this.ended) return;
     this.sources = Object.freeze(next.slice());
+    for (const source of removed) source._retire();
     if (removed.length) this._emit(new XRInputSourcesChangeEvent('inputsourceschange', {session: this, added: [], removed: [...removed]}));
     if (this.ended) return;
     for (const [raw, wrapper] of this.inputWrappers) if (removed.includes(wrapper)) this.inputWrappers.delete(raw);
@@ -488,26 +495,51 @@ export class XRFrame {
 
 /** Every exposed space and input identity is owned by exactly one session. */
 export class XRInputSource {
-  readonly hand: XRHand | null;
-  readonly targetRaySpace: XRSpace;
-  private grip: XRSpace;
+  private readonly handValue: XRHand | null;
+  private readonly targetSpace: XRSpace;
+  private readonly grip: XRSpace | null;
+  private readonly handednessValue: string;
+  private readonly targetRayModeValue: string;
+  private readonly profilesValue: readonly string[];
+  private readonly rawProfiles: readonly string[];
+  private readonly hasGamepad: boolean;
+  private readonly gamepadState: SourceGamepad | null;
   private targetWorld: mat4 | null = null;
   private gripWorld: mat4 | null = null;
   constructor(private session: XRSession, private raw: DeviceInput, index: number) {
-    this.hand = session.enabledFeatures.includes('hand-tracking') ? new XRHand(session, index) : null;
-    const provider = (type: string) => () => Array.from(session.inputSources).includes(this) ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
-    this.targetRaySpace = new XRSpace(session, provider('target-ray')); this.grip = new XRSpace(session, provider('grip'));
+    const active = () => Array.from(session.inputSources).includes(this);
+    this.handValue = session.enabledFeatures.includes('hand-tracking') ? new XRHand(session, index, active) : null;
+    this.handednessValue = raw.handedness;
+    this.targetRayModeValue = raw.targetRayMode;
+    this.rawProfiles = Object.freeze([...raw.profiles]);
+    this.profilesValue = this.handValue ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
+    this.hasGamepad = raw.gamepad !== null;
+    this.gamepadState = !this.handValue && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
+    const provider = (type: string) => () => active() ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
+    this.targetSpace = new XRSpace(session, provider('target-ray'));
+    this.grip = ['gaze', 'screen'].includes(this.targetRayModeValue) ? null : new XRSpace(session, provider('grip'));
   }
+  _matches(raw: DeviceInput) {
+    const profiles = raw.profiles;
+    return this.handednessValue === raw.handedness && this.targetRayModeValue === raw.targetRayMode &&
+      this.hasGamepad === (raw.gamepad !== null) && this.rawProfiles.length === profiles.length &&
+      this.rawProfiles.every((profile, index) => profile === profiles[index]);
+  }
+  _retire() { this.gamepadState?.retire(); }
   _updatePose() {
+    if (this.gamepadState && this.raw.gamepad) this.gamepadState.sample(this.raw.gamepad);
     const world = new XRReferenceSpace(this.session, 'local-floor', () => mat4.create()); world._update();
     const target = this.session._device.getInputPose(this.raw, world, 'target-ray');
     const grip = this.session._device.getInputPose(this.raw, world, 'grip');
     this.targetWorld = target ? mat4.clone(target.transform.matrix) : null;
     this.gripWorld = grip ? mat4.clone(grip.transform.matrix) : null;
   }
-  get handedness() { return this.raw.handedness; }
-  get targetRayMode() { return this.raw.targetRayMode; }
-  get gripSpace() { return this.targetRayMode === 'screen' ? null : this.grip; }
-  get profiles() { return this.hand ? ['generic-hand-select'] : this.raw.targetRayMode === 'screen' ? ['generic-touchscreen'] : ['meta-quest-touch-plus', 'oculus-touch-v3', 'oculus-touch', 'generic-trigger-squeeze-thumbstick']; }
-  get gamepad() { return this.hand || this.targetRayMode === 'screen' ? null : this.raw.gamepad; }
+  get hand() { return this.handValue; }
+  get targetRaySpace() { return this.targetSpace; }
+  get handedness() { return this.handednessValue; }
+  get targetRayMode() { return this.targetRayModeValue; }
+  get gripSpace() { return this.grip; }
+  get profiles() { return this.profilesValue; }
+  get gamepad() { return this.gamepadState?.value ?? null; }
+  get skipRendering() { return false; }
 }

@@ -1553,11 +1553,13 @@ function WebXRPolyfillInjection() {
       }
   }
   class XRHand {
-      constructor(session, controller) {
+      constructor(session, controller, active) {
           this.joints = new Map();
           for (const [index, name] of names.entries()) {
               const radius = index === 0 ? 0.018 : name.endsWith('tip') ? 0.007 : 0.009;
               this.joints.set(name, new XRJointSpace(session, name, radius, () => {
+                  if (!active())
+                      return null;
                   const gamepad = session._device.gamepads[controller];
                   if (!gamepad)
                       return null;
@@ -24995,6 +24997,85 @@ void main() {
     roomSurfaces: roomSurfaces
   });
 
+  class DeviceAdapter {
+      constructor(global) {
+          this.global = global;
+          this.listeners = new Map();
+      }
+      addEventListener(type, listener) {
+          var _a;
+          const list = (_a = this.listeners.get(type)) !== null && _a !== void 0 ? _a : new Set();
+          list.add(listener);
+          this.listeners.set(type, list);
+      }
+      removeEventListener(type, listener) { var _a; (_a = this.listeners.get(type)) === null || _a === void 0 ? void 0 : _a.delete(listener); }
+      dispatchEvent(type, detail) {
+          var _a;
+          for (const listener of [...((_a = this.listeners.get(type)) !== null && _a !== void 0 ? _a : [])])
+              listener(detail);
+      }
+  }
+  class ControllerInput {
+      constructor(primaryButtonIndex, primarySqueezeButtonIndex) {
+          this.primaryButtonIndex = primaryButtonIndex;
+          this.primarySqueezeButtonIndex = primarySqueezeButtonIndex;
+          this.active = false;
+          this.handedness = 'none';
+          this.targetRayMode = 'tracked-pointer';
+          this.primaryActionPressed = false;
+          this.primarySqueezeActionPressed = false;
+          this.axes = Object.freeze([]);
+          this.buttons = Object.freeze([]);
+          this.timestamp = 0;
+          const controller = this;
+          this.gamepadValue = Object.freeze({
+              id: '', index: -1, mapping: 'xr-standard',
+              get connected() { return controller.active; },
+              get timestamp() { return controller.timestamp; },
+              get axes() { return controller.axes; },
+              get buttons() { return controller.buttons; },
+              vibrationActuator: null, hapticActuators: Object.freeze([]),
+          });
+          this.inputSource = {
+              get handedness() { return controller.handedness; },
+              get targetRayMode() { return controller.targetRayMode; },
+              get profiles() { return controller.targetRayMode === 'screen' ? ['generic-touchscreen'] : ['meta-quest-touch-plus', 'oculus-touch-v3', 'oculus-touch', 'generic-trigger-squeeze-thumbstick']; },
+              get gamepad() { return controller.gamepadValue; },
+          };
+      }
+      updateFromGamepad(gamepad) {
+          this.handedness = gamepad.hand;
+          this.timestamp = performance.now();
+          this.axes = Object.freeze([...gamepad.axes]);
+          this.buttons = Object.freeze(gamepad.buttons.map((button, index) => Object.freeze(index === 2 ? { pressed: false, touched: false, value: 0 } : { ...button, touched: button.pressed })));
+      }
+  }
+  class SourceGamepad {
+      constructor(mapping) {
+          this.connected = true;
+          this.timestamp = 0;
+          this.axes = Object.freeze([]);
+          this.buttons = Object.freeze([]);
+          const state = this;
+          this.value = Object.freeze({
+              id: '', index: -1, mapping,
+              get connected() { return state.connected; },
+              get timestamp() { return state.timestamp; },
+              get axes() { return state.axes; },
+              get buttons() { return state.buttons; },
+              vibrationActuator: null, hapticActuators: Object.freeze([]),
+          });
+      }
+      sample(gamepad) {
+          if (!this.connected)
+              return;
+          this.timestamp = gamepad.timestamp;
+          this.axes = Object.freeze([...gamepad.axes]);
+          this.buttons = Object.freeze(gamepad.buttons.map(button => Object.freeze({ pressed: button.pressed, touched: button.touched, value: button.value })));
+      }
+      retire() { this.connected = false; }
+  }
+
   const HALL_PLAY_AREA = Object.freeze([
       Object.freeze([-1, 0, -1]),
       Object.freeze([1, 0, -1]),
@@ -25571,18 +25652,25 @@ void main() {
                       source._space._update();
               this._device.onFrameStart(this._id, { depthNear: this.renderState.depthNear, depthFar: this.renderState.depthFar, inlineVerticalFieldOfView: (_e = this.renderState.inlineVerticalFieldOfView) !== null && _e !== void 0 ? _e : Math.PI / 2 });
               this.rawSources = this._mode === 'inline' ? [] : this._device.getInputSources();
+              const replaced = [];
               const next = this.rawSources.map(source => {
-                  if (!this.inputWrappers.has(source))
-                      this.inputWrappers.set(source, new XRInputSource(this, source, this._device.getInputSources().indexOf(source)));
+                  const previous = this.inputWrappers.get(source);
+                  if (!previous || !previous._matches(source)) {
+                      if (previous) {
+                          previous._retire();
+                          replaced.push(previous);
+                      }
+                      this.inputWrappers.set(source, new XRInputSource(this, source, this.rawSources.indexOf(source)));
+                  }
                   return this.inputWrappers.get(source);
               });
               const added = next.filter(source => !this.sources.includes(source));
-              const removed = this.sources.filter(source => !next.includes(source));
+              const removed = this.sources.filter(source => !next.includes(source) && !replaced.includes(source));
               this.sources = Object.freeze([...next, ...removed]);
               for (const source of next)
                   source._updatePose();
-              if (added.length)
-                  this._emit(new XRInputSourcesChangeEvent('inputsourceschange', { session: this, added, removed: [] }));
+              if (added.length || replaced.length)
+                  this._emit(new XRInputSourcesChangeEvent('inputsourceschange', { session: this, added, removed: replaced }));
               if (this.ended)
                   return;
               for (const signal of this.signals.splice(0)) {
@@ -25600,6 +25688,8 @@ void main() {
               if (this.ended)
                   return;
               this.sources = Object.freeze(next.slice());
+              for (const source of removed)
+                  source._retire();
               if (removed.length)
                   this._emit(new XRInputSourcesChangeEvent('inputsourceschange', { session: this, added: [], removed: [...removed] }));
               if (this.ended)
@@ -25796,6 +25886,8 @@ void main() {
           for (const anchor of this._anchors)
               anchor.delete();
           this._environment.clear();
+          for (const source of this.inputWrappers.values())
+              source._retire();
           this.inputWrappers.clear();
           this.callbacks.clear();
           (_b = this.currentCallbacks) === null || _b === void 0 ? void 0 : _b.clear();
@@ -25976,12 +26068,28 @@ void main() {
           this.raw = raw;
           this.targetWorld = null;
           this.gripWorld = null;
-          this.hand = session.enabledFeatures.includes('hand-tracking') ? new XRHand(session, index) : null;
-          const provider = (type) => () => Array.from(session.inputSources).includes(this) ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
-          this.targetRaySpace = new XRSpace(session, provider('target-ray'));
-          this.grip = new XRSpace(session, provider('grip'));
+          const active = () => Array.from(session.inputSources).includes(this);
+          this.handValue = session.enabledFeatures.includes('hand-tracking') ? new XRHand(session, index, active) : null;
+          this.handednessValue = raw.handedness;
+          this.targetRayModeValue = raw.targetRayMode;
+          this.rawProfiles = Object.freeze([...raw.profiles]);
+          this.profilesValue = this.handValue ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
+          this.hasGamepad = raw.gamepad !== null;
+          this.gamepadState = !this.handValue && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
+          const provider = (type) => () => active() ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
+          this.targetSpace = new XRSpace(session, provider('target-ray'));
+          this.grip = ['gaze', 'screen'].includes(this.targetRayModeValue) ? null : new XRSpace(session, provider('grip'));
       }
+      _matches(raw) {
+          const profiles = raw.profiles;
+          return this.handednessValue === raw.handedness && this.targetRayModeValue === raw.targetRayMode &&
+              this.hasGamepad === (raw.gamepad !== null) && this.rawProfiles.length === profiles.length &&
+              this.rawProfiles.every((profile, index) => profile === profiles[index]);
+      }
+      _retire() { var _a; (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.retire(); }
       _updatePose() {
+          if (this.gamepadState && this.raw.gamepad)
+              this.gamepadState.sample(this.raw.gamepad);
           const world = new XRReferenceSpace(this.session, 'local-floor', () => create$3());
           world._update();
           const target = this.session._device.getInputPose(this.raw, world, 'target-ray');
@@ -25989,11 +26097,14 @@ void main() {
           this.targetWorld = target ? clone$1(target.transform.matrix) : null;
           this.gripWorld = grip ? clone$1(grip.transform.matrix) : null;
       }
-      get handedness() { return this.raw.handedness; }
-      get targetRayMode() { return this.raw.targetRayMode; }
-      get gripSpace() { return this.targetRayMode === 'screen' ? null : this.grip; }
-      get profiles() { return this.hand ? ['generic-hand-select'] : this.raw.targetRayMode === 'screen' ? ['generic-touchscreen'] : ['meta-quest-touch-plus', 'oculus-touch-v3', 'oculus-touch', 'generic-trigger-squeeze-thumbstick']; }
-      get gamepad() { return this.hand || this.targetRayMode === 'screen' ? null : this.raw.gamepad; }
+      get hand() { return this.handValue; }
+      get targetRaySpace() { return this.targetSpace; }
+      get handedness() { return this.handednessValue; }
+      get targetRayMode() { return this.targetRayModeValue; }
+      get gripSpace() { return this.grip; }
+      get profiles() { return this.profilesValue; }
+      get gamepad() { var _a, _b; return (_b = (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.value) !== null && _b !== void 0 ? _b : null; }
+      get skipRendering() { return false; }
   }
 
   var runtime = /*#__PURE__*/Object.freeze({
@@ -26022,60 +26133,6 @@ void main() {
       window.dispatchEvent(new CustomEvent(type, {
           detail: typeof cloneInto !== 'undefined' ? cloneInto(detail, window) : detail,
       }));
-  }
-
-  class DeviceAdapter {
-      constructor(global) {
-          this.global = global;
-          this.listeners = new Map();
-      }
-      addEventListener(type, listener) {
-          var _a;
-          const list = (_a = this.listeners.get(type)) !== null && _a !== void 0 ? _a : new Set();
-          list.add(listener);
-          this.listeners.set(type, list);
-      }
-      removeEventListener(type, listener) { var _a; (_a = this.listeners.get(type)) === null || _a === void 0 ? void 0 : _a.delete(listener); }
-      dispatchEvent(type, detail) {
-          var _a;
-          for (const listener of [...((_a = this.listeners.get(type)) !== null && _a !== void 0 ? _a : [])])
-              listener(detail);
-      }
-  }
-  class ControllerInput {
-      constructor(primaryButtonIndex, primarySqueezeButtonIndex) {
-          this.primaryButtonIndex = primaryButtonIndex;
-          this.primarySqueezeButtonIndex = primarySqueezeButtonIndex;
-          this.active = false;
-          this.handedness = 'none';
-          this.targetRayMode = 'tracked-pointer';
-          this.primaryActionPressed = false;
-          this.primarySqueezeActionPressed = false;
-          this.axes = Object.freeze([]);
-          this.buttons = Object.freeze([]);
-          this.timestamp = 0;
-          const controller = this;
-          this.gamepadValue = Object.freeze({
-              id: '', index: -1, mapping: 'xr-standard',
-              get connected() { return controller.active; },
-              get timestamp() { return controller.timestamp; },
-              get axes() { return controller.axes; },
-              get buttons() { return controller.buttons; },
-              vibrationActuator: null, hapticActuators: Object.freeze([]),
-          });
-          this.inputSource = {
-              get handedness() { return controller.handedness; },
-              get targetRayMode() { return controller.targetRayMode; },
-              get profiles() { return controller.targetRayMode === 'screen' ? ['generic-touchscreen'] : ['meta-quest-touch-plus', 'oculus-touch-v3', 'oculus-touch', 'generic-trigger-squeeze-thumbstick']; },
-              get gamepad() { return controller.gamepadValue; },
-          };
-      }
-      updateFromGamepad(gamepad) {
-          this.handedness = gamepad.hand;
-          this.timestamp = performance.now();
-          this.axes = Object.freeze([...gamepad.axes]);
-          this.buttons = Object.freeze(gamepad.buttons.map((button, index) => Object.freeze(index === 2 ? { pressed: false, touched: false, value: 0 } : { ...button, touched: button.pressed })));
-      }
   }
 
   const _raycaster = new Raycaster();
