@@ -26290,13 +26290,13 @@ void main() {
           this.presentationChanged = false;
           this.endedValue = false;
           this.pendingReferenceRequests = new Set();
-          this.visibility = document.hidden ? 'hidden' : 'visible';
+          this.visibility = document.visibilityState;
           this.sources = Object.freeze([]);
           this.inputSourceArray = new XRInputSourceArray(() => this.sources);
           this.signals = [];
           this.listeners = [];
           this.immersiveSuppressed = false;
-          this.visibilityListener = () => this._setVisibility(document.hidden || this.immersiveSuppressed ? 'hidden' : 'visible');
+          this.visibilityListener = () => this._setVisibility(document.visibilityState);
           this._anchors = new Set();
           this._environment = new EnvironmentTracker(this);
           this._depthFormat = 'float32';
@@ -26314,7 +26314,7 @@ void main() {
               if (this.ended)
                   return;
               this.frameHandle = this._device.requestAnimationFrame(this.tick);
-              if (this.visibility === 'hidden')
+              if (this.visibility === 'hidden' || this.immersiveSuppressed)
                   return;
               if (this.pendingRenderState) {
                   const previous = this.presentation;
@@ -26549,7 +26549,6 @@ void main() {
       }
       _setImmersiveSuppressed(value) {
           this.immersiveSuppressed = value;
-          this.visibilityListener();
       }
       async initiateRoomCapture() {
           this._assertLive();

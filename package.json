@@ -12,6 +12,8 @@
     "test:environment": "tsx --test tests/environment.ts tests/play-area.ts",
     "test:firefox": "tsx tests/firefox.ts",
     "test:extension-lifetime": "tsx tests/extension-lifetime.ts",
+    "test:visibility:chromium": "tsx tests/visibility-browser.ts chromium",
+    "test:visibility:firefox": "tsx tests/visibility-browser.ts firefox",
     "test:reference-space:chromium": "tsx tests/reference-space-browser.ts chromium",
     "test:reference-space:firefox": "tsx tests/reference-space-browser.ts firefox"
   },

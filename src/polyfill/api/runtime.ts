@@ -160,14 +160,14 @@ export class XRSession extends interfaceBrands.SessionObject {
   private activeRenderState: XRRenderState;
   private endedValue = false;
   private pendingReferenceRequests = new Set<() => void>();
-  private visibility: 'visible' | 'visible-blurred' | 'hidden' = document.hidden ? 'hidden' : 'visible';
+  private visibility: 'visible' | 'visible-blurred' | 'hidden' = document.visibilityState;
   private sources: readonly XRInputSource[] = Object.freeze([]);
   private readonly inputSourceArray = new XRInputSourceArray(() => this.sources);
   private signals: {type: typeof inputEvents[number]; source: DeviceInput}[] = [];
   private listeners: [string, (detail: InputSignal) => void][] = [];
   private endListener: (id: number) => void;
   private immersiveSuppressed = false;
-  private visibilityListener = () => this._setVisibility(document.hidden || this.immersiveSuppressed ? 'hidden' : 'visible');
+  private visibilityListener = () => this._setVisibility(document.visibilityState);
   readonly _anchors = new Set<XRAnchor>();
   readonly _environment = new EnvironmentTracker(this);
   _depthFormat = 'float32';
@@ -291,7 +291,8 @@ export class XRSession extends interfaceBrands.SessionObject {
     this.visibility = value; this._emit(new XRSessionEvent('visibilitychange', {session: this}));
   }
   _setImmersiveSuppressed(value: boolean) {
-    this.immersiveSuppressed = value; this.visibilityListener();
+    // Device §4.3 suspends inline frames independently of §4.1 visibility.
+    this.immersiveSuppressed = value;
   }
   async initiateRoomCapture() {
     this._assertLive();
@@ -379,7 +380,7 @@ export class XRSession extends interfaceBrands.SessionObject {
   private tick = (time: number) => {
     if (this.ended) return;
     this.frameHandle = this._device.requestAnimationFrame(this.tick);
-    if (this.visibility === 'hidden') return;
+    if (this.visibility === 'hidden' || this.immersiveSuppressed) return;
     if (this.pendingRenderState) {
       const previous = this.presentation;
       const state = this.pendingRenderState;

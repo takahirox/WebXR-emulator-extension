@@ -1,4 +1,5 @@
 {
+  "issue_43_correction": "Historical results retained. The original assumption that immersive presentation makes inline sessions hidden, including the document-visibility claim below, is incorrect. Device CRD 2026-06-09 sections 4.1/4.3/12.6 require document-mirrored inline visibility with independent frame suspension and owning XRSessionEvent notifications. See docs/webxr-inline-visibility.md and docs/webxr-inline-visibility-validation-2026-10-24.json for the correction and executed evidence. Historical broad partial results do not establish completion of deferred modules.",
   "date": "2026-10-16",
   "issue": 11,
   "completion": "partial; keep Issue #11 open",
