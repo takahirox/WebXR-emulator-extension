@@ -26,6 +26,8 @@ export interface EmulatorEvents {
   'webxr-input-pose': InputPose; 'device-input-pose': InputPose;
   'webxr-input-button': InputButton;
   'webxr-stereo-effect': {enabled: boolean};
+  'webxr-extension-check': Record<never, never>;
+  'webxr-extension-alive': Record<never, never>;
   'webxr-exit-immersive': Record<never, never>;
   'device-enter-immersive': Record<never, never>;
   'device-leave-immersive': Record<never, never>;
@@ -33,7 +35,7 @@ export interface EmulatorEvents {
   'webxr-virtual-room-response': {buffer: ArrayBuffer};
 }
 type BridgeEvent = Exclude<keyof EmulatorEvents,
-  'webxr-device-init' | 'webxr-virtual-room-request' | 'webxr-virtual-room-response'>;
+  'webxr-extension-check' | 'webxr-extension-alive' | 'webxr-device-init' | 'webxr-virtual-room-request' | 'webxr-virtual-room-response'>;
 export type ExtensionMessage = (
   {[K in BridgeEvent]: {action: K} & EmulatorEvents[K]}[BridgeEvent]
   | {action: 'webxr-startup'}
