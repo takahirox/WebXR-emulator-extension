@@ -1,6 +1,7 @@
 import {runBoundedFloor} from './bounded-floor';
 import {runSessionRequest} from './session-request';
 import {runRenderState} from './render-state';
+import {runEvents} from './events';
 import {runInputLifecycle} from './input-lifecycle';
 import {runBulkFrame, runPopupBulkFrame} from './bulk-frame';
 import type {Page} from 'playwright';
@@ -24,6 +25,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
   const sessionRequest = await runSessionRequest(page, mode, handheld);
   const renderState = await runRenderState(page, mode, handheld);
   const boundedFloor = await runBoundedFloor(page, mode, handheld);
+  const events = await runEvents(page, mode, handheld);
   const inputLifecycle = await runInputLifecycle(page, mode, handheld);
   const bulkFrame = await runBulkFrame(page, mode, handheld);
   const popupBulkFrame = await runPopupBulkFrame(page, mode, handheld);
@@ -1057,5 +1059,5 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     }
     return {mode, handheld, assertions: new Set(passed).size, passed: [...new Set(passed)]};
   }, {mode, handheld});
-  return {...result, boundedFloor, renderState, sessionRequest, inputLifecycle, bulkFrame, popupBulkFrame};
+  return {...result, events, boundedFloor, renderState, sessionRequest, inputLifecycle, bulkFrame, popupBulkFrame};
 }

@@ -2,7 +2,7 @@ import {mat4, quat, vec3} from 'gl-matrix';
 import type {XRSession} from './runtime';
 import {interfaceBrands} from './interface-brand';
 
-export const sessionObjects = new WeakSet<object>();
+export const sessionObjects = interfaceBrands.sessions;
 export const frameObjects = interfaceBrands.frames;
 export const spaceObjects = interfaceBrands.spaces;
 export const compatibleContexts = new WeakSet<WebGLRenderingContext | WebGL2RenderingContext>();

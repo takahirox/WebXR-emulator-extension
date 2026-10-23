@@ -3,6 +3,13 @@
 // wrapping an instance in a Proxy cannot acquire its brand.
 function createBrands() {
   const frames = new WeakSet<object>(), spaces = new WeakSet<object>(), joints = new WeakSet<object>();
+  const sessions = new WeakSet<object>(), inputSources = new WeakSet<object>();
+  class SessionObject extends EventTarget {
+    constructor() { super(); sessions.add(this); }
+  }
+  class InputSourceObject {
+    constructor() { inputSources.add(this); }
+  }
   class FrameObject {
     constructor() { frames.add(this); }
   }
@@ -11,7 +18,11 @@ function createBrands() {
   }
   Object.freeze(FrameObject.prototype); Object.freeze(FrameObject);
   Object.freeze(SpaceObject.prototype); Object.freeze(SpaceObject);
-  return Object.freeze({FrameObject, SpaceObject,
+  Object.freeze(SessionObject.prototype); Object.freeze(SessionObject);
+  Object.freeze(InputSourceObject.prototype); Object.freeze(InputSourceObject);
+  return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
+    sessions: Object.freeze({has: (value: object) => sessions.has(value)}),
+    inputSources: Object.freeze({has: (value: object) => inputSources.has(value)}),
     frames: Object.freeze({has: (value: object) => frames.has(value)}),
     spaces: Object.freeze({has: (value: object) => spaces.has(value)}),
     joints: Object.freeze({has: (value: object) => joints.has(value)}),

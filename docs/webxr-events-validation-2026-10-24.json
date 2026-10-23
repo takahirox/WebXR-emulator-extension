@@ -1,0 +1,159 @@
+{
+  "issue": 31,
+  "date": "2026-10-24",
+  "github_repository": "takahirox/WebXR-emulator-extension",
+  "evaluation_baseline": "2b92ea462cb379c35ebb4c79777f40e3544891ba",
+  "tested_checkout_head": "a3543a6c2601d2c96480578d84c6480d9c9933e0",
+  "tested_revision_note": "Final build and browser commands ran on the Issue #31 implementation working tree above this HEAD. SHA-256 values identify exact validated runtime, tests and packaged files. This checkpoint adds the validation report and inventory update; no pushed revision or independent evaluator run is claimed.",
+  "tested_files_sha256": {
+    "src/polyfill/api/event-handlers.ts": "f52ee92ee2b7a22905215fdc1bee2a2d2bea181e1432362d24db98e42c103f12",
+    "src/polyfill/api/events.ts": "c6498285e6d13e40808eb22098ddb3df3e66475a6cd9ff8335f914aeb85e03aa",
+    "src/polyfill/api/interface-brand.ts": "51ab0a473e9a9318daf63afdd180b31bfddbff400f3c570d63542855ddcbc466",
+    "src/polyfill/api/geometry.ts": "cba53b618856cc6f3281f9cb8b3c0de2accec6993b806086a3ec028b46069abb",
+    "src/polyfill/api/runtime.ts": "f99eb1072e4f9ab7bb962c7d20359b058c365772fbc12aae7ed2e8187239faff",
+    "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+    "tests/events.ts": "e9ca9859e326454dd0bdf314909623a4be58c29439ddd5655491724086eecf9c",
+    "tests/conformance.ts": "0d86ce9a108eb40c31cd9d45c20ac981d37fda21db18f1f2cef9666914d38db8",
+    "tests/input-lifecycle.ts": "5b51e84119c43329818546048648227c7b3e77e5b78bc5793f8123780146300d",
+    "tests/browser-smoke.ts": "00d363629bbf6b782604f68ce207e0a81b2c2019289ef8caacc18092c566f63b",
+    "polyfill/webxr-polyfill.js": "11f48232546cf76383296eeed588393fd9075d3b158d45ef0ca9894c4778b371"
+  },
+  "validation_stage": "Implementation-stage checks in the assigned GitWeave worktree. No graph-owned rerun or independent AI review.",
+  "browser": {
+    "name": "Playwright Chromium / Google Chrome for Testing",
+    "version": "156.0.8078.4",
+    "platform": "darwin arm64",
+    "runner": "Existing unpacked MV3 extension, fresh desktop profile, actual DevTools panel; no Manifest V2 compatibility flags"
+  },
+  "commands": {
+    "npm install": {
+      "exit_code": 0,
+      "note": "54 packages installed; lockfile unchanged."
+    },
+    "npm run build": {
+      "exit_code": 0,
+      "note": "Strict TypeScript, emission and bundle generation. Packaged polyfill diff inspected; other generated bundles unchanged."
+    },
+    "npm run test:browser": {
+      "exit_code": 0,
+      "note": "Full existing browser suite plus focused event tests passed on the final expanded run."
+    },
+    "git diff --check": {
+      "exit_code": 0
+    }
+  },
+  "focused_event_profiles": [
+    {
+      "profile": "Meta Quest 3",
+      "mode": "immersive-vr",
+      "includes_inline": true,
+      "assertions": 964,
+      "result": "passed",
+      "skipped": [],
+      "realm_coverage": [
+        "separately injected same-origin iframe",
+        "separately injected opener-linked popup"
+      ]
+    },
+    {
+      "profile": "Meta Quest 3",
+      "mode": "immersive-ar",
+      "includes_inline": true,
+      "assertions": 964,
+      "result": "passed",
+      "skipped": [],
+      "realm_coverage": [
+        "separately injected same-origin iframe",
+        "separately injected opener-linked popup"
+      ]
+    },
+    {
+      "profile": "Generic Android Phone (ARCore)",
+      "mode": "immersive-ar",
+      "includes_inline": true,
+      "assertions": 937,
+      "result": "passed",
+      "skipped": [],
+      "realm_coverage": [
+        "separately injected same-origin iframe",
+        "separately injected opener-linked popup"
+      ]
+    }
+  ],
+  "focused_event_assertions": 2865,
+  "actual_panel_profile_switch_devicechange": {
+    "order": [
+      "listener",
+      "property"
+    ],
+    "valid": true
+  },
+  "coverage": [
+    "All ten property handlers on system/session targets, including all nine session handlers on inline: null defaults, prototype accessors, primitive/object conversion, replacement order, removal/reactivation, direct/native-runtime delivery, receiver/target/currentTarget/phase, immediate propagation, literal-false cancellation and dispatch result, intrinsic cancellation despite an overridden public preventDefault, exception reporting once and later-listener continuation.",
+    "Three event constructors: required arguments, DOMString and EventInit conversion, inherited single-read dictionary getters in base-to-derived lexical order, required members, null/forged/proxy interfaces, iterable/sequence failures and original getter/iterator exceptions, direct Event inheritance, branded readonly SameObject prototype accessors, independent frozen arrays preserving duplicates/identities and caller mutability on success/failure.",
+    "Real Quest source-change/select/squeeze and Android transient touchscreen source-change/select through both listener styles. Live event poses, event viewer-pose rejection, retained-frame rejection after callbacks/exceptions, unchanged processing, complete asynchronous singular end delivery.",
+    "Cross-realm genuine sessions, frames and sources from iframe and popup accepted in constructors in both directions. Forged/proxy values rejected. Mixed-session, ended-session and inactive-frame data accepted without activation or ownership prerequisites.",
+    "Synthetic select/end/source-change dispatch on inline targets has no virtual-input or session-lifecycle side effects. Existing input-lifecycle suite also exercises two phone screen-mouse gestures and shutdown during real actions."
+  ],
+  "pinned_primary_sources": {
+    "device": "https://www.w3.org/TR/2026/CRD-webxr-20260609/#events",
+    "html": "https://github.com/whatwg/html/blob/b342939ba3b7e40041655fb926f6e41b54fe47ef/source",
+    "webidl": "https://github.com/whatwg/webidl/blob/622910c67c724e362f71e8255a0380bade261acb/index.bs"
+  },
+  "adapted_wpt": {
+    "revision": "e1859580b5fcf74940a18d2f783296b4961035e3",
+    "paths": [
+      "html/webappapis/scripting/events/event-handler-spec-example.window.js",
+      "html/webappapis/scripting/events/event-handler-removal.window.js",
+      "html/webappapis/scripting/events/event-handler-processing-algorithm.html",
+      "interfaces/webxr.idl",
+      "webxr/xrFrame_lifetime.https.html"
+    ],
+    "execution": "Focused custom adaptations through actual extension and real adapter; upstream files inspected, not executed verbatim. XR targets have no element content attributes. Window error/beforeunload special cases do not apply. Frame lifetime assertions extend to input dispatch and exception paths. No normative contradiction or Issue requirement correction was necessary."
+  },
+  "failures": "Initial development TypeScript checks caught ES2018-incompatible Object.hasOwn/BigInt literals, callback counter narrowing and tuple inference; fixed before browser execution. No browser assertion failures in either run. Final build, expanded browser suite and whitespace checks passed.",
+  "skips": {
+    "event_tests": [],
+    "existing_bulk_tests": [
+      {
+        "mode": "immersive-vr",
+        "handheld": false,
+        "skipped": [
+          "inline: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)",
+          "immersive-vr: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": false,
+        "skipped": [
+          "inline: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)",
+          "immersive-ar: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": true,
+        "skipped": [
+          "inline: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)",
+          "immersive-ar: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)"
+        ]
+      }
+    ],
+    "isolated_bulk_buffer_coverage": {
+      "assertions": 49,
+      "skipped": [],
+      "note": "The six existing ordinary-page shared-buffer skips are covered by the isolated fixture."
+    }
+  },
+  "unperformed_checks": [
+    "Broader/unmodified WPT suite (npm run test:wpt)",
+    "Firefox",
+    "Physical XR hardware",
+    "Official application/examples",
+    "Additional optional Three.js r186 consumer run (the existing full-suite custom Three.js fixture passed)",
+    "Separate environment unit suite; no environment simulation changes"
+  ],
+  "remaining_scope": "Missing event interfaces, unfinished modules and general WebIDL/native behavior remain separate work as in the inventory. No post-merge verification is required.",
+  "external_actions": "No push, PR, merge, Issue edit or comment. No usage resets, allowance purchases or model/provider switches."
+}
