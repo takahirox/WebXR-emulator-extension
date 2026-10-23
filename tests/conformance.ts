@@ -1,4 +1,5 @@
 import {runBoundedFloor} from './bounded-floor';
+import {runRenderState} from './render-state';
 import type {Page} from 'playwright';
 import type {SessionMode} from '../src/types/contracts';
 import type * as Runtime from '../src/polyfill/api/runtime';
@@ -17,6 +18,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
   // tsx preserves nested function names via this helper; Playwright serializes
   // the callback without its Node module scope. It is a harness-only identity.
   await page.evaluate('globalThis.__name = value => value');
+  const renderState = await runRenderState(page, mode, handheld);
   const boundedFloor = await runBoundedFloor(page, mode, handheld);
   const result = await page.evaluate(async ({mode, handheld}) => {
     const xr = window as unknown as TestWindow;
@@ -835,6 +837,8 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       await nextFrame(frame => {
         const active = session.renderState.layers;
         activeVictim.destroy(); activeVictim.destroy();
+        session.updateRenderState({depthFar: 100, depthNear: undefined});
+        session.updateRenderState(null);
         check(session.renderState.layers === active && active?.includes(activeVictim), 'destroy leaves active state intact until the next frame');
         throws(() => binding.getSubImage(activeVictim, frame), 'InvalidStateError', 'destroyed quad access is rejected immediately');
       });
@@ -846,12 +850,14 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       session.updateRenderState({layers: [quad, pendingVictim, projection], depthNear: 0.17});
       pendingVictim.destroy(); pendingVictim.destroy();
       session.updateRenderState({depthFar: 90});
+      session.updateRenderState({depthNear: undefined, layers: undefined});
       await nextFrame(() => check(session.renderState.layers?.length === 2 && session.renderState.layers[0] === quad && session.renderState.layers[1] === projection && session.renderState.depthNear === 0.17 && session.renderState.depthFar === 90, 'pending-only destruction preserves layer order and other pending updates'));
       const replacedVictim = binding.createQuadLayer({space: viewer, viewPixelWidth: 32, viewPixelHeight: 32});
       session.updateRenderState({layers: [projection, replacedVictim]});
       await nextFrame(() => {});
       session.updateRenderState({baseLayer: legacy, depthNear: 0.18});
       replacedVictim.destroy();
+      session.updateRenderState({depthFar: 90, baseLayer: undefined});
       await nextFrame(() => check(session.renderState.baseLayer === legacy && session.renderState.layers === null && session.renderState.depthNear === 0.18, 'destroy preserves a pending switch to legacy rendering'));
       session.updateRenderState({layers: [projection, quad]});
       await nextFrame(() => {});
@@ -1044,5 +1050,5 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     }
     return {mode, handheld, assertions: new Set(passed).size, passed: [...new Set(passed)]};
   }, {mode, handheld});
-  return {...result, boundedFloor};
+  return {...result, boundedFloor, renderState};
 }

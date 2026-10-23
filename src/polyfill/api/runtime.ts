@@ -46,6 +46,43 @@ export class XRRenderState {
     Object.freeze(this);
   }
 }
+// Emulator-selected limits, applied only when a pending state becomes active.
+// Device CRD 2026-06-09 imposes a near minimum and far maximum, not near < far.
+const minimumDepthNear = 0.01;
+const maximumDepthFar = 10000;
+const minimumInlineFov = 0.01;
+const maximumInlineFov = 3.13;
+type RenderStateInit = {-readonly [K in keyof XRRenderState]?: XRRenderState[K]};
+function convertRenderStateInit(value: unknown): RenderStateInit {
+  if (value == null) return {};
+  if (typeof value !== 'object' && typeof value !== 'function') throw new TypeError('Expected XRRenderStateInit dictionary.');
+  const dictionary = value as Record<string, unknown>;
+  const init: RenderStateInit = {};
+  // WebIDL dictionary members are read and converted once, in lexicographic
+  // order (including inherited/non-enumerable members), before session checks.
+  const baseLayer = dictionary.baseLayer;
+  if (baseLayer !== undefined) {
+    if (baseLayer !== null && !(baseLayer instanceof XRWebGLLayer)) throw new TypeError('Expected XRWebGLLayer.');
+    init.baseLayer = baseLayer;
+  }
+  for (const key of ['depthFar', 'depthNear', 'inlineVerticalFieldOfView'] as const) {
+    const member = dictionary[key];
+    if (member === undefined) continue;
+    // Unary + implements ToNumber, including rejecting BigInt (Number() does not).
+    const number = +(member as number);
+    if (!Number.isFinite(number)) throw new TypeError(`${key} must be a finite double.`);
+    init[key] = number;
+  }
+  const layers = dictionary.layers;
+  if (layers !== undefined) {
+    if (layers === null) init.layers = null;
+    else {
+      if ((typeof layers !== 'object' && typeof layers !== 'function') || !(Symbol.iterator in layers)) throw new TypeError('Expected layer sequence.');
+      init.layers = Array.from(layers as Iterable<XRCompositionLayer>);
+    }
+  }
+  return init;
+}
 const modes = ['inline', 'immersive-vr', 'immersive-ar'];
 function validateMode(mode: string): asserts mode is SessionMode { if (!modes.includes(mode)) throw new TypeError('Invalid XRSessionMode.'); }
 
@@ -251,22 +288,22 @@ export class XRSession extends XREventTarget {
     if (type === 'bounded-floor') return new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA);
     return new XRReferenceSpace(this, type, () => world);
   }
-  updateRenderState(init: Partial<XRRenderState>) {
+  updateRenderState(value: unknown = {}) {
+    const init = convertRenderStateInit(value);
     this._assertLive();
-    if (init.baseLayer !== undefined && init.layers !== undefined) unsupported('baseLayer and layers cannot both be supplied.');
     if (init.baseLayer && (!(init.baseLayer instanceof XRWebGLLayer) || init.baseLayer._session !== this)) invalidState('Layer belongs to a different session.');
+    if (init.inlineVerticalFieldOfView !== undefined && this._mode !== 'inline') invalidState('Immersive sessions cannot set inlineVerticalFieldOfView.');
+    if (Object.keys(init).length === 0) return;
+    if (init.baseLayer !== undefined && init.layers !== undefined) unsupported('baseLayer and layers cannot both be supplied.');
     if (init.layers !== undefined && init.layers !== null) {
       if (!this.enabledFeatures.includes('layers') && (init.layers.length > 1 || init.layers.some(layer => !(layer instanceof XRProjectionLayer)))) unsupported('Only a single projection layer is supported without the layers feature.');
       if (new Set(init.layers).size !== init.layers.length) throw new TypeError('Duplicate composition layers.');
       for (const layer of init.layers) if (!(layer instanceof XRCompositionLayer) || layer._binding._session !== this || layer._destroyed) invalidState('Invalid composition layer.');
       if (init.layers.some(layer => layer._binding._context !== init.layers![0]._binding._context)) unsupported('All layers must share one WebGL context.');
     }
-    if (init.inlineVerticalFieldOfView != null && this._mode !== 'inline') invalidState('Immersive sessions cannot set inlineVerticalFieldOfView.');
     const state = {...(this.pendingRenderState ?? this.renderState), ...init};
     if (init.baseLayer !== undefined) state.layers = null;
     if (init.layers !== undefined) state.baseLayer = null;
-    if (state.inlineVerticalFieldOfView != null) state.inlineVerticalFieldOfView = Math.max(0.01, Math.min(3.13, state.inlineVerticalFieldOfView));
-    if (![state.depthNear, state.depthFar].every(Number.isFinite)) throw new TypeError('Depth values must be finite.');
     this.pendingRenderState = new XRRenderState(state);
   }
   _removeLayer(layer: XRCompositionLayer) {
@@ -314,7 +351,13 @@ export class XRSession extends XREventTarget {
     if (this.visibility === 'hidden') return;
     if (this.pendingRenderState) {
       const previous = this.presentation;
-      this.activeRenderState = this.pendingRenderState; this.pendingRenderState = null;
+      const state = this.pendingRenderState;
+      this.activeRenderState = new XRRenderState({...state,
+        depthNear: Math.max(minimumDepthNear, state.depthNear),
+        depthFar: Math.min(maximumDepthFar, state.depthFar),
+        inlineVerticalFieldOfView: state.inlineVerticalFieldOfView === null ? null : Math.max(minimumInlineFov, Math.min(maximumInlineFov, state.inlineVerticalFieldOfView)),
+      });
+      this.pendingRenderState = null;
       this.presentation = this.renderState.baseLayer ?? this.renderState.layers?.[0]?._binding._presentation ?? null;
       if (this.presentation && this.presentation !== previous) this._device.onBaseLayerSet(this._id, this.presentation);
     }
