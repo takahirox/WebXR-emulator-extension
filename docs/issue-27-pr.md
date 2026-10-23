@@ -6,6 +6,8 @@ XRInputSource metadata previously read mutable adapter fields, `profiles` return
 
 Each active Quest source owns one SameObject Gamepad with live sampled state, empty ID, index -1, xr-standard mapping, placeholder slots and existing digital touched/pressed/value behavior. Removal/replacement/end permanently disconnects it and retains its final sampled axes/buttons/timestamp. Later input, reconnection, restart and profile switching cannot change it. Preserve touch add/start/select/end/remove order and one identity per gesture; retired target-ray/grip/joint spaces yield null within the same session. Foreign spaces and inactive frames still reject.
 
+Recreated hands resolve their controller slot from adapter identity, so disconnecting an earlier controller and then replacing the surviving hand source preserves its wrist/grip pose. Quest VR/MR regressions cover this sequence and retirement of the previous hand joints.
+
 No feature descriptor or hand negotiation change. Ordered Quest/hand/touchscreen profiles and supported-device nullability are preserved. Additional tracked-sources support, virtual haptics and deferred modules remain follow-ups; this does not complete the broader compatibility goal or administratively closed Issue #11.
 
 Correction provenance retained from the Issue: an earlier assessment assumed shared adapter Gamepads proved universally distinct cross-session allocation was mandatory. The [Gamepads WD, 7 July 2025](https://www.w3.org/TR/webxr-gamepads-module-1/#xrinputsource) guarantees SameObject within a source and specifies connection/frame updates, without explicitly mandating distinct allocation for every session. Per-source wrappers and permanent final-sample retention are our implementation policy for coherent source lifetimes. The published alias identifies that publication; the dated URL was unavailable.
@@ -14,7 +16,7 @@ Two related implementation assumptions were also corrected: the old getter treat
 
 ## Validation
 
-`npm run build`, `npm run test:browser` and `git diff --check` passed on macOS arm64 with Chromium **156.0.8078.4**. Focused lifecycle checks executed **164** assertions in Quest VR, **164** in Quest MR and **43** in Android AR (including empty inline frames), plus the held-Gamepad panel profile-switch probe. Two initial harness errors were corrected; the final full run passed.
+`npm run build`, `npm run test:browser` and `git diff --check` passed on macOS arm64 with Chromium **156.0.8078.4**. Focused lifecycle checks executed **168** assertions in Quest VR, **168** in Quest MR and **43** in Android AR (including empty inline frames), plus the held-Gamepad panel profile-switch probe. Two initial harness errors were corrected. The hand-slot regression failed on the earlier bundle and passed after the fix; the full browser suite, build and whitespace checks passed again for that revision.
 
 See the [committed execution record](webxr-input-lifecycle-validation-2026-10-24.json) for actual command results, browser/version, assertion counts, exact focused coverage, resolved harness failures and skips. The capability inventory documents the lifecycle policy and pinned WPT adaptations.
 
