@@ -17,23 +17,21 @@ function convertNullableFloat(value: unknown) {
 export class XRLayer extends EventTarget {}
 const webglStorage = new WeakMap<XRWebGLLayer, XRFramebuffer>();
 export class XRWebGLLayer extends XRLayer implements BaseLayer {
-  constructor(readonly _session: XRSession, readonly context: WebGLRenderingContext | WebGL2RenderingContext, init?: unknown) {
+  declare readonly _session: XRSession;
+  declare readonly context: WebGLRenderingContext | WebGL2RenderingContext;
+  constructor(_session: XRSession, context: WebGLRenderingContext | WebGL2RenderingContext, init?: unknown) {
     super();
     if (!sessionObjects.has(_session)) throw new TypeError('Expected XRSession.');
     if (!(context instanceof WebGLRenderingContext) && !(typeof WebGL2RenderingContext !== 'undefined' && context instanceof WebGL2RenderingContext)) throw new TypeError('Expected WebGL context.');
     const options = convertWebGLLayerOptions(init);
     _session._assertLive();
     if (context.isContextLost() || (_session._mode !== 'inline' && !compatibleContexts.has(context) && !(context.getContextAttributes() as (WebGLContextAttributes & {xrCompatible?: boolean}) | null)?.xrCompatible)) invalidState('WebGL context is lost or not XR compatible.');
-    if (_session._mode !== 'inline') {
-      const storage = new XRFramebuffer(context, _session._device.getRecommendedFramebufferSize(_session._id), options, !_session._device.handheld);
-      webglStorage.set(this, storage);
-      storage.active = _session._inAnimationCallback;
-      _session._webglLayers.add(this);
-      context.canvas.addEventListener('webglcontextlost', this.lost);
-    }
-    layerBrands.webgl.add(this);
+    const storage = _session._mode === 'inline' ? null : new XRFramebuffer(context, _session._device.getRecommendedFramebufferSize(_session._id), options, !_session._device.handheld);
+    const layer = Reflect.construct(layerBrands.WebGLLayerAllocation, [_session, context, storage], new.target) as unknown as XRWebGLLayer;
+    if (storage) webglStorage.set(layer, storage);
+    return layer;
   }
-  private lost = () => this._dispose();
+  declare private readonly lost: () => void;
   get antialias() { return webglStorage.get(this)?.antialias ?? this.context.getContextAttributes()?.antialias ?? false; }
   get ignoreDepthValues() { return true; }
   get framebuffer() { return webglStorage.get(this)?.framebuffer ?? null; }
@@ -66,7 +64,7 @@ export class XRWebGLLayer extends XRLayer implements BaseLayer {
 
 
 type GL = WebGL2RenderingContext;
-interface LayerInit {
+export interface LayerInit {
   colorFormat?: number; depthFormat?: number | null; textureType?: string; scaleFactor?: number;
   space?: XRSpace; transform?: XRRigidTransform; width?: number; height?: number;
   viewPixelWidth?: number; viewPixelHeight?: number; layout?: string; isStatic?: boolean;
@@ -76,29 +74,31 @@ function validateLayerSpace(session: XRSession, space: XRSpace) {
   if (!(space instanceof XRSpace) || space._session !== session) throw new TypeError('Layer space must belong to the same session.');
   return space;
 }
+const projectionAllocation = Symbol();
 export class XRCompositionLayer extends XRLayer {
-  readonly layout: string;
-  blendTextureSourceAlpha = true;
-  readonly chromaticAberrationCorrection = null;
-  forceMonoPresentation = false;
-  readonly mipLevels = 1;
-  readonly quality = 'default';
-  opacity = 1;
-  readonly _color: WebGLTexture;
-  readonly _depth: WebGLTexture | null;
-  readonly _hasStencil: boolean;
-  _width = 0; _height = 0; _destroyed = false;
-  readonly _clearOnAccess: boolean;
-  _needsClear = true;
-  _lastClearFrame: XRFrame | null = null;
-  _needsRedraw = true;
-  constructor(readonly _binding: XRWebGLBinding, readonly _init: LayerInit) {
+  declare readonly layout: string;
+  declare blendTextureSourceAlpha: boolean;
+  declare readonly chromaticAberrationCorrection: null;
+  declare forceMonoPresentation: boolean;
+  declare readonly mipLevels: 1;
+  declare readonly quality: 'default';
+  declare opacity: number;
+  declare readonly _color: WebGLTexture;
+  declare readonly _depth: WebGLTexture | null;
+  declare readonly _hasStencil: boolean;
+  declare _width: number;
+  declare _height: number;
+  declare _destroyed: boolean;
+  declare readonly _clearOnAccess: boolean;
+  declare _needsClear: boolean;
+  declare _lastClearFrame: XRFrame | null;
+  declare _needsRedraw: boolean;
+  declare readonly _binding: XRWebGLBinding;
+  declare readonly _init: LayerInit;
+  constructor(binding: XRWebGLBinding, init: LayerInit, allocation?: symbol) {
     super();
-    this.layout = _init.layout ?? 'mono';
-    this._clearOnAccess = _init.clearOnAccess === undefined || Boolean(_init.clearOnAccess);
-    const gl = _binding._gl2(); this._color = gl.createTexture()!;
-    this._depth = _init.depthFormat === 0 ? null : gl.createTexture();
-    this._hasStencil = _init.depthFormat === gl.DEPTH_STENCIL || _init.depthFormat === gl.DEPTH24_STENCIL8;
+    const C = allocation === projectionAllocation ? layerBrands.ProjectionLayerAllocation : layerBrands.CompositionLayerAllocation;
+    return Reflect.construct(C, [binding, init], new.target) as XRCompositionLayer;
   }
   get needsRedraw() { return this._needsRedraw; }
   get textureWidth() { return this._width; }
@@ -135,7 +135,7 @@ export class XRCompositionLayer extends XRLayer {
   }
 }
 export class XRProjectionLayer extends XRCompositionLayer {
-  constructor(binding: XRWebGLBinding, init: LayerInit) { super(binding, init); layerBrands.projection.add(this); }
+  constructor(binding: XRWebGLBinding, init: LayerInit) { super(binding, init, projectionAllocation); }
   get fixedFoveation() {
     if (!layerBrands.projection.has(this)) throw new TypeError('Expected XRProjectionLayer.');
     return null;
@@ -144,8 +144,8 @@ export class XRProjectionLayer extends XRCompositionLayer {
     if (!layerBrands.projection.has(this)) throw new TypeError('Expected XRProjectionLayer.');
     convertNullableFloat(value);
   }
-  readonly ignoreDepthValues = true;
-  readonly deltaPose = null;
+  declare readonly ignoreDepthValues: true;
+  declare readonly deltaPose: null;
 }
 for (const prototype of [XRWebGLLayer.prototype, XRProjectionLayer.prototype]) {
   Object.defineProperty(prototype, 'fixedFoveation', {...Object.getOwnPropertyDescriptor(prototype, 'fixedFoveation'), enumerable: true});

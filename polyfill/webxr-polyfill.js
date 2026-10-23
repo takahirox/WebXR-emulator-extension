@@ -1005,6 +1005,81 @@ function WebXRPolyfillInjection() {
     };
   })();
 
+  function createLayerAllocations(sessions) {
+      const webgl = new WeakSet(), projection = new WeakSet();
+      const gl1Attributes = WebGLRenderingContext.prototype.getContextAttributes;
+      const gl2Attributes = typeof WebGL2RenderingContext === 'undefined' ? null : WebGL2RenderingContext.prototype.getContextAttributes;
+      class WebGLLayerAllocation extends EventTarget {
+          constructor(_session, context, storage) {
+              super();
+              this._session = _session;
+              this.context = context;
+              this.lost = () => this._dispose();
+              if (!sessions.has(_session))
+                  throw new TypeError('Expected XRSession.');
+              try {
+                  gl1Attributes.call(context);
+              }
+              catch (_a) {
+                  if (!gl2Attributes)
+                      throw new TypeError('Expected WebGL context.');
+                  gl2Attributes.call(context);
+              }
+              _session._assertLive();
+              if (_session._mode !== 'inline') {
+                  if (!storage)
+                      throw new TypeError('Expected layer framebuffer storage.');
+                  storage.active = _session._inAnimationCallback;
+                  _session._webglLayers.add(this);
+                  context.canvas.addEventListener('webglcontextlost', this.lost);
+              }
+              webgl.add(this);
+          }
+      }
+      class CompositionLayerAllocation extends EventTarget {
+          constructor(_binding, _init) {
+              var _a;
+              super();
+              this._binding = _binding;
+              this._init = _init;
+              this.blendTextureSourceAlpha = true;
+              this.chromaticAberrationCorrection = null;
+              this.forceMonoPresentation = false;
+              this.mipLevels = 1;
+              this.quality = 'default';
+              this.opacity = 1;
+              this._width = 0;
+              this._height = 0;
+              this._destroyed = false;
+              this._needsClear = true;
+              this._lastClearFrame = null;
+              this._needsRedraw = true;
+              this.layout = (_a = _init.layout) !== null && _a !== void 0 ? _a : 'mono';
+              this._clearOnAccess = _init.clearOnAccess === undefined || Boolean(_init.clearOnAccess);
+              const gl = _binding._gl2();
+              this._color = gl.createTexture();
+              this._depth = _init.depthFormat === 0 ? null : gl.createTexture();
+              this._hasStencil = _init.depthFormat === gl.DEPTH_STENCIL || _init.depthFormat === gl.DEPTH24_STENCIL8;
+          }
+      }
+      class ProjectionLayerAllocation extends CompositionLayerAllocation {
+          constructor(binding, init) {
+              super(binding, init);
+              this.ignoreDepthValues = true;
+              this.deltaPose = null;
+              projection.add(this);
+          }
+      }
+      for (const C of [WebGLLayerAllocation, CompositionLayerAllocation, ProjectionLayerAllocation]) {
+          Object.freeze(C.prototype);
+          Object.freeze(C);
+      }
+      return Object.freeze({ WebGLLayerAllocation, CompositionLayerAllocation, ProjectionLayerAllocation,
+          webgl: Object.freeze({ has: (value) => webgl.has(value) }),
+          projection: Object.freeze({ has: (value) => projection.has(value) }),
+      });
+  }
+
   function createBrands() {
       const frames = new WeakSet(), spaces = new WeakSet(), joints = new WeakSet();
       const sessions = new WeakSet(), inputSources = new WeakSet();
@@ -1030,6 +1105,7 @@ function WebXRPolyfillInjection() {
       Object.freeze(InputSourceObject.prototype);
       Object.freeze(InputSourceObject);
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
+          layerAllocations: createLayerAllocations(sessions),
           eventSessions: new WeakMap(),
           eventInputs: new WeakMap(),
           eventChanges: new WeakMap(),
@@ -1073,54 +1149,7 @@ function WebXRPolyfillInjection() {
       Object.defineProperty(shared, key, { value: createBrands() });
   }
   const interfaceBrands = shared[key];
-  const webglLayers = new WeakSet(), projectionLayers = new WeakSet();
-  const localLayers = Object.freeze({
-      webgl: (value) => webglLayers.has(value),
-      projection: (value) => projectionLayers.has(value),
-  });
-  const layerKey = Symbol.for('WebXR-emulator.layer-brands');
-  Object.defineProperty(globalThis, layerKey, { value: localLayers });
-  const knownLayers = new Set([localLayers]);
-  function hasLayer(value, kind) {
-      for (const brands of knownLayers)
-          if (brands[kind](value))
-              return true;
-      if (typeof window === 'undefined')
-          return false;
-      const pending = [window], visited = new Set();
-      while (pending.length) {
-          const candidate = pending.pop();
-          if (visited.has(candidate))
-              continue;
-          visited.add(candidate);
-          try {
-              void candidate.document;
-              const brands = candidate[layerKey];
-              if (brands) {
-                  knownLayers.add(brands);
-                  if (brands[kind](value))
-                      return true;
-              }
-              for (let i = 0; i < candidate.frames.length; i++)
-                  pending.push(candidate.frames[i]);
-          }
-          catch ( _a) {  }
-          try {
-              if (candidate.opener)
-                  pending.push(candidate.opener);
-          }
-          catch ( _b) {  }
-          try {
-              pending.push(candidate.parent);
-          }
-          catch ( _c) {  }
-      }
-      return false;
-  }
-  const layerBrands = {
-      webgl: { add: (value) => webglLayers.add(value), has: (value) => hasLayer(value, 'webgl') },
-      projection: { add: (value) => projectionLayers.add(value), has: (value) => hasLayer(value, 'projection') },
-  };
+  const layerBrands = interfaceBrands.layerAllocations;
 
   const sessionObjects = interfaceBrands.sessions;
   const frameObjects = interfaceBrands.frames;
@@ -1570,9 +1599,6 @@ function WebXRPolyfillInjection() {
       constructor(_session, context, init) {
           var _a;
           super();
-          this._session = _session;
-          this.context = context;
-          this.lost = () => this._dispose();
           if (!sessionObjects.has(_session))
               throw new TypeError('Expected XRSession.');
           if (!(context instanceof WebGLRenderingContext) && !(typeof WebGL2RenderingContext !== 'undefined' && context instanceof WebGL2RenderingContext))
@@ -1581,14 +1607,11 @@ function WebXRPolyfillInjection() {
           _session._assertLive();
           if (context.isContextLost() || (_session._mode !== 'inline' && !compatibleContexts.has(context) && !((_a = context.getContextAttributes()) === null || _a === void 0 ? void 0 : _a.xrCompatible)))
               invalidState('WebGL context is lost or not XR compatible.');
-          if (_session._mode !== 'inline') {
-              const storage = new XRFramebuffer(context, _session._device.getRecommendedFramebufferSize(_session._id), options, !_session._device.handheld);
-              webglStorage.set(this, storage);
-              storage.active = _session._inAnimationCallback;
-              _session._webglLayers.add(this);
-              context.canvas.addEventListener('webglcontextlost', this.lost);
-          }
-          layerBrands.webgl.add(this);
+          const storage = _session._mode === 'inline' ? null : new XRFramebuffer(context, _session._device.getRecommendedFramebufferSize(_session._id), options, !_session._device.handheld);
+          const layer = Reflect.construct(layerBrands.WebGLLayerAllocation, [_session, context, storage], new.target);
+          if (storage)
+              webglStorage.set(layer, storage);
+          return layer;
       }
       get antialias() { var _a, _b, _c, _d; return (_d = (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.antialias) !== null && _b !== void 0 ? _b : (_c = this.context.getContextAttributes()) === null || _c === void 0 ? void 0 : _c.antialias) !== null && _d !== void 0 ? _d : false; }
       get ignoreDepthValues() { return true; }
@@ -1634,30 +1657,12 @@ function WebXRPolyfillInjection() {
           throw new TypeError('Layer space must belong to the same session.');
       return space;
   }
+  const projectionAllocation = Symbol();
   class XRCompositionLayer extends XRLayer {
-      constructor(_binding, _init) {
-          var _a;
+      constructor(binding, init, allocation) {
           super();
-          this._binding = _binding;
-          this._init = _init;
-          this.blendTextureSourceAlpha = true;
-          this.chromaticAberrationCorrection = null;
-          this.forceMonoPresentation = false;
-          this.mipLevels = 1;
-          this.quality = 'default';
-          this.opacity = 1;
-          this._width = 0;
-          this._height = 0;
-          this._destroyed = false;
-          this._needsClear = true;
-          this._lastClearFrame = null;
-          this._needsRedraw = true;
-          this.layout = (_a = _init.layout) !== null && _a !== void 0 ? _a : 'mono';
-          this._clearOnAccess = _init.clearOnAccess === undefined || Boolean(_init.clearOnAccess);
-          const gl = _binding._gl2();
-          this._color = gl.createTexture();
-          this._depth = _init.depthFormat === 0 ? null : gl.createTexture();
-          this._hasStencil = _init.depthFormat === gl.DEPTH_STENCIL || _init.depthFormat === gl.DEPTH24_STENCIL8;
+          const C = allocation === projectionAllocation ? layerBrands.ProjectionLayerAllocation : layerBrands.CompositionLayerAllocation;
+          return Reflect.construct(C, [binding, init], new.target);
       }
       get needsRedraw() { return this._needsRedraw; }
       get textureWidth() { return this._width; }
@@ -1705,12 +1710,7 @@ function WebXRPolyfillInjection() {
       }
   }
   class XRProjectionLayer extends XRCompositionLayer {
-      constructor(binding, init) {
-          super(binding, init);
-          this.ignoreDepthValues = true;
-          this.deltaPose = null;
-          layerBrands.projection.add(this);
-      }
+      constructor(binding, init) { super(binding, init, projectionAllocation); }
       get fixedFoveation() {
           if (!layerBrands.projection.has(this))
               throw new TypeError('Expected XRProjectionLayer.');

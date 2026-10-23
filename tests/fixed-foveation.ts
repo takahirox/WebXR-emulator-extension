@@ -172,6 +172,42 @@ export async function runFixedFoveation(page: Page, mode: SessionMode, handheld:
         quad.destroy();
         const remote = await allocate(foreign, foreignAPI);
         try {
+          // An accessible, uninjected about:blank frame is page-controlled. Its
+          // frozen predicates must never become trusted allocation evidence,
+          // including when copied alongside a real shared interface registry.
+          const forgedFrame = document.createElement('iframe');
+          document.body.append(forgedFrame);
+          const forgedWindow = forgedFrame.contentWindow!;
+          const registryKey = Symbol.for('WebXR-emulator.layer-brands');
+          let predicateCalls = 0;
+          Object.defineProperty(forgedWindow, registryKey, {value: Object.freeze({
+            webgl: () => { predicateCalls++; return true; },
+            projection: () => { predicateCalls++; return true; },
+          })});
+          Object.defineProperty(forgedWindow, Symbol.for('WebXR-emulator.interface-brands'), {
+            value: (window as unknown as Record<symbol, unknown>)[Symbol.for('WebXR-emulator.interface-brands')],
+          });
+          try {
+            for (const phase of ['attached', 'removed'] as const) {
+              if (phase === 'removed') forgedFrame.remove();
+              for (const borrower of [api, foreignAPI]) {
+                for (const [layer, C, other] of [[local.base, borrower.XRWebGLLayer, local.projection], [local.projection, borrower.XRProjectionLayer, local.base]] as const) {
+                  const d = descriptor(C);
+                  // Force a genuine cross-realm lookup before removing the
+                  // frame, which previously cached its forged predicates.
+                  check(d.get!.call(layer) === null, `forged registry/${phase}/${C.name}: genuine getter`);
+                  for (const [index, fake] of [{}, Object.create(C.prototype), new Proxy(layer, {}), other].entries()) {
+                    const label = `forged registry/${phase}/${C.name}/receiver ${index}`;
+                    throws(() => d.get!.call(fake), `${label}: getter`);
+                    let reads = 0;
+                    throws(() => d.set!.call(fake, {valueOf() { reads++; return 0.5; }}), `${label}: setter`);
+                    check(reads === 0, `${label}: receiver before conversion`);
+                  }
+                }
+              }
+              check(predicateCalls === 0, `forged registry/${phase}: page predicates never called`);
+            }
+          } finally { forgedFrame.remove(); }
           check(!(remote.base instanceof api.XRWebGLLayer) && !(remote.projection instanceof api.XRProjectionLayer), 'genuine layers have distinct injected realm prototypes');
           for (const [owner, borrower, name] of [[local, foreignAPI, 'local'], [remote, api, 'foreign']] as const) {
             for (const [layer, C, other] of [[owner.base, borrower.XRWebGLLayer, owner.projection], [owner.projection, borrower.XRProjectionLayer, owner.base]] as const) {
