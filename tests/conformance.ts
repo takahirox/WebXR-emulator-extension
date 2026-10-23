@@ -1,3 +1,4 @@
+import {runFixedFoveation} from './fixed-foveation';
 import {runWebGLLayer} from './webgl-layer';
 import {runBoundedFloor} from './bounded-floor';
 import {runSessionRequest} from './session-request';
@@ -25,6 +26,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
   await page.evaluate('globalThis.__name = value => value');
   const sessionRequest = await runSessionRequest(page, mode, handheld);
   const webglLayer = await runWebGLLayer(page, mode, handheld);
+  const fixedFoveation = await runFixedFoveation(page, mode, handheld);
   const renderState = await runRenderState(page, mode, handheld);
   const boundedFloor = await runBoundedFloor(page, mode, handheld);
   const events = await runEvents(page, mode, handheld);
@@ -47,71 +49,102 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     // Exercise the installed Three.js client, including its projection-layer path
     // for sessions that did not request the layers feature.
     const threeUrl = '/three.module.js'; const three = await import(threeUrl) as typeof import('three');
-    for (const depth of [true, false]) for (const withLayers of [false, true]) {
+    const threeClients: unknown[] = [];
+    for (const {depth, withLayers, legacy} of [
+      {depth: true, withLayers: false, legacy: true},
+      ...[true, false].flatMap(depth => [false, true].map(withLayers => ({depth, withLayers, legacy: false}))),
+    ]) {
+      const label = `legacy=${legacy}, layers=${withLayers}, depth=${depth}`;
+      // Harness adaptation: hide binding capability before renderer construction,
+      // because WebXRManager caches it there. The Three.js library is unmodified.
       const client = await xr.navigator.xr.requestSession(mode, {requiredFeatures: ['local-floor', ...(withLayers ? ['layers'] : [])]});
-      const renderer = new three.WebGLRenderer({antialias: false, preserveDrawingBuffer: true, depth});
-      renderer.setSize(640, 480); renderer.xr.enabled = true; document.body.append(renderer.domElement);
-      const geometry = new three.BoxGeometry(0.5, 0.5, 0.5); const material = new three.MeshBasicMaterial({color: 0xff0000});
-      const mesh = new three.Mesh(geometry, material); const scene = new three.Scene(); scene.add(mesh); scene.background = new three.Color(0x0000ff);
+      const capability = Object.getOwnPropertyDescriptor(window, 'XRWebGLBinding')!;
+      if (legacy) Object.defineProperty(window, 'XRWebGLBinding', {...capability, value: undefined});
       try {
-        try { await renderer.xr.setSession(client as unknown as XRSession); }
-        catch (error) {
-          // Three.js 0.186.1 unconditionally constructs its own DepthTexture
-          // with a null format when depth is disabled, after creating the XR
-          // layer. Verify that our initialization succeeded before that error.
-          if (depth || !(error instanceof Error) || !error.message.startsWith('THREE.DepthTexture:')) throw error;
-          const layer = renderer.xr.getBaseLayer() as unknown as Layers.XRProjectionLayer;
-          const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
-          const space = await client.requestReferenceSpace('local-floor');
-          check(layer instanceof xr.XRProjectionLayer && layer.textureWidth > 0 && layer.textureHeight > 0, `Three.js creates a usable no-depth XR layer before its DepthTexture error (layers=${withLayers})`);
-          await new Promise<void>((resolve, reject) => client.requestAnimationFrame((_time, frame) => {
-            try {
-              const image = binding.getViewSubImage(layer, frame.getViewerPose(space)!.views[0]);
-              check(image.depthStencilTexture === null && image.depthStencilTextureWidth === null && image.depthStencilTextureHeight === null, `Three.js null depth format produces no XR depth attachment (layers=${withLayers})`);
-              resolve();
-            } catch (error) { reject(error); }
-          }));
-          continue;
-        }
-        const layer = renderer.xr.getBaseLayer() as unknown as Layers.XRProjectionLayer;
-        const size = renderer.getDrawingBufferSize(new three.Vector2());
-        check(layer instanceof xr.XRProjectionLayer && layer.textureWidth > 0 && layer.textureHeight > 0 && size.x === layer.textureWidth && size.y === layer.textureHeight, `Three.js initializes usable projection dimensions (layers=${withLayers}, depth=${depth})`);
-        if (!withLayers) {
-          check(!client.enabledFeatures.includes('layers'), 'projection rendering does not implicitly enable layers');
-          const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
-          const space = await client.requestReferenceSpace('local-floor');
-          throws(() => binding.createQuadLayer({space, viewPixelWidth: 32, viewPixelHeight: 32}), 'NotSupportedError', 'quad creation still requires layers');
-          const second = binding.createProjectionLayer();
-          throws(() => client.updateRenderState({layers: [layer, second]}), 'NotSupportedError', 'multiple projections still require layers'); second.destroy();
-        }
-        await new Promise<void>((resolve, reject) => {
-          let frames = 0;
-          const timeout = setTimeout(() => { renderer.setAnimationLoop(null); reject(new Error('Three.js XR frames did not complete')); }, 15000);
-          renderer.setAnimationLoop((_time, frame) => {
-            if (!frame) return;
-            try {
-              const pose = frame.getViewerPose(renderer.xr.getReferenceSpace()!)!;
-              mesh.position.set(0, 0, -2).applyMatrix4(new three.Matrix4().fromArray(pose.transform.matrix));
-              renderer.render(scene, new three.PerspectiveCamera());
-              const target = renderer.getRenderTarget()!;
-              check(target.width > 0 && target.height > 0, `Three.js render target remains usable (layers=${withLayers}, depth=${depth})`);
-              const gl = renderer.getContext();
-              check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE, `Three.js framebuffer is complete (layers=${withLayers}, depth=${depth})`);
-              const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
-              const image = binding.getViewSubImage(layer, pose.views[0] as unknown as Geometry.XRView);
-              check((image.depthStencilTexture !== null) === depth, `Three.js projection depth follows renderer options (layers=${withLayers}, depth=${depth})`);
-              if (++frames === 3) { renderer.setAnimationLoop(null); clearTimeout(timeout); resolve(); }
-            } catch (error) { renderer.setAnimationLoop(null); clearTimeout(timeout); reject(error); }
+        const renderer = new three.WebGLRenderer({antialias: false, preserveDrawingBuffer: true, depth});
+        renderer.setSize(640, 480); renderer.xr.enabled = true; document.body.append(renderer.domElement);
+        const geometry = new three.BoxGeometry(0.5, 0.5, 0.5); const material = new three.MeshBasicMaterial({color: 0xff0000});
+        const mesh = new three.Mesh(geometry, material); const scene = new three.Scene(); scene.add(mesh); scene.background = new three.Color(0x0000ff);
+        try {
+          try { await renderer.xr.setSession(client as unknown as XRSession); }
+          catch (error) {
+            // Three.js 0.186.1 unconditionally constructs its own DepthTexture
+            // with a null format when depth is disabled, after creating the XR
+            // layer. Verify that our initialization succeeded before that error.
+            if (legacy || depth || !(error instanceof Error) || !error.message.startsWith('THREE.DepthTexture:')) throw error;
+            const layer = renderer.xr.getBaseLayer() as unknown as Layers.XRProjectionLayer;
+            const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
+            const space = await client.requestReferenceSpace('local-floor');
+            check(layer instanceof xr.XRProjectionLayer && layer.textureWidth > 0 && layer.textureHeight > 0, `Three.js creates a usable no-depth XR layer before its DepthTexture error (layers=${withLayers})`);
+            await new Promise<void>((resolve, reject) => client.requestAnimationFrame((_time, frame) => {
+              try {
+                const image = binding.getViewSubImage(layer, frame.getViewerPose(space)!.views[0]);
+                check(image.depthStencilTexture === null && image.depthStencilTextureWidth === null && image.depthStencilTextureHeight === null, `Three.js null depth format produces no XR depth attachment (layers=${withLayers})`);
+                resolve();
+              } catch (error) { reject(error); }
+            }));
+            threeClients.push({legacy, depth, withLayers, revision: three.REVISION, outcome: 'expected depth-disabled projection client failure', error: error.message});
+            continue;
+          }
+          const layer = renderer.xr.getBaseLayer() as unknown as Layers.XRProjectionLayer | Layers.XRWebGLLayer;
+          const size = renderer.getDrawingBufferSize(new three.Vector2());
+          const width = layer instanceof xr.XRWebGLLayer ? layer.framebufferWidth : layer.textureWidth;
+          const height = layer instanceof xr.XRWebGLLayer ? layer.framebufferHeight : layer.textureHeight;
+          check((legacy ? layer instanceof xr.XRWebGLLayer : layer instanceof xr.XRProjectionLayer) && width > 0 && height > 0 && size.x === width && size.y === height, `Three.js initializes selected layer dimensions (${label})`);
+          for (const value of [0, 0.5, 1, -1, 2]) {
+            renderer.xr.setFoveation(value);
+            check(layer.fixedFoveation === null, `Three.js repeated setFoveation(${value}) reports unsupported (${label})`);
+          }
+          if (!legacy && !withLayers) {
+            check(!client.enabledFeatures.includes('layers'), 'projection rendering does not implicitly enable layers');
+            const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
+            const space = await client.requestReferenceSpace('local-floor');
+            throws(() => binding.createQuadLayer({space, viewPixelWidth: 32, viewPixelHeight: 32}), 'NotSupportedError', 'quad creation still requires layers');
+            const second = binding.createProjectionLayer();
+            throws(() => client.updateRenderState({layers: [layer as Layers.XRProjectionLayer, second]}), 'NotSupportedError', 'multiple projections still require layers'); second.destroy();
+          }
+          await new Promise<void>((resolve, reject) => {
+            let frames = 0;
+            const timeout = setTimeout(() => { renderer.setAnimationLoop(null); reject(new Error('Three.js XR frames did not complete')); }, 15000);
+            renderer.setAnimationLoop((_time, frame) => {
+              if (!frame) return;
+              try {
+                const pose = frame.getViewerPose(renderer.xr.getReferenceSpace()!)!;
+                mesh.position.set(0, 0, -2).applyMatrix4(new three.Matrix4().fromArray(pose.transform.matrix));
+                renderer.render(scene, new three.PerspectiveCamera());
+                const target = renderer.getRenderTarget()!;
+                check(target.width > 0 && target.height > 0, `Three.js render target remains usable (${label})`);
+                const gl = renderer.getContext();
+                check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE, `Three.js framebuffer is complete (${label})`);
+                renderer.xr.setFoveation(frames / 2);
+                check(layer.fixedFoveation === null, `Three.js callback foveation remains null (${label})`);
+                if (layer instanceof xr.XRProjectionLayer) {
+                  const binding = renderer.xr.getBinding() as unknown as Layers.XRWebGLBinding;
+                  const image = binding.getViewSubImage(layer, pose.views[0] as unknown as Geometry.XRView);
+                  check((image.depthStencilTexture !== null) === depth, `Three.js projection depth follows renderer options (${label})`);
+                }
+                if (++frames === 3) { renderer.setAnimationLoop(null); clearTimeout(timeout); resolve(); }
+              } catch (error) { renderer.setAnimationLoop(null); clearTimeout(timeout); reject(error); }
+            });
           });
-        });
-        const gl = renderer.getContext(); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
-        gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-        const red = pixels.filter((v, i) => i % 4 === 0 && v > 200).length; const blue = pixels.filter((v, i) => i % 4 === 2 && v > 200).length;
-        // Three.js deliberately clears the background to transparent for AR.
-        check(red > 0 && (mode === 'immersive-ar' || blue > 0), `Three.js mesh reaches the presentation canvas with the mode's background (layers=${withLayers}, depth=${depth})`);
-        check(gl.getError() === gl.NO_ERROR, `Three.js projection rendering has no GL errors (layers=${withLayers}, depth=${depth})`);
-      } finally { renderer.setAnimationLoop(null); if (!client.ended) await client.end(); renderer.dispose(); geometry.dispose(); material.dispose(); renderer.domElement.remove(); }
+          const gl = renderer.getContext(); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+          gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+          const output = layer instanceof xr.XRWebGLLayer ? (layer._presentationCanvas as HTMLCanvasElement).getContext('2d')!.getImageData(0, 0, layer.framebufferWidth, layer.framebufferHeight).data : pixels;
+          const red = output.filter((v, i) => i % 4 === 0 && v > 200).length; const blue = output.filter((v, i) => i % 4 === 2 && v > 200).length;
+          // Three.js deliberately clears the background to transparent for AR.
+          check(red > 0 && (mode === 'immersive-ar' || blue > 0), `Three.js mesh reaches the presentation canvas with the mode's background (${label})`);
+          check(gl.getError() === gl.NO_ERROR, `Three.js rendering has no GL errors (${label})`);
+          threeClients.push({outcome: 'rendered', legacy, harnessAdaptation: legacy ? 'XRWebGLBinding hidden before renderer construction' : null, depth, withLayers, revision: three.REVISION, layer: layer.constructor.name, frames: 3, foveation: layer.fixedFoveation, red, blue});
+        } finally {
+          renderer.setAnimationLoop(null); if (!client.ended) await client.end(); renderer.dispose(); geometry.dispose(); material.dispose(); renderer.domElement.remove();
+          check(client.ended && !renderer.xr.isPresenting, `Three.js clean shutdown (${label})`);
+        }
+      } finally {
+        try { if (!client.ended) await client.end(); }
+        finally { Object.defineProperty(window, 'XRWebGLBinding', capability); }
+        check(Object.getOwnPropertyDescriptor(window, 'XRWebGLBinding')!.value === capability.value, `Three.js capability restored (${label})`);
+      }
     }
     check(['XRSystem', 'XRSession', 'XRFrame', 'XRSpace', 'XRReferenceSpace', 'XRBoundedReferenceSpace', 'XRRigidTransform', 'XRWebGLLayer', 'XRWebGLBinding', 'XRAnchor', 'XRHand', 'XRJointPose', 'XRCPUDepthInformation', 'XRLightProbe'].every(name => typeof (window as unknown as Record<string, unknown>)[name] === 'function'), 'public constructors installed');
     await rejects(() => xr.navigator.xr.isSessionSupported('invalid' as SessionMode), 'TypeError', 'invalid support mode');
@@ -1061,7 +1094,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         inputCanvas.remove();
       }
     }
-    return {mode, handheld, assertions: new Set(passed).size, passed: [...new Set(passed)]};
+    return {mode, handheld, threeClients, assertions: new Set(passed).size, passed: [...new Set(passed)]};
   }, {mode, handheld});
-  return {...result, webglLayer, events, boundedFloor, renderState, sessionRequest, inputLifecycle, bulkFrame, popupBulkFrame};
+  return {...result, fixedFoveation, webglLayer, events, boundedFloor, renderState, sessionRequest, inputLifecycle, bulkFrame, popupBulkFrame};
 }

@@ -1,5 +1,6 @@
 import type {XRSession, XRFrame, XRInputSource} from './runtime';
 import type {EventHandler} from './event-handlers';
+import {createLayerAllocations} from './layer-allocation';
 
 // Same-origin injections share allocation brands, not writable WeakSets. Only
 // constructors can brand a newly allocated object; borrowing a prototype or
@@ -24,6 +25,7 @@ function createBrands() {
   Object.freeze(SessionObject.prototype); Object.freeze(SessionObject);
   Object.freeze(InputSourceObject.prototype); Object.freeze(InputSourceObject);
   return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
+    layerAllocations: createLayerAllocations(sessions),
     // Dispatch and declared event attributes belong to the object, even when an
     // accessor from another injection is borrowed. Weak keys reject proxies and
     // prototype forgeries just as they do in an individual injection.
@@ -65,3 +67,7 @@ if (!Object.prototype.hasOwnProperty.call(shared, key)) {
   Object.defineProperty(shared, key, {value: createBrands()});
 }
 export const interfaceBrands = shared[key];
+
+// All injections use the same complete allocation constructors and private
+// membership records. Never discover or invoke predicates from frame properties.
+export const layerBrands = interfaceBrands.layerAllocations;
