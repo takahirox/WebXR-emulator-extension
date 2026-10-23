@@ -3,6 +3,7 @@ import type {XRSession} from './runtime';
 
 export const sessionObjects = new WeakSet<object>();
 export const frameObjects = new WeakSet<object>();
+export const spaceObjects = new WeakSet<object>();
 export const compatibleContexts = new WeakSet<WebGLRenderingContext | WebGL2RenderingContext>();
 
 export const invalidState = (message: string): never => { throw new DOMException(message, 'InvalidStateError'); };
@@ -42,7 +43,7 @@ export class XRRigidTransform {
 // Every space carries a session and a world-space matrix provider.
 export class XRSpace extends EventTarget {
   _baseMatrix: mat4 | null = null;
-  constructor(readonly _session: XRSession, private matrixProvider: () => mat4 | null) { super(); }
+  constructor(readonly _session: XRSession, private matrixProvider: () => mat4 | null) { super(); spaceObjects.add(this); }
   get _inverseBaseMatrix() { return this._baseMatrix && mat4.invert(mat4.create(), this._baseMatrix); }
   _update() { this._baseMatrix = this.matrixProvider(); return this._baseMatrix; }
   _adjustForOriginOffset(_matrix: mat4) {} // Offset is already in _baseMatrix.

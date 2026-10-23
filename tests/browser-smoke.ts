@@ -1,5 +1,6 @@
 import {runDeferredSessionRequest} from './session-request';
 import {runConformance} from './conformance';
+import {runSharedBulkFrame} from './bulk-frame';
 import {startProfileSwitchProbe, checkProfileSwitchProbe} from './input-lifecycle';
 import {runDOMOverlayPreview} from './dom-overlay-production';
 import {runDOMOverlayNegotiation} from './dom-overlay-negotiation';
@@ -59,6 +60,11 @@ const server = createServer((request, response) => {
   } else if (request.url === '/fixture.js') {
     response.setHeader('Content-Type', 'application/javascript');
     response.end(fixture);
+  } else if (request.url === '/bulk-isolated') {
+    response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+    response.setHeader('Content-Type', 'text/html');
+    response.end('<!doctype html><body>Isolated bulk buffer fixture</body>');
   } else if (request.url === '/' || request.url === '/frame' || request.url === '/csp') {
     // Embedded AR images may use blob URLs, but must not need blob connections.
     if (request.url === '/csp') response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' blob: data:; frame-src 'self' http://localhost:*; style-src 'self' 'unsafe-inline'; object-src 'none'");
@@ -573,6 +579,11 @@ try {
   conformance.push(await runConformance(page, 'immersive-ar', true));
   await checkProfileSwitchProbe(profileSwitchProbe);
   await profileSwitchProbe.dispose();
+  console.log('Checking shared bulk buffers in an isolated page');
+  const isolated = await context.newPage();
+  let sharedBulkFrame: Awaited<ReturnType<typeof runSharedBulkFrame>>;
+  try { await isolated.goto(`${origin}/bulk-isolated`); sharedBulkFrame = await runSharedBulkFrame(isolated); }
+  finally { await isolated.close(); }
   await writeFile(path.join(root, 'test-results/input-lifecycle.json'), JSON.stringify({browser: await context.browser()!.version(), profiles: conformance.map(result => result.inputLifecycle), panelProfileSwitch: 'passed: held Quest MR Gamepad remains disconnected and unchanged through Android AR inputs'}, null, 2));
   console.log('Checking session requests with deferred device initialization');
   const deferredSessionRequests = [];
@@ -690,7 +701,7 @@ try {
   } finally { await restarted.close(); }
   await writeFile(path.join(root, 'test-results/dom-overlay-preview.json'), JSON.stringify({browser: await context.browser()!.version(), disabledNegotiation: [overlayNegotiation, questDisabledNegotiation], previews: overlayPreviews, lifecycle: ['profile switch', 'opt-out', 'Quest MR to VR', 'page reload', 'panel reload persistence', 'extension reload cleanup', 'same-profile browser relaunch persistence']}, null, 2));
   await writeFile(path.join(root, 'test-results/dom-overlay-feasibility.json'), JSON.stringify({browser: await context.browser()!.version(), overlayPrototypes}, null, 2));
-  await writeFile(path.join(root, 'test-results/webxr-conformance.json'), JSON.stringify({browser: await context.browser()!.version(), conformance}, null, 2));
+  await writeFile(path.join(root, 'test-results/webxr-conformance.json'), JSON.stringify({browser: await context.browser()!.version(), conformance, sharedBulkFrame}, null, 2));
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(panel.errors, [], 'no panel runtime or WebGL errors');
   assert.deepEqual(consoleErrors, [], 'no page shader, WebGL, or loader errors');

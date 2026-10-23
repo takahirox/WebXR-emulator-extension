@@ -894,6 +894,7 @@ function WebXRPolyfillInjection() {
 
   const sessionObjects = new WeakSet();
   const frameObjects = new WeakSet();
+  const spaceObjects = new WeakSet();
   const compatibleContexts = new WeakSet();
   const invalidState = (message) => { throw new DOMException(message, 'InvalidStateError'); };
   const unsupported = (message) => { throw new DOMException(message, 'NotSupportedError'); };
@@ -933,6 +934,7 @@ function WebXRPolyfillInjection() {
           this._session = _session;
           this.matrixProvider = matrixProvider;
           this._baseMatrix = null;
+          spaceObjects.add(this);
       }
       get _inverseBaseMatrix() { return this._baseMatrix && invert(create$3(), this._baseMatrix); }
       _update() { this._baseMatrix = this.matrixProvider(); return this._baseMatrix; }
@@ -1031,6 +1033,7 @@ function WebXRPolyfillInjection() {
     frameObjects: frameObjects,
     invalidState: invalidState,
     sessionObjects: sessionObjects,
+    spaceObjects: spaceObjects,
     unsupported: unsupported
   });
 
@@ -1539,11 +1542,13 @@ function WebXRPolyfillInjection() {
   }
   const names = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
       ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))];
+  const jointObjects = new WeakSet();
   class XRJointSpace extends XRSpace {
       constructor(session, jointName, _radius, provider) {
           super(session, provider);
           this.jointName = jointName;
           this._radius = _radius;
+          jointObjects.add(this);
       }
   }
   class XRJointPose extends XRPose {
@@ -1660,7 +1665,8 @@ function WebXRPolyfillInjection() {
     XRJointPose: XRJointPose,
     XRJointSpace: XRJointSpace,
     XRLightEstimate: XRLightEstimate,
-    XRLightProbe: XRLightProbe
+    XRLightProbe: XRLightProbe,
+    jointObjects: jointObjects
   });
 
   const REVISION = '186';
@@ -25083,6 +25089,49 @@ void main() {
       Object.freeze([-1, 0, 1]),
   ]);
 
+  var _a;
+  const typedArray = Object.getPrototypeOf(Float32Array.prototype);
+  const arrayName = Object.getOwnPropertyDescriptor(typedArray, Symbol.toStringTag).get;
+  const arrayBuffer = Object.getOwnPropertyDescriptor(typedArray, 'buffer').get;
+  const arrayLength = Object.getOwnPropertyDescriptor(typedArray, 'length').get;
+  const bufferLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
+  const bufferResizable = (_a = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'resizable')) === null || _a === void 0 ? void 0 : _a.get;
+  function isObject$1(value) { return Object(value) === value; }
+  function interfaceValue(value, brand, name) {
+      if (!isObject$1(value) || !brand.has(value))
+          throw new TypeError(`Expected ${name}.`);
+      return value;
+  }
+  function interfaceSequence(value, brand, name) {
+      if (!isObject$1(value))
+          throw new TypeError('Expected iterable sequence.');
+      const method = value[Symbol.iterator];
+      if (typeof method !== 'function')
+          throw new TypeError('Expected iterable sequence.');
+      const iterator = Reflect.apply(method, value, []);
+      if (!isObject$1(iterator))
+          throw new TypeError('Expected iterator object.');
+      const next = iterator.next;
+      const list = [];
+      while (true) {
+          const step = Reflect.apply(next, iterator, []);
+          if (!isObject$1(step))
+              throw new TypeError('Expected iterator result object.');
+          if (step.done)
+              return list;
+          list.push(interfaceValue(step.value, brand, name));
+      }
+  }
+  function float32Output(value) {
+      if (arrayName.call(value) !== 'Float32Array')
+          throw new TypeError('Expected Float32Array.');
+      const buffer = arrayBuffer.call(value);
+      bufferLength.call(buffer);
+      if (bufferResizable === null || bufferResizable === void 0 ? void 0 : bufferResizable.call(buffer))
+          throw new TypeError('Resizable buffers are not supported.');
+      return arrayLength.call(value);
+  }
+
   const PRIVATE$4 = Symbol('@@webxr-polyfill/XRRay');
   class XRRay {
       constructor(origin, direction) {
@@ -26008,32 +26057,45 @@ void main() {
           return pose ? new XRJointPose(pose.transform, joint._radius) : null;
       }
       fillJointRadii(joints, radii) {
+          interfaceValue(this, frameObjects, 'XRFrame');
+          if (arguments.length < 2)
+              throw new TypeError('Expected joints and radii.');
+          const list = interfaceSequence(joints, jointObjects, 'XRJointSpace');
+          const capacity = float32Output(radii);
           this._assertActive();
-          const list = [...joints];
-          if (radii.length < list.length)
-              throw new TypeError('Insufficient radii array.');
-          for (const [index, joint] of list.entries()) {
-              if (!(joint instanceof XRJointSpace))
-                  throw new TypeError('Expected XRJointSpace.');
+          for (const joint of list)
               this.session._owns(joint);
-              radii[index] = joint._radius;
+          if (capacity < list.length)
+              throw new TypeError('Insufficient radii array.');
+          let valid = true;
+          for (const [index, joint] of list.entries()) {
+              const tracked = joint._update() !== null;
+              radii[index] = tracked ? joint._radius : NaN;
+              if (!tracked)
+                  valid = false;
           }
-          return true;
+          return valid;
       }
       fillPoses(spaces, baseSpace, transforms) {
+          interfaceValue(this, frameObjects, 'XRFrame');
+          if (arguments.length < 3)
+              throw new TypeError('Expected spaces, baseSpace and transforms.');
+          const list = interfaceSequence(spaces, spaceObjects, 'XRSpace');
+          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+          const capacity = float32Output(transforms);
           this._assertActive();
-          const list = [...spaces];
-          if (transforms.length < list.length * 16)
+          for (const space of list)
+              this.session._owns(space);
+          this.session._owns(baseSpace);
+          if (capacity < list.length * 16)
               throw new TypeError('Insufficient transform array.');
           let valid = true;
           for (const [index, space] of list.entries()) {
               const pose = this.getPose(space, baseSpace);
-              if (pose)
-                  transforms.set(pose.transform.matrix, index * 16);
-              else {
+              if (!pose)
                   valid = false;
-                  transforms.fill(NaN, index * 16, index * 16 + 16);
-              }
+              for (let component = 0; component < 16; component++)
+                  transforms[index * 16 + component] = pose ? pose.transform.matrix[component] : NaN;
           }
           return valid;
       }
