@@ -372,5 +372,307 @@
     "Preserve the Issue #33 framebuffer requirement corrections and page-world/native-isolation distinctions in docs/webxr-conformance.md and docs/webxr-framebuffer-validation-2026-10-24.json."
   ],
   "required_post_merge_verification": "None",
-  "downstream_handoff": "Implementation, build and browser checks performed by the Coordinator in this worktree. No independent AI review was requested/performed. Carry the documented assumption/correction and primary references into the eventual Issue/PR record; this node does not push, open PRs, merge, or change GitHub comments/content."
+  "downstream_handoff": "Implementation, build and browser checks performed by the Coordinator in this worktree. No independent AI review was requested/performed. Carry the documented assumption/correction and primary references into the eventual Issue/PR record; this node does not push, open PRs, merge, or change GitHub comments/content.",
+  "review_fix_validation": {
+    "recorded_at": "2026-10-23T20:12:17.300785+00:00",
+    "selected_upstream_checkpoint": "e9f240fe9878b976f7f541ec8490dfeb02b8b994",
+    "tested_revision": "Review-fix worktree; runtime, fixtures, inventory and bundle identified by SHA-256 below. Commit created after this record.",
+    "finding": "Exposed WebGLLayerObject/CompositionLayerObject constructors could brand unrelated objects allocated with Reflect.construct, so getters succeeded and setters coerced invalid receivers.",
+    "fix": "Remove the branding allocation bases. Brand only after the matching complete layer constructor initializes its object. Keep writers and WeakSets injection-local; publish frozen read-only membership checks for discovery through accessible frame/parent/opener links. Cache discovered checks for previously borrowed retained objects.",
+    "regressions": "Both former ancestor paths, called directly and with Object or a matching public constructor as newTarget, are rejected by both getters and setters before coercion. Cases run on WebGL1/2, inline/immersive and across injected realms. Existing forged-quad case remains. Ended cross-realm layers retain behavior after their iframe is removed.",
+    "commands": [
+      {
+        "command": "npm ci",
+        "exit_code": 0,
+        "log_sha256": "1e60c51e3aa9cc066259c70a528eb2674573fa511d67a9dfaa37d61f0f036bd0"
+      },
+      {
+        "command": "npm run build",
+        "exit_code": 0,
+        "includes": "typecheck, TypeScript emission, polyfill/extension/panel bundles",
+        "log_sha256": "1bdfda3710958f770a08bbc9dbb1ca24641d400668cdcf28d56d3849489cd640"
+      },
+      {
+        "command": "npm run test:browser",
+        "exit_code": 0,
+        "log_sha256": "87c3419d27d8a3bbb95529aa93519f3bb9213bf49c11866fe2bf267e9d78eccb"
+      },
+      {
+        "command": "git diff --check",
+        "exit_code": 0
+      }
+    ],
+    "tools": {
+      "node": "v24.12.0",
+      "npm": "11.6.2",
+      "playwright": "1.64.0",
+      "typescript": "5.9.3",
+      "tsx": "4.23.15",
+      "chromium": "156.0.8078.4",
+      "three": "0.186.1; REVISION 186",
+      "platform": "Darwin arm64; Playwright Chromium revision 1248 desktop Chrome for Testing, fresh temporary profile, unpacked MV3 extension, SwiftShader; no Manifest V2 compatibility flags"
+    },
+    "outcome": "PASS; complete build and unpacked-extension browser suite pass. No failed attempts or focused skips in this revision.",
+    "focused_foveation_assertions_total": 2748,
+    "new_ancestor_rejection_assertions_total": 486,
+    "existing_framebuffer_assertions_total": 670,
+    "profiles": [
+      {
+        "mode": "immersive-vr",
+        "handheld": false,
+        "focused_foveation_assertions": 916,
+        "new_ancestor_rejection_assertions": 162,
+        "focused_foveation_failures": [],
+        "focused_foveation_skips": [],
+        "existing_framebuffer_assertions": 232,
+        "consolidated_conformance_distinct_assertions": 546,
+        "three_clients": [
+          {
+            "outcome": "rendered",
+            "legacy": true,
+            "harnessAdaptation": "XRWebGLBinding hidden before renderer construction",
+            "depth": true,
+            "withLayers": false,
+            "revision": "186",
+            "layer": "XRWebGLLayer",
+            "frames": 3,
+            "foveation": null,
+            "red": 20808,
+            "blue": 900384
+          },
+          {
+            "outcome": "rendered",
+            "legacy": false,
+            "harnessAdaptation": null,
+            "depth": true,
+            "withLayers": false,
+            "revision": "186",
+            "layer": "XRProjectionLayer",
+            "frames": 3,
+            "foveation": null,
+            "red": 21012,
+            "blue": 900588
+          },
+          {
+            "outcome": "rendered",
+            "legacy": false,
+            "harnessAdaptation": null,
+            "depth": true,
+            "withLayers": true,
+            "revision": "186",
+            "layer": "XRProjectionLayer",
+            "frames": 3,
+            "foveation": null,
+            "red": 21012,
+            "blue": 900588
+          },
+          {
+            "legacy": false,
+            "depth": false,
+            "withLayers": false,
+            "revision": "186",
+            "outcome": "expected depth-disabled projection client failure",
+            "error": "THREE.DepthTexture: format must be either THREE.DepthFormat or THREE.DepthStencilFormat"
+          },
+          {
+            "legacy": false,
+            "depth": false,
+            "withLayers": true,
+            "revision": "186",
+            "outcome": "expected depth-disabled projection client failure",
+            "error": "THREE.DepthTexture: format must be either THREE.DepthFormat or THREE.DepthStencilFormat"
+          }
+        ],
+        "existing_bulk_skips": [
+          "inline: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)",
+          "immersive-vr: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": false,
+        "focused_foveation_assertions": 916,
+        "new_ancestor_rejection_assertions": 162,
+        "focused_foveation_failures": [],
+        "focused_foveation_skips": [],
+        "existing_framebuffer_assertions": 232,
+        "consolidated_conformance_distinct_assertions": 617,
+        "three_clients": [
+          {
+            "outcome": "rendered",
+            "legacy": true,
+            "harnessAdaptation": "XRWebGLBinding hidden before renderer construction",
+            "depth": true,
+            "withLayers": false,
+            "revision": "186",
+            "layer": "XRWebGLLayer",
+            "frames": 3,
+            "foveation": null,
+            "red": 21012,
+            "blue": 0
+          },
+          {
+            "outcome": "rendered",
+            "legacy": false,
+            "harnessAdaptation": null,
+            "depth": true,
+            "withLayers": false,
+            "revision": "186",
+            "layer": "XRProjectionLayer",
+            "frames": 3,
+            "foveation": null,
+            "red": 21012,
+            "blue": 0
+          },
+          {
+            "outcome": "rendered",
+            "legacy": false,
+            "harnessAdaptation": null,
+            "depth": true,
+            "withLayers": true,
+            "revision": "186",
+            "layer": "XRProjectionLayer",
+            "frames": 3,
+            "foveation": null,
+            "red": 21012,
+            "blue": 0
+          },
+          {
+            "legacy": false,
+            "depth": false,
+            "withLayers": false,
+            "revision": "186",
+            "outcome": "expected depth-disabled projection client failure",
+            "error": "THREE.DepthTexture: format must be either THREE.DepthFormat or THREE.DepthStencilFormat"
+          },
+          {
+            "legacy": false,
+            "depth": false,
+            "withLayers": true,
+            "revision": "186",
+            "outcome": "expected depth-disabled projection client failure",
+            "error": "THREE.DepthTexture: format must be either THREE.DepthFormat or THREE.DepthStencilFormat"
+          }
+        ],
+        "existing_bulk_skips": [
+          "inline: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)",
+          "immersive-ar: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": true,
+        "focused_foveation_assertions": 916,
+        "new_ancestor_rejection_assertions": 162,
+        "focused_foveation_failures": [],
+        "focused_foveation_skips": [],
+        "existing_framebuffer_assertions": 206,
+        "consolidated_conformance_distinct_assertions": 506,
+        "three_clients": [
+          {
+            "outcome": "rendered",
+            "legacy": true,
+            "harnessAdaptation": "XRWebGLBinding hidden before renderer construction",
+            "depth": true,
+            "withLayers": false,
+            "revision": "186",
+            "layer": "XRWebGLLayer",
+            "frames": 3,
+            "foveation": null,
+            "red": 75076,
+            "blue": 0
+          },
+          {
+            "outcome": "rendered",
+            "legacy": false,
+            "harnessAdaptation": null,
+            "depth": true,
+            "withLayers": false,
+            "revision": "186",
+            "layer": "XRProjectionLayer",
+            "frames": 3,
+            "foveation": null,
+            "red": 75076,
+            "blue": 0
+          },
+          {
+            "outcome": "rendered",
+            "legacy": false,
+            "harnessAdaptation": null,
+            "depth": true,
+            "withLayers": true,
+            "revision": "186",
+            "layer": "XRProjectionLayer",
+            "frames": 3,
+            "foveation": null,
+            "red": 75076,
+            "blue": 0
+          },
+          {
+            "legacy": false,
+            "depth": false,
+            "withLayers": false,
+            "revision": "186",
+            "outcome": "expected depth-disabled projection client failure",
+            "error": "THREE.DepthTexture: format must be either THREE.DepthFormat or THREE.DepthStencilFormat"
+          },
+          {
+            "legacy": false,
+            "depth": false,
+            "withLayers": true,
+            "revision": "186",
+            "outcome": "expected depth-disabled projection client failure",
+            "error": "THREE.DepthTexture: format must be either THREE.DepthFormat or THREE.DepthStencilFormat"
+          }
+        ],
+        "existing_bulk_skips": [
+          "inline: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)",
+          "immersive-ar: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)"
+        ]
+      }
+    ],
+    "isolated_bulk_assertions": 49,
+    "source_sha256": {
+      "build.ts": "87dee5f5acf79f860967347b1929c8253f2d41dae1afda94aa510cc47e6b8dca",
+      "package.json": "16742db6018a59485c43c9823eb78715403b459efd9aed378042f0dd0f8fcc69",
+      "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+      "docs/webxr-conformance.md": "da3ef5d5f23275df69806c097c201a0a91eb5021d89b0ce5e1a848ec4bdb6083",
+      "polyfill/webxr-polyfill.js": "e4d9a492d57d30836f4d449c92be72c3094cfa5a7e692d3561c2b2b0124cca54",
+      "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+      "src/polyfill/api/interface-brand.ts": "7657d48862e918f620cc025996be4553b8ca7c162c622a8ee215acb9cac7d678",
+      "src/polyfill/api/layers.ts": "77017f938425cdba4d789d69c3e70b75d59a0b97aa5b9a28343baa266631e2c2",
+      "src/polyfill/api/geometry.ts": "cba53b618856cc6f3281f9cb8b3c0de2accec6993b806086a3ec028b46069abb",
+      "src/polyfill/api/runtime.ts": "9b9045ec65ef58d48d505b7268dd39055fead403d6ee83cd8480ebf2b611b04f",
+      "src/polyfill/webgl.ts": "69598ac7e14f5e65b8f5193331c68ffe7d6e8a8e4b25081b8528f6dc9374a4f6",
+      "src/polyfill/opaque-framebuffer.ts": "cc62717ab1fff897e0948dfc8cc716b7ff332a79859754443a0cf881300b22c4",
+      "src/polyfill/xr-framebuffer.ts": "5ca4197ee38325ba5e69641a8918be2e00faa585431e45d439cb7c96d06cee51",
+      "src/polyfill/ARScene.ts": "31668cab4f4fda0dfb98fb7dfbef0d75e2c834ac44c52373ddb9859878058846",
+      "src/polyfill/EmulatedXRDevice.ts": "32287d2242ac79c58176cb0c9c146568dfada82d40eb3c4959c53e100e7b8d5b",
+      "tests/browser-smoke.ts": "7748bfb901840eda8fd6c256f06c101686a44c43d8bb751e155beb96b6e04fca",
+      "tests/conformance.ts": "0d79897c68cca9f5b94d950dc866b2841b249bfed8796a85f56f116ab7134141",
+      "tests/fixed-foveation.ts": "22224caae6bbea813d1112c6fad63aa602cb92e9b41f6c6a4152ae65c6f39f8d",
+      "tests/webgl-layer.ts": "1a61e0c0ee343afbdb7f6ffb9da2860df904a03e60c59bc60fc1690103cc6e1a",
+      "tests/render-state.ts": "bde61507ea8fb72b2c5cd21cfb5c0b91b3d20c69169975cf5730d7c193bd1b9c",
+      "tests/fixture.ts": "a33c6a632e36cb3b4b86ff09f49f4378ca6a3bb8a2a40081459cc84c8dff97e5",
+      "node_modules/three/package.json": "f9c474a27c920b9435353a6235968f4453436bee0444fac7e5fd289c8fa463de",
+      "node_modules/three/src/renderers/webxr/WebXRManager.js": "828834acbac95ab4236af9f23061049686f84d9b66a7bfae27ae92a68af97040",
+      "node_modules/three/build/three.core.js": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+      "node_modules/three/build/three.module.js": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea"
+    },
+    "artifact_sha256": {
+      "fixed-foveation.json": "bc8c48916f9a5bd411e4380caa47e7e22d7259155674197d4d082e40f10134cb",
+      "webgl-layer.json": "f82c2c009c13977d798c12886728f9bfc108cbb1badd61e319ce9ba24349b444",
+      "webxr-conformance.json": "44831c618fc2b52843147176bd2b6ed606c57f4bdcf9054c0c281a0eb8fbe594"
+    },
+    "generated_bundle_inspection": "Inspected the complete generated bundle diff: removal of shared layer allocation bases and projection token, injection-local brand writes/read-only cross-realm membership discovery, direct XRLayer inheritance, and matching-constructor branding. Float conversion and unrelated runtime/library sections are unchanged. No tracked changes to other generated bundles.",
+    "skips_and_limits": [
+      "No focused foveation/framebuffer skips. Six pre-existing ordinary-page shared-buffer skips remain; isolated shared-buffer fixture passes 49 assertions.",
+      "No new unmodified WPT or WPT IDL run; pinned IDL files are reference evidence only.",
+      "Firefox runtime, physical devices and optional pinned official Three.js example were not exercised. Custom library fixtures do not establish official application success.",
+      "Preserve the Issue #33 framebuffer requirement corrections and page-world/native-isolation distinctions in docs/webxr-conformance.md and docs/webxr-framebuffer-validation-2026-10-24.json."
+    ],
+    "requirement_changes": "None; receiver-before-conversion acceptance is preserved. Earlier commands, hashes and counts above remain historical evidence; this section identifies the review-fix runtime.",
+    "required_post_merge_verification": "None",
+    "publication": "No push, merge, GitHub content changes or independent review performed. Forward the existing PR identity/head SHA unchanged for downstream publication."
+  }
 }

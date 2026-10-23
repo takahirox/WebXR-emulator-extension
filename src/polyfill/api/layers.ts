@@ -5,7 +5,7 @@ import {XRSpace, XRRigidTransform, XRView, XRViewport, sessionObjects, frameObje
 import type {XRSession, XRFrame} from './runtime';
 import type {BaseLayer} from '../../types/polyfill';
 import type {XRLightProbe} from './sensing';
-import {interfaceBrands} from './interface-brand';
+import {layerBrands} from './interface-brand';
 
 function convertNullableFloat(value: unknown) {
   if (value === null || value === undefined) return;
@@ -16,7 +16,7 @@ function convertNullableFloat(value: unknown) {
 
 export class XRLayer extends EventTarget {}
 const webglStorage = new WeakMap<XRWebGLLayer, XRFramebuffer>();
-export class XRWebGLLayer extends interfaceBrands.WebGLLayerObject implements BaseLayer {
+export class XRWebGLLayer extends XRLayer implements BaseLayer {
   constructor(readonly _session: XRSession, readonly context: WebGLRenderingContext | WebGL2RenderingContext, init?: unknown) {
     super();
     if (!sessionObjects.has(_session)) throw new TypeError('Expected XRSession.');
@@ -31,17 +31,18 @@ export class XRWebGLLayer extends interfaceBrands.WebGLLayerObject implements Ba
       _session._webglLayers.add(this);
       context.canvas.addEventListener('webglcontextlost', this.lost);
     }
+    layerBrands.webgl.add(this);
   }
   private lost = () => this._dispose();
   get antialias() { return webglStorage.get(this)?.antialias ?? this.context.getContextAttributes()?.antialias ?? false; }
   get ignoreDepthValues() { return true; }
   get framebuffer() { return webglStorage.get(this)?.framebuffer ?? null; }
   get fixedFoveation() {
-    if (!interfaceBrands.webglLayers.has(this)) throw new TypeError('Expected XRWebGLLayer.');
+    if (!layerBrands.webgl.has(this)) throw new TypeError('Expected XRWebGLLayer.');
     return null;
   }
   set fixedFoveation(value: unknown) {
-    if (!interfaceBrands.webglLayers.has(this)) throw new TypeError('Expected XRWebGLLayer.');
+    if (!layerBrands.webgl.has(this)) throw new TypeError('Expected XRWebGLLayer.');
     convertNullableFloat(value);
   }
   get framebufferWidth() { return webglStorage.get(this)?.width ?? this.context.drawingBufferWidth; }
@@ -75,8 +76,7 @@ function validateLayerSpace(session: XRSession, space: XRSpace) {
   if (!(space instanceof XRSpace) || space._session !== session) throw new TypeError('Layer space must belong to the same session.');
   return space;
 }
-const projectionAllocation = Symbol('XRProjectionLayer allocation');
-export class XRCompositionLayer extends interfaceBrands.CompositionLayerObject {
+export class XRCompositionLayer extends XRLayer {
   readonly layout: string;
   blendTextureSourceAlpha = true;
   readonly chromaticAberrationCorrection = null;
@@ -92,10 +92,8 @@ export class XRCompositionLayer extends interfaceBrands.CompositionLayerObject {
   _needsClear = true;
   _lastClearFrame: XRFrame | null = null;
   _needsRedraw = true;
-  constructor(readonly _binding: XRWebGLBinding, readonly _init: LayerInit, allocation?: symbol) {
-    // Only the projection constructor can supply this injection-local token.
-    // Changing another interface's prototype must not grant its brand.
-    super(allocation === projectionAllocation);
+  constructor(readonly _binding: XRWebGLBinding, readonly _init: LayerInit) {
+    super();
     this.layout = _init.layout ?? 'mono';
     this._clearOnAccess = _init.clearOnAccess === undefined || Boolean(_init.clearOnAccess);
     const gl = _binding._gl2(); this._color = gl.createTexture()!;
@@ -137,21 +135,18 @@ export class XRCompositionLayer extends interfaceBrands.CompositionLayerObject {
   }
 }
 export class XRProjectionLayer extends XRCompositionLayer {
-  constructor(binding: XRWebGLBinding, init: LayerInit) { super(binding, init, projectionAllocation); }
+  constructor(binding: XRWebGLBinding, init: LayerInit) { super(binding, init); layerBrands.projection.add(this); }
   get fixedFoveation() {
-    if (!interfaceBrands.projectionLayers.has(this)) throw new TypeError('Expected XRProjectionLayer.');
+    if (!layerBrands.projection.has(this)) throw new TypeError('Expected XRProjectionLayer.');
     return null;
   }
   set fixedFoveation(value: unknown) {
-    if (!interfaceBrands.projectionLayers.has(this)) throw new TypeError('Expected XRProjectionLayer.');
+    if (!layerBrands.projection.has(this)) throw new TypeError('Expected XRProjectionLayer.');
     convertNullableFloat(value);
   }
   readonly ignoreDepthValues = true;
   readonly deltaPose = null;
 }
-// Keep public prototype inheritance local, as with the other allocation bases.
-Object.setPrototypeOf(XRWebGLLayer.prototype, XRLayer.prototype);
-Object.setPrototypeOf(XRCompositionLayer.prototype, XRLayer.prototype);
 for (const prototype of [XRWebGLLayer.prototype, XRProjectionLayer.prototype]) {
   Object.defineProperty(prototype, 'fixedFoveation', {...Object.getOwnPropertyDescriptor(prototype, 'fixedFoveation'), enumerable: true});
 }

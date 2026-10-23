@@ -46,11 +46,21 @@ export async function runFixedFoveation(page: Page, mode: SessionMode, handheld:
           let error: unknown; try { layer.fixedFoveation = value; } catch (caught) { error = caught; }
           check(error === sentinel, `${label}: coercion exception identity`);
         }
-        for (const fake of [undefined, null, 1, {}, C.prototype, Object.create(C.prototype), new Proxy(layer, {}), ...(other ? [other] : [])]) {
-          throws(() => d.get!.call(fake), `${label}: getter receiver`);
+        // Public constructors expose their allocation ancestry. Neither calling
+        // those bases directly nor supplying Object/the matching public
+        // constructor as newTarget may manufacture a matching layer brand.
+        const allocations = [
+          [Object.getPrototypeOf(api.XRWebGLLayer), []],
+          [Object.getPrototypeOf(api.XRCompositionLayer), [true]],
+        ] as const;
+        const allocatedForgeries = allocations.flatMap(([base, args]) => [
+          Reflect.construct(base, args), Reflect.construct(base, args, Object), Reflect.construct(base, args, C as Function),
+        ]);
+        for (const [index, fake] of [undefined, null, 1, {}, C.prototype, Object.create(C.prototype), new Proxy(layer, {}), ...(other ? [other] : []), ...allocatedForgeries].entries()) {
+          throws(() => d.get!.call(fake), `${label}: getter receiver ${index}`);
           let reads = 0;
-          throws(() => d.set!.call(fake, {[Symbol.toPrimitive]() { reads++; throw sentinel; }}), `${label}: setter receiver before conversion`);
-          check(reads === 0, `${label}: invalid receiver does not coerce`);
+          throws(() => d.set!.call(fake, {[Symbol.toPrimitive]() { reads++; throw sentinel; }}), `${label}: setter receiver before conversion ${index}`);
+          check(reads === 0, `${label}: invalid receiver does not coerce ${index}`);
         }
       }
       // Any GL call from the attributes is a failure, including allocation,
@@ -169,6 +179,7 @@ export async function runFixedFoveation(page: Page, mode: SessionMode, handheld:
             }
           }
           await local.session.end(); await remote.session.end();
+          document.querySelector('#foveation-realm')!.remove();
           for (const [owner, borrower] of [[local, foreignAPI], [remote, api]] as const) {
             noGL(owner.gl, () => {
               for (const [layer, C] of [[owner.base, borrower.XRWebGLLayer], [owner.projection, borrower.XRProjectionLayer]] as const) {
@@ -182,5 +193,5 @@ export async function runFixedFoveation(page: Page, mode: SessionMode, handheld:
       } finally { if (!local.session.ended) await local.session.end(); local.gl.getExtension('WEBGL_lose_context')?.loseContext(); }
       return {mode, handheld, assertions: passed.length, passed};
     }, {mode, handheld});
-  } finally { await page.locator('#foveation-realm').evaluate(frame => frame.remove()); }
+  } finally { await page.evaluate(() => document.querySelector('#foveation-realm')?.remove()); }
 }
