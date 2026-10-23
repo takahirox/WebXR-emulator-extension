@@ -277,32 +277,32 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     try {
       check(Object.isFrozen(session.enabledFeatures) && features.every(feature => session.enabledFeatures.includes(feature)) && !session.enabledFeatures.includes('not-a-real-feature'), 'enabledFeatures reflects negotiated capabilities');
       check(session.environmentBlendMode === (mode === 'immersive-ar' ? 'alpha-blend' : 'opaque'), 'AR/VR environment blend mode');
-      check(inline.visibilityState === 'hidden', 'inline hidden during immersive presentation');
+      check(inline.visibilityState === document.visibilityState, 'inline mirrors document during immersive presentation');
       const inlineCanvas = document.createElement('canvas');
       inline.updateRenderState({baseLayer: new xr.XRWebGLLayer(inline, inlineCanvas.getContext('webgl')!)});
       let inlineRendered = false;
       inline.requestAnimationFrame(() => { inlineRendered = true; });
       const inlineVisibility: string[] = [];
       inline.addEventListener('visibilitychange', () => inlineVisibility.push(inline.visibilityState));
-      const hiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+      const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
       const setDocumentHidden = (hidden: boolean) => {
-        Object.defineProperty(document, 'hidden', {configurable: true, value: hidden});
+        Object.defineProperty(document, 'visibilityState', {configurable: true, value: hidden ? 'hidden' : 'visible'});
         document.dispatchEvent(new Event('visibilitychange'));
       };
       try {
         for (const hidden of [true, false, true, false]) {
           setDocumentHidden(hidden);
-          check(inline.visibilityState === 'hidden', 'document visibility cannot reveal a suppressed inline session');
+          check(inline.visibilityState === document.visibilityState, 'suspended inline session follows document visibility');
           check(session.visibilityState === (hidden ? 'hidden' : 'visible'), 'immersive session follows document visibility');
         }
         await new Promise<void>(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
-        check(!inlineRendered && inlineVisibility.length === 0, 'suppressed inline session retains queued frames without spurious visibility events');
+        check(!inlineRendered && inlineVisibility.join(',') === 'hidden,visible,hidden,visible', 'suspended inline session retains queued frames and reports actual visibility transitions');
       } finally {
-        if (hiddenDescriptor) Object.defineProperty(document, 'hidden', hiddenDescriptor); else Reflect.deleteProperty(document, 'hidden');
+        if (visibilityDescriptor) Object.defineProperty(document, 'visibilityState', visibilityDescriptor); else Reflect.deleteProperty(document, 'visibilityState');
         document.dispatchEvent(new Event('visibilitychange'));
       }
       const newInline = await xr.navigator.xr.requestSession('inline');
-      check(newInline.visibilityState === 'hidden', 'new inline session hidden during immersive presentation'); await newInline.end();
+      check(newInline.visibilityState === document.visibilityState, 'new inline session mirrors document during immersive presentation'); await newInline.end();
       await rejects(() => xr.navigator.xr.requestSession(mode), 'InvalidStateError', 'duplicate immersive session');
       await rejects(() => session.requestReferenceSpace('local-floor'), 'NotSupportedError', 'unrequested reference space');
       await rejects(() => session.requestReferenceSpace('invalid'), 'TypeError', 'invalid reference space enum');
@@ -929,7 +929,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       await nextFrame(() => check(session.renderState.layers === null, 'pending transition returns to legacy rendering'));
       gl.deleteFramebuffer(fbo);
       await session.end();
-      check(String(inline.visibilityState) === 'visible' && inlineVisibility.join(',') === 'visible', 'ending immersive presentation restores inline visibility');
+      check(String(inline.visibilityState) === document.visibilityState && inlineVisibility.join(',') === 'hidden,visible,hidden,visible', 'ending immersive presentation causes no inline visibility event');
       await new Promise<void>(resolve => inline.requestAnimationFrame(() => resolve()));
       check(inlineRendered, 'queued inline frames resume after immersive presentation ends');
     } finally { if (!session.ended) await session.end(); if (!inline.ended) await inline.end(); canvas.remove(); overlay.remove(); }
