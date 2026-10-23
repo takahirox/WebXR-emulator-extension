@@ -10,12 +10,12 @@ const bufferResizable = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, '
 
 function isObject(value: unknown): value is Record<PropertyKey, unknown> { return Object(value) === value; }
 
-export function interfaceValue<T>(value: unknown, brand: WeakSet<object>, name: string): T {
+export function interfaceValue<T>(value: unknown, brand: {has(value: object): boolean}, name: string): T {
   if (!isObject(value) || !brand.has(value)) throw new TypeError(`Expected ${name}.`);
   return value as T;
 }
 
-export function interfaceSequence<T>(value: unknown, brand: WeakSet<object>, name: string): T[] {
+export function interfaceSequence<T>(value: unknown, brand: {has(value: object): boolean}, name: string): T[] {
   if (!isObject(value)) throw new TypeError('Expected iterable sequence.');
   const method = value[Symbol.iterator];
   if (typeof method !== 'function') throw new TypeError('Expected iterable sequence.');

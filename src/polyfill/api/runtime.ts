@@ -8,6 +8,7 @@ import {HALL_PLAY_AREA} from '../virtual-play-area';
 import {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
 import {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation, jointObjects} from './sensing';
 import {interfaceValue, interfaceSequence, float32Output} from './bulk-input';
+import {interfaceBrands} from './interface-brand';
 import XRHitTestSource from './XRHitTestSource';
 import XRTransientInputHitTestSource from './XRTransientInputHitTestSource';
 import XRHitTestResult from './XRHitTestResult';
@@ -252,7 +253,7 @@ export class XRSession extends XREventTarget {
   _assertLive() { if (this.ended) invalidState('The session has ended.'); }
   _require(feature: string) { this._assertLive(); if (!this.enabledFeatures.includes(feature)) unsupported(`${feature} was not enabled.`); }
   _owns(space: XRSpace) {
-    if (!(space instanceof XRSpace)) throw new TypeError('Expected XRSpace.');
+    interfaceValue(space, spaceObjects, 'XRSpace');
     if (space._session !== this) invalidState('Space belongs to a different session.');
   }
   _setVisibility(value: typeof this.visibility) {
@@ -413,14 +414,14 @@ export class XRSession extends XREventTarget {
   };
 }
 
-export class XRFrame {
+export class XRFrame extends interfaceBrands.FrameObject {
   _active = false;
   private hitResults = new Map<XRHitTestSource, XRHitTestResult[]>();
   private anchorSnapshot: XRAnchorSet;
   private environmentSnapshot: ReturnType<EnvironmentTracker['snapshot']>;
   private transientResults = new Map<XRTransientInputHitTestSource, XRTransientInputHitTestResult[]>();
   constructor(readonly session: XRSession, readonly predictedDisplayTime: number, readonly _animation: boolean) {
-    frameObjects.add(this);
+    super();
     this.anchorSnapshot = new XRAnchorSet(session._anchors);
     this.environmentSnapshot = session._environment.snapshot();
     if (_animation) {
@@ -520,6 +521,8 @@ export class XRFrame {
   getHitTestResults(source: XRHitTestSource) { this._assertActive(); if (!this.hitResults.has(source)) invalidState('Hit test source was not active for this frame.'); return this.hitResults.get(source)!.slice(); }
   getHitTestResultsForTransientInput(source: XRTransientInputHitTestSource) { this._assertActive(); if (!this.transientResults.has(source)) invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source)!.slice(); }
 }
+// Share allocation branding while retaining the public prototype's own realm.
+Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
 
 /** Every exposed space and input identity is owned by exactly one session. */
 export class XRInputSource {

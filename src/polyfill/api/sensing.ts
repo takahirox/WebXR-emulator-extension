@@ -1,6 +1,7 @@
 import {mat4, vec3} from 'gl-matrix';
 import {XRSpace, XRPose, XRRigidTransform, XRView, XRViewGeometry, invalidState, unsupported} from './geometry';
 import type {XRSession, XRFrame} from './runtime';
+import {interfaceBrands} from './interface-brand';
 
 /** Read-only WebIDL setlike view; callers cannot add/delete tracked anchors. */
 export class XRAnchorSet implements Iterable<XRAnchor> {
@@ -25,9 +26,9 @@ export class XRAnchor {
 
 const names = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
   ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))];
-export const jointObjects = new WeakSet<object>();
+export const jointObjects = interfaceBrands.joints;
 export class XRJointSpace extends XRSpace {
-  constructor(session: XRSession, readonly jointName: string, readonly _radius: number, provider: () => mat4 | null) { super(session, provider); jointObjects.add(this); }
+  constructor(session: XRSession, readonly jointName: string, readonly _radius: number, provider: () => mat4 | null) { super(session, provider, true); }
 }
 export class XRJointPose extends XRPose { constructor(transform: XRRigidTransform, readonly radius: number) { super(transform); } }
 export class XRHand implements Iterable<[string, XRJointSpace]> {

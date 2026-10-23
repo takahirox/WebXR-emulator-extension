@@ -9,7 +9,13 @@ type TestWindow = typeof Runtime & typeof Geometry & typeof Sensing & typeof Lay
 
 /** Hands WD bulk algorithms + pinned WebIDL conversion, through the real extension. */
 export async function runBulkFrame(page: Page, mode: SessionMode, handheld: boolean) {
-  return page.evaluate(async ({mode, handheld}) => {
+  // Navigate before the evaluate call grants transient activation, so the new
+  // same-origin document also has activation for its real immersive session.
+  await page.evaluate(() => {
+    const realm = document.createElement('iframe'); realm.id = 'bulk-interface-realm'; realm.src = '/frame'; document.body.append(realm);
+  });
+  await page.frameLocator('#bulk-interface-realm').locator('body').waitFor();
+  try { return await page.evaluate(async ({mode, handheld}) => {
     const w = window as unknown as TestWindow;
     const passed: string[] = [], skipped: string[] = [];
     let context = '';
@@ -19,17 +25,18 @@ export async function runBulkFrame(page: Page, mode: SessionMode, handheld: bool
     }
     function throws(action: () => unknown, name: string, label: string) {
       let error: unknown; try { action(); } catch (caught) { error = caught; }
-      check(error instanceof Error && error.name === name, `${label}: ${name} (got ${String(error)})`);
+      check(error !== null && typeof error === 'object' && (error as Error).name === name, `${label}: ${name} (got ${String(error)})`);
     }
     const sentinel = 12345;
     function untouched(buffer: Float32Array, action: () => unknown, name: string, label: string) {
       buffer.fill(sentinel); throws(action, name, label);
       check(buffer.every(value => value === sentinel), `${label}: no output writes`);
     }
-    async function setup(sessionMode: SessionMode, hands: boolean) {
-      const session = await w.navigator.xr.requestSession(sessionMode, {requiredFeatures: hands ? ['hand-tracking'] : [], optionalFeatures: sessionMode === 'inline' ? ['hand-tracking'] : []});
-      const canvas = document.createElement('canvas'); document.body.append(canvas);
-      session.updateRenderState({baseLayer: new w.XRWebGLLayer(session, canvas.getContext('webgl', {xrCompatible: true} as WebGLContextAttributes)!)});
+    async function setup(sessionMode: SessionMode, hands: boolean, realmWindow: Window = window) {
+      const api = realmWindow as unknown as TestWindow;
+      const session = await api.navigator.xr.requestSession(sessionMode, {requiredFeatures: hands ? ['hand-tracking'] : [], optionalFeatures: sessionMode === 'inline' ? ['hand-tracking'] : []});
+      const canvas = realmWindow.document.createElement('canvas'); realmWindow.document.body.append(canvas);
+      session.updateRenderState({baseLayer: new api.XRWebGLLayer(session, canvas.getContext('webgl', {xrCompatible: true} as WebGLContextAttributes)!)});
       const base = await session.requestReferenceSpace('viewer');
       const next = <T>(read: (frame: Runtime.XRFrame) => T) => new Promise<T>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Bulk frame timeout')), 5000);
@@ -42,9 +49,16 @@ export async function runBulkFrame(page: Page, mode: SessionMode, handheld: bool
     const foreign = await setup(mode, !handheld);
     const foreignJoint = await foreign.next(() => foreign.session.inputSources[0]?.hand?.get('wrist'));
     await foreign.close();
-    const realm = document.createElement('iframe'); document.body.append(realm);
-    const other = realm.contentWindow as unknown as {Float32Array: typeof Float32Array; ArrayBuffer: typeof ArrayBuffer};
+    // A navigated frame gets a separate real MAIN-world extension injection.
+    const realm = document.querySelector<HTMLIFrameElement>('#bulk-interface-realm')!;
+    const other = realm.contentWindow as unknown as TestWindow & {Float32Array: typeof Float32Array; ArrayBuffer: typeof ArrayBuffer; EventTarget: typeof EventTarget; Object: typeof Object};
+    let child: Awaited<ReturnType<typeof setup>> | undefined;
     try {
+      child = await setup(mode, !handheld, realm.contentWindow!);
+      const childTest = child;
+      const childJoint = await childTest.next(() => childTest.session.inputSources[0]?.hand?.get('wrist'));
+      check(other.XRFrame !== w.XRFrame && other.XRSpace !== w.XRSpace, 'separate iframe interface constructors');
+      check(childTest.base instanceof other.EventTarget && !(childTest.base instanceof w.XRSpace), 'iframe spaces preserve their realm inheritance');
       for (const sessionMode of ['inline', mode] as const) {
         context = sessionMode;
         const test = await setup(sessionMode, !handheld && sessionMode !== 'inline');
@@ -54,6 +68,32 @@ export async function runBulkFrame(page: Page, mode: SessionMode, handheld: bool
         try {
           await next(frame => {
             held = frame;
+            // Borrow methods in both directions. The receiver and its owned
+            // interfaces must convert independently of the method's realm.
+            const childPoses = other.XRFrame.prototype.fillPoses;
+            const childRadii = other.XRFrame.prototype.fillJointRadii;
+            poses.fill(sentinel);
+            check(childPoses.call(frame, [base], base, poses) && poses[0] === 1 && poses.slice(16).every(v => v === sentinel), 'iframe pose method accepts parent receiver and owned spaces');
+            radii.fill(sentinel);
+            check(childRadii.call(frame, [], radii) && radii.every(v => v === sentinel), 'iframe radius method accepts parent receiver with empty input');
+            for (const method of [frame.fillPoses, childPoses]) {
+              untouched(poses, () => method.call(frame, [base, childTest.base], base, poses), 'InvalidStateError', 'iframe space reaches ownership validation before writes');
+              untouched(poses, () => method.call(frame, [], childTest.base, poses), 'InvalidStateError', 'iframe base reaches ownership validation even for empty input');
+              untouched(poses, () => method.call(frame, [base, childTest.base], base, poses.subarray(0, 1)), 'InvalidStateError', 'iframe ownership precedes short pose capacity');
+              for (const fake of [Object.create(other.XRSpace.prototype), new Proxy(childTest.base, {})]) {
+                untouched(poses, () => method.call(frame, [fake], base, poses), 'TypeError', 'iframe space forgeries and proxies rejected');
+              }
+            }
+            for (const method of [frame.fillJointRadii, childRadii]) {
+              if (childJoint) untouched(radii, () => method.call(frame, [childJoint], radii.subarray(0, 0)), 'InvalidStateError', 'iframe joint ownership precedes short radius capacity');
+              untouched(radii, () => method.call(frame, [Object.create(other.XRJointSpace.prototype)], radii), 'TypeError', 'iframe joint forgery rejected');
+              if (childJoint) untouched(radii, () => method.call(frame, [new Proxy(childJoint, {})], radii), 'TypeError', 'iframe joint proxy rejected');
+            }
+            for (const method of [childPoses, childRadii]) {
+              for (const fake of [Object.create(w.XRFrame.prototype), new Proxy(frame, {})]) {
+                throws(() => Reflect.apply(method, fake, []), 'TypeError', 'borrowed method rejects forged/proxy receiver');
+              }
+            }
             check(sessionMode !== 'inline' || (!session.enabledFeatures.includes('hand-tracking') && session.inputSources.length === 0), 'inline has no articulated hands');
             check(frame.fillPoses([], base, new Float32Array(0)) && frame.fillJointRadii([], new Float32Array(0)), 'empty sequences and exact empty outputs succeed');
             poses.fill(sentinel); radii.fill(sentinel);
@@ -179,6 +219,7 @@ export async function runBulkFrame(page: Page, mode: SessionMode, handheld: bool
             try {
               await next(frame => {
                 handResult(frame, joints.flat(), joints.flat().map(() => true), 'both tracked hands');
+                check(other.XRFrame.prototype.fillJointRadii.call(frame, [first, tip], radii) && Math.abs(radii[0] - first._radius) < 1e-8, 'iframe radius method accepts parent joints');
                 for (const output of [new Float32Array(3), new Float32Array(8), new Float32Array(12).subarray(2, 10), new other.Float32Array(8)]) {
                   const backing = new Float32Array(output.buffer).fill(sentinel);
                   check(frame.fillJointRadii([first, tip, first], output), 'exact/oversized/subarray/cross-realm radius buffers');
@@ -254,13 +295,27 @@ export async function runBulkFrame(page: Page, mode: SessionMode, handheld: bool
             } finally { session.removeEventListener('selectstart', onInput); session._device._updateInputButtonPressed(false, 0, 0); }
           }
           await session.end();
+          untouched(poses, () => other.XRFrame.prototype.fillPoses.call(held, [base], base, poses), 'InvalidStateError', 'borrowed iframe method retains shutdown validation');
           untouched(poses, () => held.fillPoses([base], base, poses), 'InvalidStateError', 'session shutdown rejects bulk poses without writes');
           untouched(radii, () => held.fillJointRadii([], radii), 'InvalidStateError', 'session shutdown rejects bulk radii without writes');
         } finally { await test.close(); }
       }
-    } finally { realm.remove(); }
+      context = 'iframe';
+      let childFrame!: Runtime.XRFrame;
+      await childTest.next(frame => {
+        childFrame = frame;
+        check(frame instanceof other.Object && Object.getPrototypeOf(other.XRFrame.prototype) === other.Object.prototype, 'iframe frame preserves its realm prototype chain');
+        const poses = new Float32Array(32).fill(sentinel), radii = new Float32Array(3).fill(sentinel);
+        check(w.XRFrame.prototype.fillPoses.call(frame, [childTest.base], childTest.base, poses) && poses[0] === 1 && poses.slice(16).every(v => v === sentinel), 'parent pose method accepts iframe receiver and owned spaces');
+        check(w.XRFrame.prototype.fillJointRadii.call(frame, childJoint ? [childJoint] : [], radii) && (childJoint ? Math.abs(radii[0] - childJoint._radius) < 1e-8 : radii[0] === sentinel), 'parent radius method accepts iframe receiver and joints');
+        untouched(poses, () => w.XRFrame.prototype.fillPoses.call(frame, [foreign.base], childTest.base, poses), 'InvalidStateError', 'parent space reaches iframe ownership check');
+      });
+      const inactiveOutput = new Float32Array(16);
+      untouched(inactiveOutput, () => w.XRFrame.prototype.fillPoses.call(childFrame, [], childTest.base, inactiveOutput), 'InvalidStateError', 'parent method checks inactive iframe receiver');
+      untouched(inactiveOutput, () => w.XRFrame.prototype.fillJointRadii.call(childFrame, [], inactiveOutput), 'InvalidStateError', 'parent radius method checks inactive iframe receiver');
+    } finally { if (child) await child.close(); realm.remove(); }
     return {mode, handheld, assertions: passed.length, passed, skipped};
-  }, {mode, handheld});
+  }, {mode, handheld}); } finally { await page.locator('#bulk-interface-realm').evaluateAll(frames => frames.forEach(frame => frame.remove())); }
 }
 
 /** COOP/COEP page exposes shared buffers that the ordinary smoke page cannot. */

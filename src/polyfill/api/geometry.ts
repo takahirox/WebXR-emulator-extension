@@ -1,9 +1,10 @@
 import {mat4, quat, vec3} from 'gl-matrix';
 import type {XRSession} from './runtime';
+import {interfaceBrands} from './interface-brand';
 
 export const sessionObjects = new WeakSet<object>();
-export const frameObjects = new WeakSet<object>();
-export const spaceObjects = new WeakSet<object>();
+export const frameObjects = interfaceBrands.frames;
+export const spaceObjects = interfaceBrands.spaces;
 export const compatibleContexts = new WeakSet<WebGLRenderingContext | WebGL2RenderingContext>();
 
 export const invalidState = (message: string): never => { throw new DOMException(message, 'InvalidStateError'); };
@@ -41,13 +42,16 @@ export class XRRigidTransform {
 }
 
 // Every space carries a session and a world-space matrix provider.
-export class XRSpace extends EventTarget {
+export class XRSpace extends interfaceBrands.SpaceObject {
   _baseMatrix: mat4 | null = null;
-  constructor(readonly _session: XRSession, private matrixProvider: () => mat4 | null) { super(); spaceObjects.add(this); }
+  constructor(readonly _session: XRSession, private matrixProvider: () => mat4 | null, joint = false) { super(joint); }
   get _inverseBaseMatrix() { return this._baseMatrix && mat4.invert(mat4.create(), this._baseMatrix); }
   _update() { this._baseMatrix = this.matrixProvider(); return this._baseMatrix; }
   _adjustForOriginOffset(_matrix: mat4) {} // Offset is already in _baseMatrix.
 }
+// Keep the public inheritance chain in the object's own realm. The shared
+// allocation constructor only supplies the private interface brand.
+Object.setPrototypeOf(XRSpace.prototype, EventTarget.prototype);
 
 export class XRReferenceSpace extends XRSpace {
   onreset: ((event: Event) => void) | null = null;

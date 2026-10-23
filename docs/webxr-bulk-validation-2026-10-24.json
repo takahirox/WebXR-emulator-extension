@@ -245,5 +245,168 @@
     "Official application validation"
   ],
   "required_post_merge_verification": "None",
-  "downstream_handoff": "Implementation, focused tests, generated polyfill and capability inventory are complete in this node. No push, PR, merge or comment performed. Normal downstream review/publication remains separate from this implementation result."
+  "downstream_handoff": "Implementation, focused tests, generated polyfill and capability inventory are complete in this node. No push, PR, merge or comment performed. Normal downstream review/publication remains separate from this implementation result.",
+  "review_fix_validation": {
+    "finding": "P2: bulk receiver/interface WeakSets and session ownership checks rejected genuine interfaces from another same-origin injection.",
+    "tested_checkout_head": "677954cfc17243aae3243babc202b2eb5728b6f0",
+    "tested_revision_note": "Validation ran on the review-fix working tree above this checkpoint. SHA-256 values identify the exact final source/test/bundle files. This report and the inventory are added after execution.",
+    "tested_files_sha256": {
+      "src/polyfill/api/interface-brand.ts": "037ded7967be26df9f47a02dce8379eb87c2c0920c9a3bbc03bc3deb77790d93",
+      "src/polyfill/api/bulk-input.ts": "08d92beec8fb5f326a01f640026cb3795e62d3379d8f2bab21081d393997fb20",
+      "src/polyfill/api/geometry.ts": "944a296a09434dade46f94750d30c4f7c7c7d5e9f6a08db7c70cdbce0ac10a1a",
+      "src/polyfill/api/runtime.ts": "1ce22b738e802eac46feba571ab3c1959fa6dd5484b417336170aabb3ea7bc18",
+      "src/polyfill/api/sensing.ts": "fd5ef371827e8b587f5658554a9a043c590e88430ff2404cc7d7c652ad530cf6",
+      "tests/bulk-frame.ts": "140c8199e0345e00932e14fd4ac7ba89fa173812006e112fd66cb2e3ee827c90",
+      "polyfill/webxr-polyfill.js": "3b13121e099edb1db56d04adfa5a73ee52658ee7ce170180f72e17991b3b57b3"
+    },
+    "browser": "156.0.8078.4",
+    "platform": "darwin arm64",
+    "implementation": "Same-origin frame injections share frozen allocation constructors and read-only brand predicates; WeakSets and arbitrary-object registration are not exposed. Ownership uses the same brand recognition. Public frame/space prototype chains retain their own realm.",
+    "checks": {
+      "npm ci": "passed: 54 packages installed, zero reported vulnerabilities",
+      "npm run build": "passed, including strict typecheck and generated polyfill",
+      "npm run test:browser": "passed: full unpacked-extension browser suite",
+      "npm run test:environment": "passed: four tests",
+      "git diff --check": "passed"
+    },
+    "profiles": [
+      {
+        "mode": "immersive-vr",
+        "handheld": false,
+        "assertions": 906,
+        "result": "passed",
+        "iframe_passed_labels": [
+          ": separate iframe interface constructors",
+          ": iframe spaces preserve their realm inheritance",
+          "iframe pose method accepts parent receiver and owned spaces",
+          "iframe radius method accepts parent receiver with empty input",
+          "iframe space reaches ownership validation before writes: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe space reaches ownership validation before writes: no output writes",
+          "iframe base reaches ownership validation even for empty input: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe base reaches ownership validation even for empty input: no output writes",
+          "iframe ownership precedes short pose capacity: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe ownership precedes short pose capacity: no output writes",
+          "iframe space forgeries and proxies rejected: TypeError (got TypeError: Expected XRSpace.)",
+          "iframe space forgeries and proxies rejected: no output writes",
+          "iframe joint ownership precedes short radius capacity: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe joint ownership precedes short radius capacity: no output writes",
+          "iframe joint forgery rejected: TypeError (got TypeError: Expected XRJointSpace.)",
+          "iframe joint forgery rejected: no output writes",
+          "iframe joint proxy rejected: TypeError (got TypeError: Expected XRJointSpace.)",
+          "iframe joint proxy rejected: no output writes",
+          "borrowed method rejects forged/proxy receiver: TypeError (got TypeError: Expected XRFrame.)",
+          "borrowed iframe method retains shutdown validation: InvalidStateError (got InvalidStateError: The session has ended.)",
+          "borrowed iframe method retains shutdown validation: no output writes",
+          "iframe radius method accepts parent joints",
+          "iframe frame preserves its realm prototype chain",
+          "parent pose method accepts iframe receiver and owned spaces",
+          "parent radius method accepts iframe receiver and joints",
+          "parent space reaches iframe ownership check: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "parent space reaches iframe ownership check: no output writes",
+          "parent method checks inactive iframe receiver: InvalidStateError (got InvalidStateError: XRFrame is not active for this operation.)",
+          "parent method checks inactive iframe receiver: no output writes",
+          "parent radius method checks inactive iframe receiver: InvalidStateError (got InvalidStateError: XRFrame is not active for this operation.)",
+          "parent radius method checks inactive iframe receiver: no output writes"
+        ],
+        "skipped": [
+          "inline: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)",
+          "immersive-vr: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": false,
+        "assertions": 906,
+        "result": "passed",
+        "iframe_passed_labels": [
+          ": separate iframe interface constructors",
+          ": iframe spaces preserve their realm inheritance",
+          "iframe pose method accepts parent receiver and owned spaces",
+          "iframe radius method accepts parent receiver with empty input",
+          "iframe space reaches ownership validation before writes: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe space reaches ownership validation before writes: no output writes",
+          "iframe base reaches ownership validation even for empty input: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe base reaches ownership validation even for empty input: no output writes",
+          "iframe ownership precedes short pose capacity: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe ownership precedes short pose capacity: no output writes",
+          "iframe space forgeries and proxies rejected: TypeError (got TypeError: Expected XRSpace.)",
+          "iframe space forgeries and proxies rejected: no output writes",
+          "iframe joint ownership precedes short radius capacity: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe joint ownership precedes short radius capacity: no output writes",
+          "iframe joint forgery rejected: TypeError (got TypeError: Expected XRJointSpace.)",
+          "iframe joint forgery rejected: no output writes",
+          "iframe joint proxy rejected: TypeError (got TypeError: Expected XRJointSpace.)",
+          "iframe joint proxy rejected: no output writes",
+          "borrowed method rejects forged/proxy receiver: TypeError (got TypeError: Expected XRFrame.)",
+          "borrowed iframe method retains shutdown validation: InvalidStateError (got InvalidStateError: The session has ended.)",
+          "borrowed iframe method retains shutdown validation: no output writes",
+          "iframe radius method accepts parent joints",
+          "iframe frame preserves its realm prototype chain",
+          "parent pose method accepts iframe receiver and owned spaces",
+          "parent radius method accepts iframe receiver and joints",
+          "parent space reaches iframe ownership check: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "parent space reaches iframe ownership check: no output writes",
+          "parent method checks inactive iframe receiver: InvalidStateError (got InvalidStateError: XRFrame is not active for this operation.)",
+          "parent method checks inactive iframe receiver: no output writes",
+          "parent radius method checks inactive iframe receiver: InvalidStateError (got InvalidStateError: XRFrame is not active for this operation.)",
+          "parent radius method checks inactive iframe receiver: no output writes"
+        ],
+        "skipped": [
+          "inline: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)",
+          "immersive-ar: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": true,
+        "assertions": 346,
+        "result": "passed",
+        "iframe_passed_labels": [
+          ": separate iframe interface constructors",
+          ": iframe spaces preserve their realm inheritance",
+          "iframe pose method accepts parent receiver and owned spaces",
+          "iframe radius method accepts parent receiver with empty input",
+          "iframe space reaches ownership validation before writes: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe space reaches ownership validation before writes: no output writes",
+          "iframe base reaches ownership validation even for empty input: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe base reaches ownership validation even for empty input: no output writes",
+          "iframe ownership precedes short pose capacity: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "iframe ownership precedes short pose capacity: no output writes",
+          "iframe space forgeries and proxies rejected: TypeError (got TypeError: Expected XRSpace.)",
+          "iframe space forgeries and proxies rejected: no output writes",
+          "iframe joint forgery rejected: TypeError (got TypeError: Expected XRJointSpace.)",
+          "iframe joint forgery rejected: no output writes",
+          "borrowed method rejects forged/proxy receiver: TypeError (got TypeError: Expected XRFrame.)",
+          "borrowed iframe method retains shutdown validation: InvalidStateError (got InvalidStateError: The session has ended.)",
+          "borrowed iframe method retains shutdown validation: no output writes",
+          "iframe frame preserves its realm prototype chain",
+          "parent pose method accepts iframe receiver and owned spaces",
+          "parent radius method accepts iframe receiver and joints",
+          "parent space reaches iframe ownership check: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+          "parent space reaches iframe ownership check: no output writes",
+          "parent method checks inactive iframe receiver: InvalidStateError (got InvalidStateError: XRFrame is not active for this operation.)",
+          "parent method checks inactive iframe receiver: no output writes",
+          "parent radius method checks inactive iframe receiver: InvalidStateError (got InvalidStateError: XRFrame is not active for this operation.)",
+          "parent radius method checks inactive iframe receiver: no output writes"
+        ],
+        "skipped": [
+          "inline: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)",
+          "immersive-ar: SharedArrayBuffer/growable SharedArrayBuffer unavailable (page is not cross-origin isolated)"
+        ]
+      }
+    ],
+    "isolated_shared_buffer_checks": {
+      "assertions": 49,
+      "result": "passed",
+      "skipped": []
+    },
+    "total_focused_assertions": 2207,
+    "regression_scope": "Separately injected same-origin iframe with real sessions and Quest hands. Both directions of borrowed bulk methods; foreign spaces/bases/joints reach InvalidStateError, including empty input and short output precedence; sentinel preservation; forged/proxy receiver and interface rejection; retained inactive and shutdown frames. Iframe, sessions and canvases cleaned up.",
+    "resolved_failures": [
+      "Initial typecheck required explicit Window annotations for WindowProxy parents and the iframe setup parameter.",
+      "Initial browser attempt ran before the corrected build and stopped at the new iframe session: it lacked transient user activation. Navigate the fixture before the evaluate call grants activation; final build and both subsequent browser runs passed."
+    ],
+    "unchanged_limits": "Six ordinary-page shared-buffer skips remain; all 49 isolated shared/growable buffer checks pass. No new specification corrections or human confirmations. Full WPT, Firefox, physical hardware, optional Three.js hand consumer and official applications were not executed.",
+    "publication": "Local commit only; no push or merge. PR #30 metadata remains unchanged for the downstream publisher."
+  }
 }

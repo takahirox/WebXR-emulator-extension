@@ -892,9 +892,47 @@ function WebXRPolyfillInjection() {
     };
   })();
 
+  function createBrands() {
+      const frames = new WeakSet(), spaces = new WeakSet(), joints = new WeakSet();
+      class FrameObject {
+          constructor() { frames.add(this); }
+      }
+      class SpaceObject extends EventTarget {
+          constructor(joint = false) { super(); spaces.add(this); if (joint)
+              joints.add(this); }
+      }
+      Object.freeze(FrameObject.prototype);
+      Object.freeze(FrameObject);
+      Object.freeze(SpaceObject.prototype);
+      Object.freeze(SpaceObject);
+      return Object.freeze({ FrameObject, SpaceObject,
+          frames: Object.freeze({ has: (value) => frames.has(value) }),
+          spaces: Object.freeze({ has: (value) => spaces.has(value) }),
+          joints: Object.freeze({ has: (value) => joints.has(value) }),
+      });
+  }
+  let host = globalThis;
+  if (typeof window !== 'undefined') {
+      for (let ancestor = window;; ancestor = ancestor.parent) {
+          try {
+              void ancestor.document;
+              host = ancestor;
+          }
+          catch ( _a) {  }
+          if (ancestor === ancestor.parent)
+              break;
+      }
+  }
+  const key = Symbol.for('WebXR-emulator.interface-brands');
+  const shared = host;
+  if (!Object.prototype.hasOwnProperty.call(shared, key)) {
+      Object.defineProperty(shared, key, { value: createBrands() });
+  }
+  const interfaceBrands = shared[key];
+
   const sessionObjects = new WeakSet();
-  const frameObjects = new WeakSet();
-  const spaceObjects = new WeakSet();
+  const frameObjects = interfaceBrands.frames;
+  const spaceObjects = interfaceBrands.spaces;
   const compatibleContexts = new WeakSet();
   const invalidState = (message) => { throw new DOMException(message, 'InvalidStateError'); };
   const unsupported = (message) => { throw new DOMException(message, 'NotSupportedError'); };
@@ -928,18 +966,18 @@ function WebXRPolyfillInjection() {
           return this.inverseValue;
       }
   }
-  class XRSpace extends EventTarget {
-      constructor(_session, matrixProvider) {
-          super();
+  class XRSpace extends interfaceBrands.SpaceObject {
+      constructor(_session, matrixProvider, joint = false) {
+          super(joint);
           this._session = _session;
           this.matrixProvider = matrixProvider;
           this._baseMatrix = null;
-          spaceObjects.add(this);
       }
       get _inverseBaseMatrix() { return this._baseMatrix && invert(create$3(), this._baseMatrix); }
       _update() { this._baseMatrix = this.matrixProvider(); return this._baseMatrix; }
       _adjustForOriginOffset(_matrix) { }
   }
+  Object.setPrototypeOf(XRSpace.prototype, EventTarget.prototype);
   class XRReferenceSpace extends XRSpace {
       constructor(session, _type, nativeMatrix, offset = create$3()) {
           super(session, () => {
@@ -1542,13 +1580,12 @@ function WebXRPolyfillInjection() {
   }
   const names = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
       ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))];
-  const jointObjects = new WeakSet();
+  const jointObjects = interfaceBrands.joints;
   class XRJointSpace extends XRSpace {
       constructor(session, jointName, _radius, provider) {
-          super(session, provider);
+          super(session, provider, true);
           this.jointName = jointName;
           this._radius = _radius;
-          jointObjects.add(this);
       }
   }
   class XRJointPose extends XRPose {
@@ -25837,8 +25874,7 @@ void main() {
       _require(feature) { this._assertLive(); if (!this.enabledFeatures.includes(feature))
           unsupported(`${feature} was not enabled.`); }
       _owns(space) {
-          if (!(space instanceof XRSpace))
-              throw new TypeError('Expected XRSpace.');
+          interfaceValue(space, spaceObjects, 'XRSpace');
           if (space._session !== this)
               invalidState('Space belongs to a different session.');
       }
@@ -25976,15 +26012,15 @@ void main() {
           }
       }
   }
-  class XRFrame {
+  class XRFrame extends interfaceBrands.FrameObject {
       constructor(session, predictedDisplayTime, _animation) {
+          super();
           this.session = session;
           this.predictedDisplayTime = predictedDisplayTime;
           this._animation = _animation;
           this._active = false;
           this.hitResults = new Map();
           this.transientResults = new Map();
-          frameObjects.add(this);
           this.anchorSnapshot = new XRAnchorSet(session._anchors);
           this.environmentSnapshot = session._environment.snapshot();
           if (_animation) {
@@ -26125,6 +26161,7 @@ void main() {
       getHitTestResultsForTransientInput(source) { this._assertActive(); if (!this.transientResults.has(source))
           invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source).slice(); }
   }
+  Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
   class XRInputSource {
       constructor(session, raw, index) {
           this.session = session;
