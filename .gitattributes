@@ -1,3 +1,0 @@
-# Bundled vendor indentation is generated, not hand-maintained formatting.
-polyfill/webxr-polyfill.js linguist-generated=true -whitespace
-dist/** linguist-generated=true -whitespace
