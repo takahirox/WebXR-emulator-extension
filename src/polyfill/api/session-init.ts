@@ -2,10 +2,12 @@ import type {SessionMode} from '../../types/contracts';
 import type {SessionOptions} from '../../types/polyfill';
 
 function isObject(value: unknown): value is Record<PropertyKey, unknown> {
-  return value !== null && (typeof value === 'object' || typeof value === 'function');
+  // Object preserves object identity, including document.all, whose legacy
+  // typeof result is 'undefined'. It wraps primitives without coercing objects.
+  return Object(value) === value;
 }
 function dictionary(value: unknown): Record<string, unknown> {
-  if (value == null) return Object.create(null) as Record<string, unknown>;
+  if (value === null || value === undefined) return Object.create(null) as Record<string, unknown>;
   if (!isObject(value)) throw new TypeError('Expected session initialization dictionary.');
   return value;
 }

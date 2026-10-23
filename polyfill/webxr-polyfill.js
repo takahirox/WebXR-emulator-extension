@@ -25248,10 +25248,10 @@ void main() {
   }
 
   function isObject(value) {
-      return value !== null && (typeof value === 'object' || typeof value === 'function');
+      return Object(value) === value;
   }
   function dictionary(value) {
-      if (value == null)
+      if (value === null || value === undefined)
           return Object.create(null);
       if (!isObject(value))
           throw new TypeError('Expected session initialization dictionary.');

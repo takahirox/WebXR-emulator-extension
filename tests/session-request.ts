@@ -107,6 +107,51 @@ export async function runSessionRequest(page: Page, mode: SessionMode, handheld:
       Object.defineProperty(inherited, 'requiredFeatures', {get() { reads++; return new Set(['viewer']); }});
       const inheritedSession = await xr.requestSession(sessionMode, Object.create(inherited));
       check(reads === 1 && inheritedSession.enabledFeatures.includes('viewer'), 'inherited nonenumerable member read once'); await inheritedSession.end();
+      const legacy = document.all;
+      check(typeof legacy === 'undefined' && legacy !== undefined && legacy !== null, 'document.all exercises legacy object semantics');
+      const members = ['depthSensing', 'domOverlay', 'optionalFeatures', 'requiredFeatures'];
+      const savedMembers = members.map(member => Object.getOwnPropertyDescriptor(legacy, member));
+      const legacyReads: string[] = [];
+      try {
+        for (const member of members) Object.defineProperty(legacy, member, {configurable: true, get() {
+          legacyReads.push(member);
+          return member === 'requiredFeatures' ? ['unknown-required'] : undefined;
+        }});
+        const pending = xr.requestSession(sessionMode, legacy);
+        check(legacyReads.join(',') === members.join(','), 'document.all dictionary members read once in order before returning');
+        await rejects(() => pending, 'NotSupportedError', 'document.all dictionary retains unknown required feature');
+      } finally {
+        members.forEach((member, index) => {
+          const descriptor = savedMembers[index];
+          if (descriptor) Object.defineProperty(legacy, member, descriptor);
+          else Reflect.deleteProperty(legacy, member);
+        });
+      }
+      const savedIterator = Object.getOwnPropertyDescriptor(legacy, Symbol.iterator);
+      try {
+        for (const member of ['optionalFeatures', 'requiredFeatures']) {
+          let iteratorReads = 0, conversions = 0;
+          Object.defineProperty(legacy, Symbol.iterator, {configurable: true, get() {
+            iteratorReads++;
+            return function* () {
+              yield {toString() { conversions++; return 'viewer'; }};
+              yield {toString() { conversions++; return 'unknown-feature'; }};
+            };
+          }});
+          const pending = xr.requestSession(sessionMode, {[member]: legacy});
+          check(iteratorReads === 1 && conversions === 2, `${member}: iterable document.all converted once before returning`);
+          if (member === 'requiredFeatures') {
+            await rejects(() => pending, 'NotSupportedError', 'iterable document.all retains unknown required feature');
+          } else {
+            const session = await pending;
+            try { check(session.enabledFeatures.join(',') === (sessionMode === 'inline' ? 'viewer' : 'viewer,local'), 'iterable document.all grants viewer and omits unknown optional feature'); }
+            finally { await session.end(); }
+          }
+        }
+      } finally {
+        if (savedIterator) Object.defineProperty(legacy, Symbol.iterator, savedIterator);
+        else Reflect.deleteProperty(legacy, Symbol.iterator);
+      }
       const foreign = document.createElement('iframe'); document.body.append(foreign);
       try {
         const foreignRoot = foreign.contentDocument!.body;

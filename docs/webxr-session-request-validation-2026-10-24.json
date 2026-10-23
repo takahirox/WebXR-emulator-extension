@@ -27,8 +27,8 @@
     },
     "npm run test:browser": {
       "exit_code": 0,
-      "completed_runs": 2,
-      "final_run": "Includes final null-prototype empty dictionary regression and all added cases; all pass."
+      "completed_runs": 3,
+      "final_run": "Includes document.all dictionary member reads and iterable feature conversion regressions on all three profile/mode combinations plus inline; all pass."
     },
     "git diff --check": {
       "exit_code": 0
@@ -39,6 +39,11 @@
       "command": "npm run test:browser",
       "failure": "Initial run placed deferred-init cases after the existing extension reload/relaunch checks had closed the original browser context. browserContext.newPage rejected with Target page, context or browser has been closed.",
       "resolution": "Run deferred cases after Android conformance, before overlay lifecycle and browser shutdown. Subsequent complete runs pass."
+    },
+    {
+      "command": "npm run test:browser",
+      "failure": "First review-fix run passed Quest inline/VR conversion regressions, then failed the existing OrbitControls rotates the panel camera assertion (unchanged quaternion after drag).",
+      "resolution": "Reran the full suite without further source or test changes; the complete suite passed, including all profiles and deferred initialization."
     }
   ],
   "focused_conversion": [
@@ -46,30 +51,30 @@
       "profile": "Meta Quest 3",
       "mode": "immersive-vr",
       "inline_also_tested": true,
-      "assertions": 351,
+      "assertions": 369,
       "assertions_by_mode": {
-        "inline": 173,
-        "immersive-vr": 178
+        "inline": 182,
+        "immersive-vr": 187
       }
     },
     {
       "profile": "Meta Quest 3",
       "mode": "immersive-ar",
       "inline_also_tested": true,
-      "assertions": 351,
+      "assertions": 369,
       "assertions_by_mode": {
-        "inline": 173,
-        "immersive-ar": 178
+        "inline": 182,
+        "immersive-ar": 187
       }
     },
     {
       "profile": "Generic Android Phone (ARCore)",
       "mode": "immersive-ar",
       "inline_also_tested": true,
-      "assertions": 351,
+      "assertions": 369,
       "assertions_by_mode": {
-        "inline": 173,
-        "immersive-ar": 178
+        "inline": 182,
+        "immersive-ar": 187
       }
     }
   ],
@@ -296,5 +301,64 @@
     "related_issues": "Closes #25",
     "publication": "No push, PR creation, merge, Issue edit or comment performed. A downstream publisher should include this scope, execution evidence and WPT reconciliation in the implementation PR. No Issue acceptance correction was required."
   },
-  "required_post_merge_verification": "None"
+  "required_post_merge_verification": "None",
+  "review_fix_validation": {
+    "finding": "document.all was treated as null/undefined or rejected as a sequence Object.",
+    "fix": "Use strict null/undefined dictionary checks and Object identity to recognize Objects, including document.all; rebuild the packaged polyfill.",
+    "baseline_regression": {
+      "command": "npm run test:browser",
+      "exit_code": 1,
+      "bundle": "Existing pre-fix bundle",
+      "failure": "inline: document.all dictionary members read once in order before returning",
+      "expected_failure": true
+    },
+    "commands": {
+      "npm ci": {
+        "exit_code": 0
+      },
+      "npm run build": {
+        "exit_code": 0
+      },
+      "npm run test:browser": {
+        "exit_code": 0,
+        "browser": "156.0.8078.4",
+        "failed_runs_before_success": 1
+      },
+      "git diff --check": {
+        "exit_code": 0
+      }
+    },
+    "document_all_assertions": [
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-vr",
+        "inline_also_tested": true,
+        "assertions": 18,
+        "conversion_assertions": 369
+      },
+      {
+        "profile": "Meta Quest 3",
+        "mode": "immersive-ar",
+        "inline_also_tested": true,
+        "assertions": 18,
+        "conversion_assertions": 369
+      },
+      {
+        "profile": "Generic Android Phone (ARCore)",
+        "mode": "immersive-ar",
+        "inline_also_tested": true,
+        "assertions": 18,
+        "conversion_assertions": 369
+      }
+    ],
+    "coverage": [
+      "All four dictionary getters read once in order before returning",
+      "Unknown required features reject with NotSupportedError",
+      "Symbol.iterator and DOMString elements converted once before returning",
+      "Unknown optional features omitted and default grants retained",
+      "Test property descriptors restored after each regression"
+    ],
+    "failures_remaining": [],
+    "skips": []
+  }
 }
