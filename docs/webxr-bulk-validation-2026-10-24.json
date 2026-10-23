@@ -408,5 +408,66 @@
     ],
     "unchanged_limits": "Six ordinary-page shared-buffer skips remain; all 49 isolated shared/growable buffer checks pass. No new specification corrections or human confirmations. Full WPT, Firefox, physical hardware, optional Three.js hand consumer and official applications were not executed.",
     "publication": "Local commit only; no push or merge. PR #30 metadata remains unchanged for the downstream publisher."
+  },
+  "popup_review_fix_validation": {
+    "executed_at_utc": "2026-10-23T17:46:06.228470+00:00",
+    "starting_revision": "8effc26290af37b63895a6b7643920dc8fb75bea",
+    "tested_worktree_blob_hashes": {
+      "src/polyfill/api/interface-brand.ts": "354ec8cbb528c9a44e13b4e8d93897ca111eac5d",
+      "tests/bulk-frame.ts": "1300c29ba0fcab6834eaceb514f97b68c6015cdc",
+      "tests/conformance.ts": "6d000f8fd857dc95f6e24493be4d1570745a4380",
+      "polyfill/webxr-polyfill.js": "b1be6704b151c18b86eeac6edbbdff18d08cdbd0"
+    },
+    "browser": "Chromium 156.0.8078.4",
+    "commands": {
+      "npm ci": "passed; 0 vulnerabilities",
+      "npm run build": "passed (including typecheck and regenerated tracked bundle)",
+      "npm run test:browser": "passed; full unpacked-extension browser suite",
+      "npm run test:environment": "passed; 4 tests, 0 failures, 0 skips",
+      "git diff --check": "passed"
+    },
+    "popup_profile_results": [
+      {
+        "mode": "immersive-vr",
+        "handheld": false,
+        "assertions": 214,
+        "skipped": [],
+        "result": "passed"
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": false,
+        "assertions": 214,
+        "skipped": [],
+        "result": "passed"
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": true,
+        "assertions": 190,
+        "skipped": [],
+        "result": "passed"
+      }
+    ],
+    "popup_assertions": 618,
+    "existing_bulk_assertions": 2158,
+    "isolated_buffer_assertions": 49,
+    "total_focused_assertions": 2825,
+    "regression_scope": "Real window.open() popup with separate MAIN-world extension injection and opener-linked allocation brands. Borrowed pose and radius methods in both directions on active owned frames/spaces/joints; foreign space/base/joint ownership errors before writes and short-capacity errors; empty input base ownership; forged/proxy space/base/joint/receiver rejection; unused sentinel preservation; inactive frames. Inline and configured immersive sessions on Quest VR/MR and Android AR; Quest joint presence asserted in both windows. Popup sessions, canvases and window cleaned up in finally blocks.",
+    "representative_executed_labels": [
+      "immersive-vr popup to opener: borrowed pose method accepts genuine receiver and owned spaces",
+      "immersive-vr popup to opener: borrowed radius method accepts genuine receiver and owned joints",
+      "immersive-vr popup to opener: late foreign popup/opener space reaches ownership validation: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+      "immersive-vr popup to opener: foreign popup/opener base checked for empty input: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+      "immersive-vr popup to opener: late foreign popup/opener joint reaches ownership validation: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+      "immersive-vr opener to popup: borrowed pose method accepts genuine receiver and owned spaces",
+      "immersive-vr opener to popup: borrowed radius method accepts genuine receiver and owned joints",
+      "immersive-vr opener to popup: late foreign popup/opener space reaches ownership validation: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+      "immersive-vr opener to popup: foreign popup/opener base checked for empty input: InvalidStateError (got InvalidStateError: Space belongs to a different session.)",
+      "immersive-vr opener to popup: late foreign popup/opener joint reaches ownership validation: InvalidStateError (got InvalidStateError: Space belongs to a different session.)"
+    ],
+    "resolved_setup_failure": "The initial build could not find tsc because this fresh worktree had no dependencies. npm ci installed the locked dependencies; the subsequent build and browser suite passed. No browser assertion failures.",
+    "skips_and_limits": "No popup skips. Six existing ordinary-page shared-buffer skips remain; all 49 isolated shared/growable-buffer assertions passed with no skips. Full WPT, Firefox, physical hardware, optional Three.js hand consumer and official applications were not executed. No new specification corrections or human confirmations.",
+    "publication": "Local commit only; no push or merge. PR #30 metadata forwarded unchanged."
   }
 }

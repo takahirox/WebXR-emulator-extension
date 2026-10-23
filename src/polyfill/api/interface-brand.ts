@@ -18,17 +18,27 @@ function createBrands() {
   });
 }
 
-// Walk WindowProxy parents even across inaccessible intermediate origins. An
-// inaccessible window is never read or modified; a same-origin ancestor can
-// host the private allocation bases for its descendants.
+// Reuse allocation bases through both parent and opener links. Popups have
+// themselves as parent, so walking only ancestors would split their brands.
+// Only inspect registries on accessible windows; relationship links can cross
+// origins. Track visited WindowProxies because opener links can form cycles.
+const key = Symbol.for('WebXR-emulator.interface-brands');
 let host: object = globalThis;
 if (typeof window !== 'undefined') {
-  for (let ancestor: Window = window; ; ancestor = ancestor.parent) {
-    try { void ancestor.document; host = ancestor; } catch { /* cross-origin */ }
-    if (ancestor === ancestor.parent) break;
+  const pending: Window[] = [window], visited = new Set<Window>();
+  while (pending.length) {
+    const candidate = pending.pop()!;
+    if (visited.has(candidate)) continue;
+    visited.add(candidate);
+    try {
+      void candidate.document;
+      host = candidate;
+      if (Object.prototype.hasOwnProperty.call(candidate, key)) break;
+    } catch { /* cross-origin or closed */ }
+    try { if (candidate.opener) pending.push(candidate.opener as Window); } catch { /* closed */ }
+    try { pending.push(candidate.parent); } catch { /* closed */ }
   }
 }
-const key = Symbol.for('WebXR-emulator.interface-brands');
 const shared = host as unknown as {[key: symbol]: ReturnType<typeof createBrands>};
 if (!Object.prototype.hasOwnProperty.call(shared, key)) {
   Object.defineProperty(shared, key, {value: createBrands()});

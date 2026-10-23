@@ -911,19 +911,33 @@ function WebXRPolyfillInjection() {
           joints: Object.freeze({ has: (value) => joints.has(value) }),
       });
   }
+  const key = Symbol.for('WebXR-emulator.interface-brands');
   let host = globalThis;
   if (typeof window !== 'undefined') {
-      for (let ancestor = window;; ancestor = ancestor.parent) {
+      const pending = [window], visited = new Set();
+      while (pending.length) {
+          const candidate = pending.pop();
+          if (visited.has(candidate))
+              continue;
+          visited.add(candidate);
           try {
-              void ancestor.document;
-              host = ancestor;
+              void candidate.document;
+              host = candidate;
+              if (Object.prototype.hasOwnProperty.call(candidate, key))
+                  break;
           }
           catch ( _a) {  }
-          if (ancestor === ancestor.parent)
-              break;
+          try {
+              if (candidate.opener)
+                  pending.push(candidate.opener);
+          }
+          catch ( _b) {  }
+          try {
+              pending.push(candidate.parent);
+          }
+          catch ( _c) {  }
       }
   }
-  const key = Symbol.for('WebXR-emulator.interface-brands');
   const shared = host;
   if (!Object.prototype.hasOwnProperty.call(shared, key)) {
       Object.defineProperty(shared, key, { value: createBrands() });

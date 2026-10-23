@@ -2,7 +2,7 @@ import {runBoundedFloor} from './bounded-floor';
 import {runSessionRequest} from './session-request';
 import {runRenderState} from './render-state';
 import {runInputLifecycle} from './input-lifecycle';
-import {runBulkFrame} from './bulk-frame';
+import {runBulkFrame, runPopupBulkFrame} from './bulk-frame';
 import type {Page} from 'playwright';
 import type {SessionMode} from '../src/types/contracts';
 import type * as Runtime from '../src/polyfill/api/runtime';
@@ -26,6 +26,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
   const boundedFloor = await runBoundedFloor(page, mode, handheld);
   const inputLifecycle = await runInputLifecycle(page, mode, handheld);
   const bulkFrame = await runBulkFrame(page, mode, handheld);
+  const popupBulkFrame = await runPopupBulkFrame(page, mode, handheld);
   const result = await page.evaluate(async ({mode, handheld}) => {
     const xr = window as unknown as TestWindow;
     const passed: string[] = [];
@@ -1056,5 +1057,5 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
     }
     return {mode, handheld, assertions: new Set(passed).size, passed: [...new Set(passed)]};
   }, {mode, handheld});
-  return {...result, boundedFloor, renderState, sessionRequest, inputLifecycle, bulkFrame};
+  return {...result, boundedFloor, renderState, sessionRequest, inputLifecycle, bulkFrame, popupBulkFrame};
 }

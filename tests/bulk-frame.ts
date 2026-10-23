@@ -318,6 +318,102 @@ export async function runBulkFrame(page: Page, mode: SessionMode, handheld: bool
   }, {mode, handheld}); } finally { await page.locator('#bulk-interface-realm').evaluateAll(frames => frames.forEach(frame => frame.remove())); }
 }
 
+/** A real window.open() injection must share interface brands with its opener. */
+export async function runPopupBulkFrame(page: Page, mode: SessionMode, handheld: boolean) {
+  const opened = page.waitForEvent('popup');
+  const handle = await page.evaluateHandle(() => window.open('/frame'));
+  const popup = await opened;
+  try {
+    await popup.waitForLoadState();
+    await popup.waitForFunction(() => !!(window as unknown as TestWindow).XRFrame);
+    return await page.evaluate(async ({popupWindow, mode, handheld}) => {
+      const w = window as unknown as TestWindow;
+      const other = popupWindow as unknown as TestWindow & {EventTarget: typeof EventTarget};
+      const passed: string[] = [];
+      let context = '';
+      const sentinel = 12345;
+      function check(value: unknown, label: string): asserts value {
+        if (!value) throw new Error(`${context}: ${label}`);
+        passed.push(`${context}: ${label}`);
+      }
+      function untouched(output: Float32Array, action: () => unknown, name: string, label: string) {
+        output.fill(sentinel);
+        let error: unknown; try { action(); } catch (caught) { error = caught; }
+        check(error !== null && typeof error === 'object' && (error as Error).name === name, `${label}: ${name} (got ${String(error)})`);
+        check(output.every(value => value === sentinel), `${label}: no output writes`);
+      }
+      async function setup(realm: Window, sessionMode: SessionMode) {
+        const api = realm as unknown as TestWindow;
+        const session = await api.navigator.xr.requestSession(sessionMode, {requiredFeatures: !handheld && sessionMode !== 'inline' ? ['hand-tracking'] : []});
+        const canvas = realm.document.createElement('canvas'); realm.document.body.append(canvas);
+        session.updateRenderState({baseLayer: new api.XRWebGLLayer(session, canvas.getContext('webgl', {xrCompatible: true} as WebGLContextAttributes)!)});
+        const base = await session.requestReferenceSpace('viewer');
+        const next = <T>(read: (frame: Runtime.XRFrame) => T) => new Promise<T>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Popup bulk frame timeout')), 5000);
+          session.requestAnimationFrame((_time, frame) => { clearTimeout(timeout); try { resolve(read(frame)); } catch (error) { reject(error); } });
+        });
+        const close = async () => { try { if (!session.ended) await session.end(); } finally { canvas.remove(); } };
+        return {session, base, next, close};
+      }
+      check(popupWindow!.opener === window && popupWindow!.parent === popupWindow, 'fixture is a popup with a real opener');
+      check(other.XRFrame !== w.XRFrame && other.XRSpace !== w.XRSpace, 'popup has separate injected interface constructors');
+      for (const sessionMode of ['inline', mode] as const) {
+        context = sessionMode;
+        const parent = await setup(window, sessionMode);
+        let child: Awaited<ReturnType<typeof setup>> | undefined;
+        try {
+          child = await setup(popupWindow!, sessionMode);
+          const childTest = child;
+          check(childTest.base instanceof other.EventTarget && !(childTest.base instanceof w.XRSpace), 'popup space retains its realm inheritance');
+          const parentJoint = await parent.next(() => parent.session.inputSources[0]?.hand?.get('wrist'));
+          const childJoint = await childTest.next(() => childTest.session.inputSources[0]?.hand?.get('wrist'));
+          check(handheld || sessionMode === 'inline' || !!parentJoint && !!childJoint, 'Quest immersive fixture exposes genuine joints in both windows');
+          for (const [owned, foreign, ownAPI, borrowedAPI, joint, foreignJoint, direction] of [
+            [parent, childTest, w, other, parentJoint, childJoint, 'popup to opener'],
+            [childTest, parent, other, w, childJoint, parentJoint, 'opener to popup'],
+          ] as const) {
+            context = `${sessionMode} ${direction}`;
+            let held!: Runtime.XRFrame;
+            const poses = new Float32Array(48), radii = new Float32Array(3);
+            const borrowedPoses = borrowedAPI.XRFrame.prototype.fillPoses;
+            const borrowedRadii = borrowedAPI.XRFrame.prototype.fillJointRadii;
+            await owned.next(frame => {
+              held = frame;
+              poses.fill(sentinel); radii.fill(sentinel);
+              check(borrowedPoses.call(frame, [owned.base], owned.base, poses) && poses[0] === 1 && poses.slice(16).every(v => v === sentinel), 'borrowed pose method accepts genuine receiver and owned spaces');
+              check(borrowedRadii.call(frame, joint ? [joint] : [], radii) && (joint ? Math.abs(radii[0] - joint._radius) < 1e-8 : radii[0] === sentinel) && radii.slice(1).every(v => v === sentinel), 'borrowed radius method accepts genuine receiver and owned joints');
+              for (const method of [ownAPI.XRFrame.prototype.fillPoses, borrowedPoses]) {
+                untouched(poses, () => method.call(frame, [owned.base, foreign.base], owned.base, poses), 'InvalidStateError', 'late foreign popup/opener space reaches ownership validation');
+                untouched(poses, () => method.call(frame, [], foreign.base, poses), 'InvalidStateError', 'foreign popup/opener base checked for empty input');
+                untouched(poses, () => method.call(frame, [owned.base, foreign.base], owned.base, poses.subarray(0, 1)), 'InvalidStateError', 'foreign ownership precedes short pose capacity');
+                for (const fake of [Object.create(borrowedAPI.XRSpace.prototype), new Proxy(foreign.base, {})]) {
+                  untouched(poses, () => method.call(frame, [fake], owned.base, poses), 'TypeError', 'popup/opener space forgery and proxy rejected');
+                  untouched(poses, () => method.call(frame, [], fake, poses), 'TypeError', 'popup/opener base forgery and proxy rejected');
+                }
+              }
+              for (const method of [ownAPI.XRFrame.prototype.fillJointRadii, borrowedRadii]) {
+                if (foreignJoint) {
+                  untouched(radii, () => method.call(frame, joint ? [joint, foreignJoint] : [foreignJoint], radii), 'InvalidStateError', 'late foreign popup/opener joint reaches ownership validation');
+                  untouched(radii, () => method.call(frame, [foreignJoint], radii.subarray(0, 0)), 'InvalidStateError', 'foreign joint ownership precedes short radius capacity');
+                  untouched(radii, () => method.call(frame, [new Proxy(foreignJoint, {})], radii), 'TypeError', 'popup/opener joint proxy rejected');
+                }
+                untouched(radii, () => method.call(frame, [Object.create(borrowedAPI.XRJointSpace.prototype)], radii), 'TypeError', 'popup/opener joint forgery rejected');
+              }
+              for (const fake of [Object.create(ownAPI.XRFrame.prototype), new Proxy(frame, {})]) {
+                untouched(poses, () => borrowedPoses.call(fake, [], owned.base, poses), 'TypeError', 'borrowed pose method rejects forged/proxy receiver');
+                untouched(radii, () => borrowedRadii.call(fake, [], radii), 'TypeError', 'borrowed radius method rejects forged/proxy receiver');
+              }
+            });
+            untouched(poses, () => borrowedPoses.call(held, [], owned.base, poses), 'InvalidStateError', 'borrowed popup/opener method preserves inactive frame check');
+            untouched(radii, () => borrowedRadii.call(held, [], radii), 'InvalidStateError', 'borrowed popup/opener radius method preserves inactive frame check');
+          }
+        } finally { try { if (child) await child.close(); } finally { await parent.close(); } }
+      }
+      return {mode, handheld, assertions: passed.length, passed, skipped: []};
+    }, {popupWindow: handle, mode, handheld});
+  } finally { await popup.close(); await handle.dispose(); }
+}
+
 /** COOP/COEP page exposes shared buffers that the ordinary smoke page cannot. */
 export async function runSharedBulkFrame(page: Page) {
   await page.evaluate('globalThis.__name = value => value');
