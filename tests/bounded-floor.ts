@@ -143,9 +143,9 @@ export async function runBoundedFloor(page: Page, mode: SessionMode, handheld: b
         previous = space;
         const pending = session.requestReferenceSpace('bounded-floor');
         const ending = session.end();
-        await rejects(() => pending, 'InvalidStateError', 'session ended during bounded request rejects');
+        check(await pending instanceof xr.XRBoundedReferenceSpace, 'session ended during bounded request still allocates');
         await ending;
-        await rejects(() => session.requestReferenceSpace('bounded-floor'), 'InvalidStateError', 'ended session cannot request bounded space');
+        check(await session.requestReferenceSpace('bounded-floor') instanceof xr.XRBoundedReferenceSpace, 'ended session can request granted bounded space');
         await rejects(() => retainedFrame.getViewerPose(space), 'InvalidStateError', 'ended frame rejects bounded viewer pose');
         check(bounds === space.boundsGeometry && matches(coordinates(space), expected), 'ended space retains immutable bounds snapshot');
       } finally { move(originalPosition, originalOrientation); if (!session.ended) await session.end(); canvas.remove(); }

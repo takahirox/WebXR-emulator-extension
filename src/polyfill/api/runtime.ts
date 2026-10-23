@@ -200,6 +200,29 @@ export class XRSession extends interfaceBrands.SessionObject {
     super(); this.features = Object.freeze([...enabled]); this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
     this.activeRenderState = new XRRenderState({inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null});
     this._viewer = new XRReferenceSpace(this, 'viewer', () => mat4.clone(_device.getBasePoseMatrix()));
+    // Capture this injection's constructors, Promise and task queue. Borrowed
+    // operations must allocate in the session's relevant realm (Device §6.2).
+    interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
+      if (!enabled.has(type)) {
+        setTimeout(() => reject(new DOMException(`Reference space ${type} was not enabled.`, 'NotSupportedError')), 0);
+        return;
+      }
+      const ready = type === 'viewer' ? Promise.resolve(null) : _device.requestFrameOfReferenceTransform(type, undefined);
+      void ready.then(inverse => {
+        setTimeout(() => {
+          try {
+            if (type === 'viewer') {
+              resolve(new XRReferenceSpace(this, type, () => mat4.clone(_device.getBasePoseMatrix())));
+            } else {
+              const world = mat4.invert(mat4.create(), inverse!)!;
+              resolve(type === 'bounded-floor'
+                ? new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA)
+                : new XRReferenceSpace(this, type, () => world));
+            }
+          } catch (error) { reject(error); }
+        }, 0);
+      }, error => { setTimeout(() => reject(error), 0); });
+    }));
     for (const type of inputEvents) {
       const listener = (detail: InputSignal) => { if (detail.sessionId === _id) this.signals.push({type, source: detail.inputSource}); };
       this.listeners.push([`@@webxr-polyfill/input-${type}`, listener]);
@@ -259,16 +282,20 @@ export class XRSession extends interfaceBrands.SessionObject {
     // The packaged room loads automatically; there is no manual sensor capture.
     this.roomCaptureCompleted = true;
   }
-  async requestReferenceSpace(type: string) {
-    this._assertLive();
-    if (!['viewer', 'local', 'local-floor', 'bounded-floor', 'unbounded'].includes(type)) throw new TypeError('Invalid XRReferenceSpaceType.');
-    if (!this.enabledFeatures.includes(type)) unsupported(`Reference space ${type} was not enabled.`);
-    if (type === 'viewer') return this._viewer;
-    const inverse = await this._device.requestFrameOfReferenceTransform(type, undefined);
-    this._assertLive();
-    const world = mat4.invert(mat4.create(), inverse)!;
-    if (type === 'bounded-floor') return new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA);
-    return new XRReferenceSpace(this, type, () => world);
+  requestReferenceSpace(type: unknown): Promise<XRReferenceSpace> {
+    try {
+      // WebIDL Promise-returning operations reject binding errors. Validate the
+      // allocation brand before any argument access or user-defined coercion.
+      if (!sessionObjects.has(this)) throw new TypeError('Expected XRSession receiver.');
+      const request = interfaceBrands.referenceSpaceRequests.get(this);
+      if (!request) throw new TypeError('Expected XRSession receiver.');
+      if (arguments.length === 0) throw new TypeError('XRReferenceSpaceType is required.');
+      const converted = `${type}`; // ToString, including Symbol rejection.
+      if (!['viewer', 'local', 'local-floor', 'bounded-floor', 'unbounded'].includes(converted)) throw new TypeError('Invalid XRReferenceSpaceType.');
+      // The pinned Device request/support algorithms have no ended gate.
+      // Allocation only reads tracking origins; it never restarts presentation.
+      return request(converted);
+    } catch (error) { return Promise.reject(error); }
   }
   updateRenderState(value: unknown = {}) {
     const init = convertRenderStateInit(value);
@@ -573,6 +600,9 @@ export class XRInputSource extends interfaceBrands.InputSourceObject {
   get gamepad() { return this.gamepadState?.value ?? null; }
   get skipRendering() { return false; }
 }
+
+// WebIDL regular operations are enumerable, writable and configurable.
+Object.defineProperty(XRSession.prototype, 'requestReferenceSpace', {enumerable: true});
 
 // Shared allocation bases do not replace public realm-local inheritance.
 Object.setPrototypeOf(XRSession.prototype, EventTarget.prototype);

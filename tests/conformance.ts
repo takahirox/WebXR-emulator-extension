@@ -934,7 +934,7 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
       check(inlineRendered, 'queued inline frames resume after immersive presentation ends');
     } finally { if (!session.ended) await session.end(); if (!inline.ended) await inline.end(); canvas.remove(); overlay.remove(); }
     check(overlay.style.length === 0 && session.domOverlayState === null, 'session teardown leaves disabled overlay DOM and state unchanged');
-    await rejects(() => session.requestReferenceSpace('viewer'), 'InvalidStateError', 'ended reference space request');
+    check(await session.requestReferenceSpace('viewer') instanceof xr.XRReferenceSpace, 'ended reference space request follows granted support');
     await rejects(() => session.end(), 'InvalidStateError', 'repeated session end');
     for (const method of ['pauseDepthSensing', 'resumeDepthSensing'] as const) throws(() => session[method](), 'InvalidStateError', `${method} after session end`);
     check(session.inputSources.length === 0 && session.requestAnimationFrame(() => {}) === 0, 'ended input and animation lifecycle');
