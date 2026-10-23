@@ -17,7 +17,7 @@ async function build() {
       plugins: [replace({ preventAssignment: true, 'process.env.NODE_ENV': JSON.stringify('production') }), resolve({browser: true, dedupe: ['three']}), commonjs(), cleanup({comments: 'none'})],
     });
     await bundle.write(polyfill ? {
-      file: 'polyfill/webxr-polyfill.js', format: 'umd', name: 'CustomWebXRPolyfill',
+      file: 'polyfill/webxr-polyfill.js', indent: '  ', format: 'umd', name: 'CustomWebXRPolyfill',
       banner: `${threeNotice}\nfunction WebXRPolyfillInjection() {`, footer: '}',
     } : { file: `dist/${entry}.js`, format: 'iife', ...(entry === 'app/panel' ? {banner: threeNotice} : {}) });
     await bundle.close();

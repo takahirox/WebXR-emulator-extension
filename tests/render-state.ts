@@ -104,7 +104,7 @@ export async function runRenderState(page: Page, mode: SessionMode, handheld: bo
         check(gl, 'application WebGL context created');
         if (!gl) throw new Error('Application WebGL unavailable');
         await gl.makeXRCompatible();
-        const legacy = new xr.XRWebGLLayer(session, gl);
+        const legacy = new xr.XRWebGLLayer(session, gl, {antialias: false});
         let binding: Layers.XRWebGLBinding | undefined, projection: Layers.XRProjectionLayer | undefined;
         const framebuffer = gl.createFramebuffer();
         if (path === 'webgl2' && sessionMode !== 'inline') {
@@ -156,8 +156,11 @@ export async function runRenderState(page: Page, mode: SessionMode, handheld: bo
         }
         function presentationPixels() {
           gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
-          const pixels = new Uint8Array(gl!.drawingBufferWidth * gl!.drawingBufferHeight * 4);
-          gl!.readPixels(0, 0, gl!.drawingBufferWidth, gl!.drawingBufferHeight, gl!.RGBA, gl!.UNSIGNED_BYTE, pixels);
+          const output = legacy._presentationCanvas;
+          const pixels = sessionMode !== 'inline' && !projection && output instanceof HTMLCanvasElement
+            ? output.getContext('2d')!.getImageData(0, 0, output.width, output.height).data
+            : new Uint8Array(gl!.drawingBufferWidth * gl!.drawingBufferHeight * 4);
+          if (sessionMode === 'inline' || projection) gl!.readPixels(0, 0, gl!.drawingBufferWidth, gl!.drawingBufferHeight, gl!.RGBA, gl!.UNSIGNED_BYTE, pixels);
           check(pixels.some((value, i) => i % 4 === 0 && value > 240 && pixels[i + 1] < 10 && pixels[i + 2] < 10), 'application triangle reaches presentation canvas');
           check(gl!.getError() === gl!.NO_ERROR, 'render-state updates produce no GL errors');
         }

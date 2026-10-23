@@ -39,7 +39,6 @@ export default class EmulatedXRDevice extends XRDevice {
   gamepadInputSources: GamepadXRInputSource[];
   stereoEffectEnabled: boolean;
   div: HTMLDivElement;
-  originalCanvasParams: {parentElement: HTMLElement | null; width: number; height: number};
   handheld: boolean;
   emulationMode: SessionMode;
   domOverlayPreview = false;
@@ -100,12 +99,6 @@ export default class EmulatedXRDevice extends XRDevice {
     this.div.style.top = '0';
     this.div.style.left = '0';
     this.div.style.zIndex = DIV_Z_INDEX; // To override window overall
-    this.originalCanvasParams = {
-      parentElement: null,
-      width: 0,
-      height: 0
-    };
-
     // For AR
 
     this.domOverlayPreview = config.domOverlayPreview === true;
@@ -151,11 +144,9 @@ export default class EmulatedXRDevice extends XRDevice {
     if (session.immersive && session.baseLayer) {
       this._appendBaseLayerCanvasToDiv(sessionId);
       if (session.ar) {
-        const canvas = session.baseLayer!.context.canvas as HTMLCanvasElement;
-        canvas.width = this.handheld ? this.resolution.width : this.arScene!.renderer.domElement.width;
-        canvas.height = this.handheld ? this.resolution.height : this.arScene!.renderer.domElement.height;
+        const canvas = session.baseLayer!._presentationCanvas;
         this.arScene!.setCanvas(canvas);
-        if (canvas.parentElement) {
+        if (canvas instanceof HTMLCanvasElement && canvas.parentElement) {
           // Not sure why but this is necessary for Firefox.
           // Otherwise, the canvas won't be rendered in AR scene.
           // @TODO: Figure out the root issue and resolve.
@@ -260,70 +251,20 @@ export default class EmulatedXRDevice extends XRDevice {
   onFrameStart(sessionId: number, renderState: RenderState) {
     const session = this.sessions.get(sessionId)!;
     // guaranteed by the caller that session.baseLayer is not null
-    const context = session.baseLayer!.context;
-    const canvas = context.canvas as HTMLCanvasElement;
-    if (session.ar && !this.handheld && this.arScene) {
-      // Match the MR room's physical drawing buffer before calculating views or
-      // running application rendering. Only resize when needed: resizing clears GL.
-      const display = this.arScene.renderer.domElement;
-      if (canvas.width !== display.width || canvas.height !== display.height) {
-        canvas.width = display.width;
-        canvas.height = display.height;
-        // Three.js texture storage is immutable; replace it for the new size.
-        this.arScene.setCanvas(canvas);
-      }
-    }
     const near = renderState.depthNear;
     const far = renderState.depthFar;
-    const width = canvas.width;
-    const height = canvas.height;
-
-    // If session is not an inline session, XRWebGLLayer's composition disabled boolean
-    // should be false and then framebuffer should be marked as opaque.
-    // The buffers attached to an opaque framebuffer must be cleared prior to the
-    // processing of each XR animation frame.
-    if (session.immersive) {
-      const framebuffer = context.getParameter(context.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
-      const scissor = context.isEnabled(context.SCISSOR_TEST);
-      const mask = context.getParameter(context.COLOR_WRITEMASK) as boolean[];
-      const depthMask = context.getParameter(context.DEPTH_WRITEMASK) as boolean;
-      const stencilMask = context.getParameter(context.STENCIL_WRITEMASK) as number;
-      const backStencilMask = context.getParameter(context.STENCIL_BACK_WRITEMASK) as number;
-      const currentClearColor = context.getParameter(context.COLOR_CLEAR_VALUE) as Float32Array;
-      const currentClearDepth = context.getParameter(context.DEPTH_CLEAR_VALUE) as number;
-      const currentClearStencil = context.getParameter(context.STENCIL_CLEAR_VALUE) as number;
-      // Clear the emulated compositor output without altering application GL state.
-      const gl2 = context instanceof WebGL2RenderingContext ? context : null;
-      const target = gl2 ? gl2.DRAW_FRAMEBUFFER : context.FRAMEBUFFER;
-      context.bindFramebuffer(target, null); context.disable(context.SCISSOR_TEST);
-      // Draw-buffer state belongs to the framebuffer, so save it after binding
-      // the default output. Both states can otherwise suppress the clear.
-      const drawBuffer = gl2 ? gl2.getParameter(gl2.DRAW_BUFFER0) as number : null;
-      const rasterizerDiscard = gl2?.isEnabled(gl2.RASTERIZER_DISCARD);
-      if (gl2) { gl2.drawBuffers([gl2.BACK]); gl2.disable(gl2.RASTERIZER_DISCARD); }
-      context.colorMask(true, true, true, true); context.depthMask(true); context.stencilMask(0xffffffff);
-      context.clearColor(0, 0, 0, 0); context.clearDepth(1); context.clearStencil(0);
-      context.clear(context.DEPTH_BUFFER_BIT | context.COLOR_BUFFER_BIT | context.STENCIL_BUFFER_BIT);
-      context.clearColor(currentClearColor[0], currentClearColor[1], currentClearColor[2], currentClearColor[3]);
-      context.clearDepth(currentClearDepth); context.clearStencil(currentClearStencil);
-      context.colorMask(mask[0], mask[1], mask[2], mask[3]); context.depthMask(depthMask);
-      context.stencilMaskSeparate(context.FRONT, stencilMask); context.stencilMaskSeparate(context.BACK, backStencilMask);
-      if (scissor) context.enable(context.SCISSOR_TEST);
-      if (gl2) {
-        gl2.drawBuffers([drawBuffer!]);
-        if (rasterizerDiscard) gl2.enable(gl2.RASTERIZER_DISCARD);
-      }
-      context.bindFramebuffer(target, framebuffer);
-    }
+    const width = session.baseLayer!.framebufferWidth;
+    const height = session.baseLayer!.framebufferHeight;
 
     if (session.immersive && !this.handheld) {
       // @TODO: proper FOV
-      const aspect = width * (this.stereoEffectEnabled ? 0.5 : 1.0) / height;
+      const aspect = Math.floor(width / 2) / height;
       mat4.perspective(this.leftProjectionMatrix, Math.PI / 2, aspect, near, far);
-      mat4.perspective(this.rightProjectionMatrix, Math.PI / 2, aspect, near, far);
+      mat4.perspective(this.rightProjectionMatrix, Math.PI / 2, (width - Math.floor(width / 2)) / height, near, far);
+      if (session.ar && this.arScene) this.arScene.applicationAspects = [aspect, (width - Math.floor(width / 2)) / height];
     } else if (session.ar) {
       // @TODO: proper FOV
-      const aspect = this.deviceSize.width / this.deviceSize.height;
+      const aspect = width / height;
       mat4.perspective(this.projectionMatrix, Math.PI / 2, aspect, near, far);
     } else {
       const aspect = width / height;
@@ -471,30 +412,14 @@ export default class EmulatedXRDevice extends XRDevice {
   }
 
   getViewport(sessionId: number, eye: string, layer: BaseLayer, target: Viewport) {
-    const session = this.sessions.get(sessionId)!;
-    const canvas = session.baseLayer!.context.canvas as HTMLCanvasElement;
-    const width = canvas.width;
-    const height = canvas.height;
-    if (session.ar && this.handheld) {
-      // Handheld AR uses a single monoscopic view.
-      target.x = 0;
-      target.y = 0;
-      target.width = width;
-      target.height = height;
-    } else {
-      if (eye === 'none') {
-        target.x = 0;
-        target.width = width;
-      } else if (this.stereoEffectEnabled) {
-        target.x = eye === 'left' ? 0 : width / 2;
-        target.width = width / 2;
-      } else {
-        target.x = 0;
-        target.width = eye === 'left' ? width : 0;
-      }
-      target.y = 0;
-      target.height = height;
-    }
+    const width = layer.framebufferWidth;
+    const height = layer.framebufferHeight;
+    const stereo = eye !== 'none' && !this.handheld;
+    const half = Math.floor(width / 2);
+    target.x = stereo && eye === 'right' ? half : 0;
+    target.y = 0;
+    target.width = stereo ? (eye === 'right' ? width - half : half) : width;
+    target.height = height;
     return true;
   }
 
@@ -508,7 +433,7 @@ export default class EmulatedXRDevice extends XRDevice {
   }
 
   getBaseViewMatrix(eye: string) {
-    if (eye === 'none' || !this.stereoEffectEnabled) { return this.viewMatrix; }
+    if (eye === 'none') { return this.viewMatrix; }
     return eye === 'left' ? this.leftViewMatrix : this.rightViewMatrix;
   }
 
@@ -565,51 +490,20 @@ export default class EmulatedXRDevice extends XRDevice {
 
   // Private methods
 
-  // If session is immersive mode, resize the canvas size to full window size.
-  // To do that, changing canvas size and moving the canvas to
-  // the special div. They are restored when exiting immersive mode.
-  // @TODO: Simplify the method names
+  // Present the owned output without resizing or reparenting application canvases.
 
   _appendBaseLayerCanvasToDiv(sessionId: number) {
     const session = this.sessions.get(sessionId)!;
-    const canvas = session.baseLayer!.context.canvas as HTMLCanvasElement;
-
-    this.originalCanvasParams.width = canvas.width;
-    this.originalCanvasParams.height = canvas.height;
+    const canvas = session.baseLayer!._presentationCanvas;
 
     (session.enabledFeatures.has('dom-overlay') ? document.documentElement : document.body).appendChild(this.div);
-
-    // If canvas is OffscreenCanvas we don't further touch so far.
-    if (!(canvas instanceof HTMLCanvasElement)) { return; }
-
-    this.originalCanvasParams.parentElement = canvas.parentElement;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    this.div.appendChild(canvas);
+    if (canvas instanceof HTMLCanvasElement) this.div.appendChild(canvas);
   }
 
   _removeBaseLayerCanvasFromDiv(sessionId: number) {
-    const session = this.sessions.get(sessionId)!;
-    const canvas = session.baseLayer!.context.canvas as HTMLCanvasElement;
-
-    canvas.width = this.originalCanvasParams.width;
-    canvas.height = this.originalCanvasParams.height;
-
-    // There may be a case where an application operates DOM elements
-    // in immersive mode. In such case, we don't restore DOM elements
-    // hierarchies so far.
+    const canvas = this.sessions.get(sessionId)!.baseLayer!._presentationCanvas;
+    if (canvas instanceof HTMLCanvasElement && canvas.parentElement === this.div) canvas.remove();
     this.div.remove();
-    if (canvas.parentElement === this.div) {
-      this.div.removeChild(canvas);
-    }
-
-    // If canvas is OffscreenCanvas we don't touch so far.
-    if (!(canvas instanceof HTMLCanvasElement)) { return; }
-
-    if (this.originalCanvasParams.parentElement) {
-      this.originalCanvasParams.parentElement.appendChild(canvas);
-    }
-    this.originalCanvasParams.parentElement = null;
   }
 
   // For AR. Check if right controller(pointer) is touched with left controller(tablet)

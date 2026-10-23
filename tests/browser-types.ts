@@ -42,7 +42,7 @@ export interface SmokeState {
 }
 export interface SmokeWindow {
   navigator: Omit<Navigator, 'xr'> & {xr: {isSessionSupported(mode: SessionMode): Promise<boolean>; requestSession(mode: SessionMode, options: {requiredFeatures: string[]}): Promise<Session>}};
-  XRWebGLLayer: new (session: Session, context: WebGLRenderingContext) => {getViewport(view: object): {x: number; y: number; width: number; height: number}};
+  XRWebGLLayer: new (session: Session, context: WebGLRenderingContext) => {readonly framebuffer: WebGLFramebuffer | null; readonly framebufferWidth: number; readonly framebufferHeight: number; getViewport(view: object): {x: number; y: number; width: number; height: number}};
   XRRigidTransform: new (position?: DOMPointInit) => {matrix: Float32Array};
   XRRay: new (transform?: {matrix: Float32Array}) => {origin: DOMPointReadOnly; direction: DOMPointReadOnly};
   smoke: {

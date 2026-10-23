@@ -347,7 +347,7 @@ try {
       state: (window as unknown as SmokeWindow).smoke.state,
       room: (window as unknown as import('./browser-types').PanelProbeWindow).roomViews || [],
     })), sample => sample.room.length === 2 && sample.room.every(eye => eye.width === width * dpr && eye.height === height * dpr)
-      && sample.state.framebuffer.width === width * dpr && sample.state.framebuffer.height === height * dpr,
+      && sample.state.framebuffer.width === 2560 && sample.state.framebuffer.height === 1440,
     `MR room and application buffers at ${width}x${height}, DPR ${dpr}`);
     for (let i = 0; i < 2; i++) {
       const room = sample.room[i];
@@ -356,10 +356,10 @@ try {
       assert.deepEqual(room.viewport, expected, 'room eye stays inside its physical render target');
       assert.deepEqual(room.scissor, expected, 'room eye scissor matches its viewport');
       assert.equal(room.scissorTest, true, 'room eyes have separate scissor regions');
-      assert.deepEqual([app.viewport.x, app.viewport.y, app.viewport.width, app.viewport.height], expected,
-        'application and room eye viewports align');
+      assert.deepEqual([app.viewport.x, app.viewport.y, app.viewport.width, app.viewport.height], [i * 1280, 0, 1280, 1440],
+        'owned application viewports stay fixed through display resize');
       assert(Math.abs(room.projection - app.projection) < 0.00001, 'room and application eye projections align');
-      assert(Math.abs(app.projection - 2 * height / width) < 0.00001, 'eye projection follows the display aspect');
+      assert(Math.abs(app.projection - 1.125) < 0.00001, 'eye projection follows owned view regions');
     }
     assert.equal(sample.state.ended, false, 'resize preserves the active MR session');
   }
@@ -396,7 +396,7 @@ try {
     const stereo = document.querySelector('#stereoCheckbox') as HTMLInputElement;
     stereo.checked = false; stereo.dispatchEvent(new Event('change'));
   });
-  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.views[1]?.viewport.width === 0);
+  await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.views[1]?.viewport.width > 0);
   await panel.evaluate(() => {
     const stereo = document.querySelector('#stereoCheckbox') as HTMLInputElement;
     stereo.checked = true; stereo.dispatchEvent(new Event('change'));
@@ -469,8 +469,11 @@ try {
     const canvas = (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!.renderer.domElement;
     return canvas.width === 1280 && canvas.height === 720 && canvas.getBoundingClientRect().width === 1280;
   });
-  assert.equal(await page.locator('canvas').count(), 1, 'AR renderer uses the application canvas as a texture');
-  const canvasBox = await page.locator('canvas').boundingBox();
+  assert.equal(await page.locator('canvas').count(), 2, 'AR output and untouched application canvas are separate');
+  const canvasBox = await page.evaluate(() => {
+    const rect = (window as unknown as import('./browser-types').PanelProbeWindow).panelProbe!.renderer.domElement.getBoundingClientRect();
+    return {x: rect.x, y: rect.y, width: rect.width, height: rect.height};
+  });
   assert(canvasBox);
   const phoneEventsBeforeTouch = await page.evaluate(() => ({...(window as unknown as SmokeWindow).smoke.state.events}));
   await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
@@ -707,6 +710,7 @@ try {
   } finally { await restarted.close(); }
   await writeFile(path.join(root, 'test-results/dom-overlay-preview.json'), JSON.stringify({browser: await context.browser()!.version(), disabledNegotiation: [overlayNegotiation, questDisabledNegotiation], previews: overlayPreviews, lifecycle: ['profile switch', 'opt-out', 'Quest MR to VR', 'page reload', 'panel reload persistence', 'extension reload cleanup', 'same-profile browser relaunch persistence']}, null, 2));
   await writeFile(path.join(root, 'test-results/dom-overlay-feasibility.json'), JSON.stringify({browser: await context.browser()!.version(), overlayPrototypes}, null, 2));
+  await writeFile(path.join(root, 'test-results/webgl-layer.json'), JSON.stringify({browser: await context.browser()!.version(), profiles: conformance.map(result => result.webglLayer)}, null, 2));
   await writeFile(path.join(root, 'test-results/webxr-conformance.json'), JSON.stringify({browser: await context.browser()!.version(), conformance, sharedBulkFrame}, null, 2));
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(panel.errors, [], 'no panel runtime or WebGL errors');

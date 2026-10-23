@@ -6,6 +6,119 @@ function WebXRPolyfillInjection() {
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.CustomWebXRPolyfill = factory());
 })(this, (function () { 'use strict';
 
+  const owners = new WeakMap();
+  const errors = new WeakMap();
+  let privileged = 0;
+  function compositorOperation(action) {
+      privileged++;
+      try {
+          return action();
+      }
+      finally {
+          privileged--;
+      }
+  }
+  function ownFramebuffer(framebuffer, owner) { owners.set(framebuffer, owner); }
+  function installOpaqueFramebufferGuards(Context) {
+      const prototype = Context.prototype;
+      const nativeGetError = prototype.getError;
+      const nativeGetParameter = prototype.getParameter;
+      const queueError = (gl, error) => {
+          let pending = errors.get(gl);
+          if (!pending)
+              errors.set(gl, pending = new Set());
+          for (let i = 0; i < 32; i++) {
+              const value = nativeGetError.call(gl);
+              if (!value)
+                  break;
+              pending.add(value);
+          }
+          pending.add(error);
+      };
+      prototype.getError = function () {
+          const pending = errors.get(this);
+          if (pending === null || pending === void 0 ? void 0 : pending.size) {
+              const first = pending.values().next().value;
+              pending.delete(first);
+              return first;
+          }
+          return nativeGetError.call(this);
+      };
+      const bound = (gl, read = false) => owners.get(nativeGetParameter.call(gl, read && gl instanceof WebGL2RenderingContext ? gl.READ_FRAMEBUFFER_BINDING : gl.FRAMEBUFFER_BINDING));
+      const targetRead = (gl, target) => gl instanceof WebGL2RenderingContext && target === gl.READ_FRAMEBUFFER;
+      const wrap = (name, guard, fallback, writes = false) => {
+          const original = prototype[name];
+          if (!original)
+              return;
+          prototype[name] = function (...args) {
+              const error = privileged ? undefined : guard(this, args);
+              if (error !== undefined) {
+                  queueError(this, error);
+                  return fallback;
+              }
+              if (!privileged && writes) {
+                  const owner = bound(this);
+                  if (owner)
+                      owner.dirty = true;
+              }
+              return original.apply(this, args);
+          };
+      };
+      for (const name of ['framebufferTexture2D', 'framebufferRenderbuffer', 'framebufferTextureLayer', 'getFramebufferAttachmentParameter']) {
+          wrap(name, (gl, args) => bound(gl, targetRead(gl, args[0])) ? gl.INVALID_OPERATION : undefined, name === 'getFramebufferAttachmentParameter' ? null : undefined);
+      }
+      wrap('deleteFramebuffer', (gl, args) => owners.has(args[0]) ? gl.INVALID_OPERATION : undefined);
+      const originalStatus = prototype.checkFramebufferStatus;
+      prototype.checkFramebufferStatus = function (target) {
+          const owner = bound(this, targetRead(this, target));
+          if (!privileged && owner && (!owner.active || !owner.alive))
+              return this.FRAMEBUFFER_UNSUPPORTED;
+          return originalStatus.call(this, target);
+      };
+      const unavailable = (owner) => owner && (!owner.active || !owner.alive);
+      for (const name of ['clear', 'drawArrays', 'drawElements', 'drawRangeElements', 'drawArraysInstanced', 'drawElementsInstanced', 'clearBufferfv', 'clearBufferiv', 'clearBufferuiv', 'clearBufferfi']) {
+          wrap(name, gl => unavailable(bound(gl)) ? gl.INVALID_FRAMEBUFFER_OPERATION : undefined, undefined, true);
+      }
+      for (const name of ['readPixels', 'copyTexImage2D', 'copyTexSubImage2D', 'copyTexSubImage3D']) {
+          wrap(name, gl => unavailable(bound(gl, true)) ? gl.INVALID_FRAMEBUFFER_OPERATION : undefined);
+      }
+      wrap('blitFramebuffer', gl => unavailable(bound(gl)) || unavailable(bound(gl, true)) ? gl.INVALID_FRAMEBUFFER_OPERATION : undefined, undefined, true);
+      const getExtension = prototype.getExtension;
+      const patched = new WeakSet();
+      prototype.getExtension = function (name) {
+          const extension = getExtension.call(this, name);
+          if (extension && !patched.has(extension)) {
+              patched.add(extension);
+              for (const key of new Set([...Object.getOwnPropertyNames(extension), ...Object.getOwnPropertyNames(Object.getPrototypeOf(extension))])) {
+                  const attachment = /^framebufferTexture/.test(key);
+                  if (!attachment && !/^(drawArrays|drawElements|multiDraw)/.test(key))
+                      continue;
+                  const original = extension[key];
+                  if (typeof original !== 'function')
+                      continue;
+                  const gl = this;
+                  extension[key] = function (...args) {
+                      if (!privileged && attachment && bound(gl, targetRead(gl, args[0]))) {
+                          queueError(gl, gl.INVALID_OPERATION);
+                          return;
+                      }
+                      if (!privileged && !attachment && unavailable(bound(gl))) {
+                          queueError(gl, gl.INVALID_FRAMEBUFFER_OPERATION);
+                          return;
+                      }
+                      if (!privileged && !attachment) {
+                          const owner = bound(gl);
+                          if (owner)
+                              owner.dirty = true;
+                      }
+                      return original.apply(extension, args);
+                  };
+              }
+          }
+          return extension;
+      };
+  }
+
   var EPSILON = 0.000001;
   var ARRAY_TYPE = typeof Float32Array !== "undefined" ? Float32Array : Array;
 
@@ -1110,6 +1223,7 @@ function WebXRPolyfillInjection() {
       for (const Context of [globalThis.WebGLRenderingContext, globalThis.WebGL2RenderingContext]) {
           if (!Context)
               continue;
+          installOpaqueFramebufferGuards(Context);
           Context.prototype.makeXRCompatible = function () {
               if (this.isContextLost())
                   return Promise.reject(new DOMException('WebGL context is lost.', 'InvalidStateError'));
@@ -1135,25 +1249,309 @@ function WebXRPolyfillInjection() {
           patchCanvas(OffscreenCanvas.prototype);
   }
 
-  let XRWebGLLayer$1 = class XRWebGLLayer {
-      constructor(_session, context, init = {}) {
-          var _a, _b, _c, _d;
+  function convertWebGLLayerOptions(value) {
+      if (value != null && typeof value !== 'object' && typeof value !== 'function')
+          throw new TypeError('Expected XRWebGLLayerInit dictionary.');
+      const dictionary = (value !== null && value !== void 0 ? value : {});
+      const result = {};
+      for (const key of ['alpha', 'antialias', 'depth', 'framebufferScaleFactor', 'ignoreDepthValues', 'stencil']) {
+          const member = dictionary[key];
+          if (key === 'framebufferScaleFactor') {
+              const number = member === undefined ? 1 : +member;
+              if (!Number.isFinite(number))
+                  throw new TypeError('framebufferScaleFactor must be a finite double.');
+              result[key] = number;
+          }
+          else
+              result[key] = member === undefined ? ['alpha', 'antialias', 'depth'].includes(key) : Boolean(member);
+      }
+      return result;
+  }
+  function preserve(gl, action) {
+      return compositorOperation(() => {
+          const gl2 = gl instanceof WebGL2RenderingContext ? gl : null;
+          const draw = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+          const read = gl2 === null || gl2 === void 0 ? void 0 : gl2.getParameter(gl2.READ_FRAMEBUFFER_BINDING);
+          const renderbuffer = gl.getParameter(gl.RENDERBUFFER_BINDING);
+          const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+          const unpack = gl2 === null || gl2 === void 0 ? void 0 : gl2.getParameter(gl2.PIXEL_UNPACK_BUFFER_BINDING);
+          const pack = gl2 === null || gl2 === void 0 ? void 0 : gl2.getParameter(gl2.PIXEL_PACK_BUFFER_BINDING);
+          const pixelStore = [gl.PACK_ALIGNMENT, gl.UNPACK_ALIGNMENT, ...(gl2 ? [gl2.PACK_ROW_LENGTH, gl2.PACK_SKIP_PIXELS, gl2.PACK_SKIP_ROWS, gl2.UNPACK_ROW_LENGTH, gl2.UNPACK_SKIP_PIXELS, gl2.UNPACK_SKIP_ROWS] : [])].map(key => [key, gl.getParameter(key)]);
+          const mask = gl.getParameter(gl.COLOR_WRITEMASK);
+          const depthMask = gl.getParameter(gl.DEPTH_WRITEMASK);
+          const front = gl.getParameter(gl.STENCIL_WRITEMASK), back = gl.getParameter(gl.STENCIL_BACK_WRITEMASK);
+          const color = gl.getParameter(gl.COLOR_CLEAR_VALUE);
+          const depth = gl.getParameter(gl.DEPTH_CLEAR_VALUE), stencil = gl.getParameter(gl.STENCIL_CLEAR_VALUE);
+          const enabled = [gl.SCISSOR_TEST, ...(gl2 ? [gl2.RASTERIZER_DISCARD] : [])].map(cap => [cap, gl.isEnabled(cap)]);
+          try {
+              if (gl2) {
+                  gl2.bindBuffer(gl2.PIXEL_PACK_BUFFER, null);
+                  gl2.bindBuffer(gl2.PIXEL_UNPACK_BUFFER, null);
+              }
+              for (const [key] of pixelStore)
+                  gl.pixelStorei(key, key === gl.PACK_ALIGNMENT || key === gl.UNPACK_ALIGNMENT ? 1 : 0);
+              return action();
+          }
+          finally {
+              for (const [key, value] of pixelStore)
+                  gl.pixelStorei(key, value);
+              if (gl2) {
+                  gl2.bindBuffer(gl2.PIXEL_PACK_BUFFER, pack);
+                  gl2.bindBuffer(gl2.PIXEL_UNPACK_BUFFER, unpack);
+                  gl2.bindFramebuffer(gl2.READ_FRAMEBUFFER, read);
+              }
+              gl.bindFramebuffer(gl2 ? gl2.DRAW_FRAMEBUFFER : gl.FRAMEBUFFER, draw);
+              gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
+              gl.bindTexture(gl.TEXTURE_2D, texture);
+              gl.colorMask(mask[0], mask[1], mask[2], mask[3]);
+              gl.depthMask(depthMask);
+              gl.stencilMaskSeparate(gl.FRONT, front);
+              gl.stencilMaskSeparate(gl.BACK, back);
+              gl.clearColor(color[0], color[1], color[2], color[3]);
+              gl.clearDepth(depth);
+              gl.clearStencil(stencil);
+              for (const [cap, value] of enabled)
+                  value ? gl.enable(cap) : gl.disable(cap);
+          }
+      });
+  }
+  class XRFramebuffer {
+      constructor(gl, size, options, stereo) {
+          var _a;
+          this.gl = gl;
+          this.options = options;
+          this.active = false;
+          this.alive = true;
+          this.dirty = false;
+          this.canvas = document.createElement('canvas');
+          this.resolve = null;
+          this.texture = null;
+          this.buffers = [];
+          this.lastStereo = null;
+          const scale = Math.max(1 / 16, Math.min(2, options.framebufferScaleFactor));
+          const maximum = Math.min(4096, gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+          let width = Math.max(stereo ? 2 : 1, Math.min(maximum, Math.floor(size.width * scale)));
+          let height = Math.max(1, Math.min(maximum, Math.floor(size.height * scale)));
+          const reduction = Math.min(1, Math.sqrt(4194304 / (width * height)));
+          this.width = width = Math.max(stereo ? 2 : 1, Math.floor(width * reduction));
+          this.height = height = Math.max(1, Math.floor(height * reduction));
+          this.canvas.width = width;
+          this.canvas.height = height;
+          this.canvas.style.width = '100%';
+          this.canvas.style.height = '100%';
+          try {
+              const output = this.canvas.getContext('2d', { colorSpace: 'srgb' });
+              if (!output)
+                  throw new Error('Unable to create presentation context.');
+              this.output = output;
+              this.image = output.createImageData(width, height);
+              this.pixels = new Uint8Array(width * height * 4);
+          }
+          catch (_b) {
+              throw new DOMException('Unable to allocate XR presentation storage.', 'OperationError');
+          }
+          const gl2 = gl instanceof WebGL2RenderingContext ? gl : null;
+          const colorFormat = options.alpha ? (gl2 ? gl2.RGBA8 : gl.RGBA) : (gl2 ? gl2.RGB8 : gl.RGB);
+          const depthFormat = options.stencil ? (gl2 ? gl2.DEPTH24_STENCIL8 : gl.DEPTH_STENCIL) : gl.DEPTH_COMPONENT16;
+          let samples = 0;
+          if (gl2 && options.antialias) {
+              const counts = gl2.getInternalformatParameter(gl2.RENDERBUFFER, colorFormat, gl2.SAMPLES);
+              const depthCounts = options.depth || options.stencil ? gl2.getInternalformatParameter(gl2.RENDERBUFFER, depthFormat, gl2.SAMPLES) : counts;
+              samples = (_a = Array.from(counts).find(count => count > 1 && count <= 4 && Array.from(depthCounts).includes(count))) !== null && _a !== void 0 ? _a : 0;
+          }
+          this.antialias = samples > 1;
+          const created = gl.createFramebuffer();
+          if (!created)
+              throw new DOMException('Unable to create XR framebuffer.', 'OperationError');
+          this.framebuffer = created;
+          try {
+              preserve(gl, () => {
+                  gl.bindFramebuffer(gl.FRAMEBUFFER, created);
+                  this.texture = gl.createTexture();
+                  if (!this.texture)
+                      throw new Error('Unable to create color texture.');
+                  gl.bindTexture(gl.TEXTURE_2D, this.texture);
+                  gl.texImage2D(gl.TEXTURE_2D, 0, colorFormat, width, height, 0, options.alpha ? gl.RGBA : gl.RGB, gl.UNSIGNED_BYTE, null);
+                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                  if (gl2 && samples) {
+                      this.resolve = gl.createFramebuffer();
+                      if (!this.resolve)
+                          throw new Error('Unable to create resolve framebuffer.');
+                      gl.bindFramebuffer(gl.FRAMEBUFFER, this.resolve);
+                      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+                      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+                          throw new Error('Incomplete XR resolve framebuffer.');
+                      gl.bindFramebuffer(gl.FRAMEBUFFER, created);
+                      this.attach(gl.COLOR_ATTACHMENT0, colorFormat, samples);
+                  }
+                  else
+                      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+                  if (options.depth || options.stencil)
+                      this.attach(options.stencil ? gl.DEPTH_STENCIL_ATTACHMENT : gl.DEPTH_ATTACHMENT, depthFormat, samples);
+                  if (gl.isContextLost() || gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+                      throw new Error('Incomplete XR framebuffer.');
+              });
+              ownFramebuffer(created, this);
+              this.clear();
+          }
+          catch (error) {
+              this.dispose();
+              throw new DOMException(`Unable to allocate XR framebuffer: ${String(error)}`, 'OperationError');
+          }
+      }
+      attach(attachment, format, samples) {
+          const gl = this.gl;
+          const buffer = gl.createRenderbuffer();
+          if (!buffer)
+              throw new Error('Unable to create XR renderbuffer.');
+          this.buffers.push(buffer);
+          gl.bindRenderbuffer(gl.RENDERBUFFER, buffer);
+          if (samples && gl instanceof WebGL2RenderingContext)
+              gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, format, this.width, this.height);
+          else
+              gl.renderbufferStorage(gl.RENDERBUFFER, format, this.width, this.height);
+          gl.framebufferRenderbuffer(gl.FRAMEBUFFER, attachment, gl.RENDERBUFFER, buffer);
+      }
+      get colorTexture() { return this.texture; }
+      clear() {
+          if (!this.alive || this.gl.isContextLost())
+              return;
+          const gl = this.gl;
+          preserve(gl, () => {
+              gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+              const drawBuffer = gl instanceof WebGL2RenderingContext ? gl.getParameter(gl.DRAW_BUFFER0) : 0;
+              gl.disable(gl.SCISSOR_TEST);
+              if (gl instanceof WebGL2RenderingContext) {
+                  gl.disable(gl.RASTERIZER_DISCARD);
+                  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+              }
+              gl.colorMask(true, true, true, true);
+              gl.depthMask(true);
+              gl.stencilMaskSeparate(gl.FRONT, 0xffffffff);
+              gl.stencilMaskSeparate(gl.BACK, 0xffffffff);
+              gl.clearColor(0, 0, 0, 0);
+              gl.clearDepth(1);
+              gl.clearStencil(0);
+              gl.clear(gl.COLOR_BUFFER_BIT | (this.options.depth || this.options.stencil ? gl.DEPTH_BUFFER_BIT : 0) | (this.options.stencil ? gl.STENCIL_BUFFER_BIT : 0));
+              if (gl instanceof WebGL2RenderingContext)
+                  gl.drawBuffers([drawBuffer]);
+          });
+      }
+      present(stereo, force = false) {
+          const gl = this.gl;
+          if (!this.alive || gl.isContextLost())
+              return;
+          const update = force || this.dirty;
+          if (!update && stereo === this.lastStereo)
+              return;
+          this.lastStereo = stereo;
+          this.dirty = false;
+          if (update) {
+              preserve(gl, () => {
+                  var _a;
+                  gl.disable(gl.SCISSOR_TEST);
+                  if (gl instanceof WebGL2RenderingContext && this.resolve) {
+                      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.framebuffer);
+                      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.resolve);
+                      const sourceReadBuffer = gl.getParameter(gl.READ_BUFFER);
+                      gl.readBuffer(gl.COLOR_ATTACHMENT0);
+                      gl.blitFramebuffer(0, 0, this.width, this.height, 0, 0, this.width, this.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+                      gl.readBuffer(sourceReadBuffer);
+                  }
+                  gl.bindFramebuffer(gl.FRAMEBUFFER, (_a = this.resolve) !== null && _a !== void 0 ? _a : this.framebuffer);
+                  const readBuffer = gl instanceof WebGL2RenderingContext ? gl.getParameter(gl.READ_BUFFER) : 0;
+                  if (gl instanceof WebGL2RenderingContext)
+                      gl.readBuffer(gl.COLOR_ATTACHMENT0);
+                  gl.flush();
+                  gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.UNSIGNED_BYTE, this.pixels);
+                  if (gl instanceof WebGL2RenderingContext)
+                      gl.readBuffer(readBuffer);
+              });
+              const data = this.image.data, width = this.width, height = this.height;
+              for (let y = 0; y < height; y++)
+                  for (let x = 0; x < width; x++) {
+                      const source = ((height - 1 - y) * width + x) * 4, target = (y * width + x) * 4;
+                      const alpha = this.options.alpha ? this.pixels[source + 3] : 255;
+                      for (let c = 0; c < 3; c++)
+                          data[target + c] = alpha ? Math.min(255, Math.round(this.pixels[source + c] * 255 / alpha)) : 0;
+                      data[target + 3] = alpha;
+                  }
+          }
+          const width = this.width, height = this.height;
+          this.output.putImageData(this.image, 0, 0);
+          if (!stereo) {
+              this.output.globalCompositeOperation = 'copy';
+              this.output.drawImage(this.canvas, 0, 0, Math.floor(width / 2), height, 0, 0, width, height);
+              this.output.globalCompositeOperation = 'source-over';
+          }
+      }
+      dispose() {
+          if (!this.alive)
+              return;
+          this.active = false;
+          this.alive = false;
+          compositorOperation(() => {
+              this.gl.deleteFramebuffer(this.framebuffer);
+              this.gl.deleteFramebuffer(this.resolve);
+              this.gl.deleteTexture(this.texture);
+              for (const buffer of this.buffers)
+                  this.gl.deleteRenderbuffer(buffer);
+          });
+          this.buffers = [];
+          this.canvas.width = this.canvas.height = 1;
+          this.pixels = new Uint8Array(0);
+          this.image = new ImageData(1, 1);
+          this.texture = null;
+          this.resolve = null;
+      }
+  }
+
+  class XRLayer extends EventTarget {
+  }
+  const webglStorage = new WeakMap();
+  let XRWebGLLayer$1 = class XRWebGLLayer extends XRLayer {
+      constructor(_session, context, init) {
+          var _a;
+          super();
           this._session = _session;
           this.context = context;
-          this.ignoreDepthValues = true;
-          this.framebuffer = null;
-          this.fixedFoveation = null;
+          this.lost = () => this._dispose();
           if (!sessionObjects.has(_session))
               throw new TypeError('Expected XRSession.');
-          _session._assertLive();
           if (!(context instanceof WebGLRenderingContext) && !(typeof WebGL2RenderingContext !== 'undefined' && context instanceof WebGL2RenderingContext))
               throw new TypeError('Expected WebGL context.');
+          const options = convertWebGLLayerOptions(init);
+          _session._assertLive();
           if (context.isContextLost() || (_session._mode !== 'inline' && !compatibleContexts.has(context) && !((_a = context.getContextAttributes()) === null || _a === void 0 ? void 0 : _a.xrCompatible)))
               invalidState('WebGL context is lost or not XR compatible.');
-          this.antialias = (_d = (_c = (_b = context.getContextAttributes()) === null || _b === void 0 ? void 0 : _b.antialias) !== null && _c !== void 0 ? _c : init.antialias) !== null && _d !== void 0 ? _d : false;
+          if (_session._mode !== 'inline') {
+              const storage = new XRFramebuffer(context, _session._device.getRecommendedFramebufferSize(_session._id), options, !_session._device.handheld);
+              webglStorage.set(this, storage);
+              storage.active = _session._inAnimationCallback;
+              _session._webglLayers.add(this);
+              context.canvas.addEventListener('webglcontextlost', this.lost);
+          }
       }
-      get framebufferWidth() { return this.context.drawingBufferWidth; }
-      get framebufferHeight() { return this.context.drawingBufferHeight; }
+      get antialias() { var _a, _b, _c, _d; return (_d = (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.antialias) !== null && _b !== void 0 ? _b : (_c = this.context.getContextAttributes()) === null || _c === void 0 ? void 0 : _c.antialias) !== null && _d !== void 0 ? _d : false; }
+      get ignoreDepthValues() { return true; }
+      get framebuffer() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.framebuffer) !== null && _b !== void 0 ? _b : null; }
+      get fixedFoveation() { return null; }
+      get framebufferWidth() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.width) !== null && _b !== void 0 ? _b : this.context.drawingBufferWidth; }
+      get framebufferHeight() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.height) !== null && _b !== void 0 ? _b : this.context.drawingBufferHeight; }
+      get _presentationCanvas() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.canvas) !== null && _b !== void 0 ? _b : this.context.canvas; }
+      _clear() { var _a; (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.clear(); }
+      _activate(active) { const storage = webglStorage.get(this); if (storage)
+          storage.active = active && storage.alive; }
+      _present(force = false) { var _a; (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.present(this._session._device.handheld || this._session._device.stereoEffectEnabled, force); }
+      _dispose() {
+          var _a;
+          (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.dispose();
+          this._session._webglLayers.delete(this);
+          this.context.canvas.removeEventListener('webglcontextlost', this.lost);
+      }
       getViewport(view) {
           if (!(view instanceof XRView))
               throw new TypeError('Expected XRView.');
@@ -1171,8 +1569,6 @@ function WebXRPolyfillInjection() {
       if (!(space instanceof XRSpace) || space._session !== session)
           throw new TypeError('Layer space must belong to the same session.');
       return space;
-  }
-  class XRLayer extends EventTarget {
   }
   class XRCompositionLayer extends XRLayer {
       constructor(_binding, _init) {
@@ -1296,7 +1692,7 @@ function WebXRPolyfillInjection() {
           _session._assertLive();
           if (_session._mode === 'inline')
               invalidState('XRWebGLBinding requires an immersive session.');
-          this._presentation = new XRWebGLLayer$1(_session, _context);
+          this._presentation = new XRWebGLLayer$1(_session, _context, { antialias: false });
           _session.addEventListener('end', () => {
               for (const layer of this.layers)
                   layer.destroy();
@@ -1389,7 +1785,7 @@ function WebXRPolyfillInjection() {
           const gl = this._gl2();
           const scale = Math.min(1, (_a = layer._init.scaleFactor) !== null && _a !== void 0 ? _a : 1);
           const maximum = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-          const size = layer instanceof XRProjectionLayer && layer._width === 0 ? this._session._device.getRecommendedFramebufferSize(this._session._id) : { width: gl.drawingBufferWidth, height: gl.drawingBufferHeight };
+          const size = { width: this._presentation.framebufferWidth, height: this._presentation.framebufferHeight };
           const width = layer instanceof XRProjectionLayer ? Math.max(2, Math.floor(size.width * scale)) : layer._init.viewPixelWidth;
           const height = layer instanceof XRProjectionLayer ? Math.max(1, Math.floor(size.height * scale)) : layer._init.viewPixelHeight;
           if (width > maximum || height > maximum)
@@ -1446,11 +1842,12 @@ function WebXRPolyfillInjection() {
       }
       _compose(frame, layers) {
           const gl = this._gl2();
+          webglStorage.get(this._presentation).dirty = true;
           this.preserve(() => {
               this.setupProgram();
-              gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+              gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this._presentation.framebuffer);
               const drawBuffer = gl.getParameter(gl.DRAW_BUFFER0);
-              gl.drawBuffers([gl.BACK]);
+              gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
               try {
                   gl.useProgram(this.program);
                   gl.bindVertexArray(this.vao);
@@ -1478,8 +1875,11 @@ function WebXRPolyfillInjection() {
                           let uv = [0, 1];
                           if (layer instanceof XRProjectionLayer) {
                               gl.disable(gl.CULL_FACE);
-                              if (view.eye !== 'none')
-                                  uv = [view.eye === 'right' && !layer.forceMonoPresentation ? 0.5 : 0, 0.5];
+                              if (view.eye !== 'none') {
+                                  const left = Math.floor(layer._width / 2) / layer._width;
+                                  const right = view.eye === 'right' && !layer.forceMonoPresentation;
+                                  uv = [right ? left : 0, right ? 1 - left : left];
+                              }
                           }
                           else if (layer instanceof XRQuadLayer) {
                               gl.enable(gl.CULL_FACE);
@@ -1503,6 +1903,18 @@ function WebXRPolyfillInjection() {
               finally {
                   gl.drawBuffers([drawBuffer]);
               }
+              gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+              const output = gl.getParameter(gl.DRAW_BUFFER0);
+              gl.drawBuffers([gl.BACK]);
+              gl.disable(gl.BLEND);
+              gl.disable(gl.CULL_FACE);
+              gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+              gl.bindTexture(gl.TEXTURE_2D, webglStorage.get(this._presentation).colorTexture);
+              gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'matrix'), false, create$3());
+              gl.uniform2f(gl.getUniformLocation(this.program, 'uvRange'), 0, 1);
+              gl.uniform2f(gl.getUniformLocation(this.program, 'alphaOptions'), 1, 1);
+              gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+              gl.drawBuffers([output]);
           });
       }
       setupProgram() {
@@ -1540,7 +1952,7 @@ function WebXRPolyfillInjection() {
           const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
           const sampler = gl.getParameter(gl.SAMPLER_BINDING);
           try {
-              action();
+              compositorOperation(action);
           }
           finally {
               gl.bindSampler(0, sampler);
@@ -25793,8 +26205,11 @@ void main() {
           this.frameHandle = 0;
           this.currentCallbacks = null;
           this.animationFrame = null;
+          this._webglLayers = new Set();
+          this._inAnimationCallback = false;
           this.pendingRenderState = null;
           this.presentation = null;
+          this.presentationChanged = false;
           this.endedValue = false;
           this.visibility = document.hidden ? 'hidden' : 'visible';
           this.sources = Object.freeze([]);
@@ -25832,8 +26247,10 @@ void main() {
                   });
                   this.pendingRenderState = null;
                   this.presentation = (_d = (_a = this.renderState.baseLayer) !== null && _a !== void 0 ? _a : (_c = (_b = this.renderState.layers) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c._binding._presentation) !== null && _d !== void 0 ? _d : null;
-                  if (this.presentation && this.presentation !== previous)
+                  if (this.presentation && this.presentation !== previous) {
+                      this.presentationChanged = true;
                       this._device.onBaseLayerSet(this._id, this.presentation);
+                  }
               }
               if (!this.presentation || this.presentation.context.isContextLost())
                   return;
@@ -25900,20 +26317,34 @@ void main() {
               this.callbacks = new Map();
               frame._active = true;
               this.animationFrame = frame;
+              for (const layer of this._webglLayers)
+                  layer._clear();
               try {
                   for (const [id, callback] of callbacks) {
                       if (this.ended)
                           break;
                       callbacks.delete(id);
+                      this._inAnimationCallback = true;
+                      for (const layer of this._webglLayers)
+                          layer._activate(true);
                       try {
                           callback(time, frame);
                       }
                       catch (error) {
                           window.dispatchEvent(new ErrorEvent('error', { error, message: String(error) }));
                       }
+                      finally {
+                          this._inAnimationCallback = false;
+                          for (const layer of this._webglLayers)
+                              layer._activate(false);
+                      }
                   }
-                  if (!this.ended && (layers === null || layers === void 0 ? void 0 : layers.length))
-                      layers[0]._binding._compose(frame, layers);
+                  if (!this.ended && !this.presentation.context.isContextLost()) {
+                      if (layers === null || layers === void 0 ? void 0 : layers.length)
+                          layers[0]._binding._compose(frame, layers);
+                      this.presentation._present(this.presentationChanged);
+                      this.presentationChanged = false;
+                  }
               }
               finally {
                   frame._active = false;
@@ -26068,6 +26499,8 @@ void main() {
           (_a = this.overlay) === null || _a === void 0 ? void 0 : _a.dispose();
           this.overlay = null;
           this.endedValue = true;
+          for (const layer of this._webglLayers)
+              layer._dispose();
           this._device.cancelAnimationFrame(this.frameHandle);
           for (const [type, listener] of this.listeners)
               this._device.removeEventListener(type, listener);
@@ -30026,6 +30459,7 @@ void main() {
           this.resetControls = () => { };
           this.cleanup = [];
           this.appTexture = { value: dummyCanvasTexture };
+          this.applicationAspects = null;
           this.isTouched = false;
           this.onCameraPoseUpdate = null;
           this.onTabletPoseUpdate = null;
@@ -30222,7 +30656,7 @@ void main() {
           compositeScene.add(composite);
           this.cleanup.push(() => { composite.geometry.dispose(); composite.material.dispose(); });
           const animate = () => {
-              var _a;
+              var _a, _b, _c;
               if (this.disposed)
                   return;
               requestAnimationFrame(animate);
@@ -30235,17 +30669,19 @@ void main() {
                   const height = renderer.domElement.height;
                   if (renderTarget.width !== width || renderTarget.height !== height)
                       renderTarget.setSize(width, height);
-                  const eyes = this.stereoEffectEnabled ? [-0.02, 0.02] : [0];
+                  const eyes = this.stereoEffectEnabled ? [-0.02, 0.02] : [-0.02];
                   const eyeCamera = tabletCamera;
                   eyeCamera.fov = 90;
-                  eyeCamera.aspect = width / eyes.length / height;
-                  eyeCamera.updateProjectionMatrix();
                   renderTarget.scissorTest = true;
                   for (let i = 0; i < eyes.length; i++) {
+                      const leftWidth = Math.floor(width / eyes.length);
+                      const eyeWidth = eyes.length === 1 ? width : i === 0 ? leftWidth : width - leftWidth;
+                      eyeCamera.aspect = (_b = (_a = this.applicationAspects) === null || _a === void 0 ? void 0 : _a[i]) !== null && _b !== void 0 ? _b : eyeWidth / height;
+                      eyeCamera.updateProjectionMatrix();
                       eyeCamera.position.copy(camera.position);
                       eyeCamera.quaternion.copy(camera.quaternion);
                       eyeCamera.translateX(eyes[i]);
-                      renderTarget.viewport.set(i * width / eyes.length, 0, width / eyes.length, height);
+                      renderTarget.viewport.set(i === 0 ? 0 : leftWidth, 0, eyeWidth, height);
                       renderTarget.scissor.copy(renderTarget.viewport);
                       renderer.setRenderTarget(renderTarget);
                       renderer.render(scene, eyeCamera);
@@ -30273,7 +30709,7 @@ void main() {
               });
               renderer.setRenderTarget(null);
               renderer.render(scene, camera);
-              (_a = this.domOverlay) === null || _a === void 0 ? void 0 : _a.update();
+              (_c = this.domOverlay) === null || _c === void 0 ? void 0 : _c.update();
           };
           animate();
           const onResize = () => {
@@ -30555,11 +30991,6 @@ void main() {
           this.div.style.top = '0';
           this.div.style.left = '0';
           this.div.style.zIndex = DIV_Z_INDEX;
-          this.originalCanvasParams = {
-              parentElement: null,
-              width: 0,
-              height: 0
-          };
           this.domOverlayPreview = config.domOverlayPreview === true;
           this.domOverlayPreviewFlat = config.domOverlayPreviewFlat === true;
           this.handheld = config.formFactor === 'handheld';
@@ -30595,11 +31026,9 @@ void main() {
           if (session.immersive && session.baseLayer) {
               this._appendBaseLayerCanvasToDiv(sessionId);
               if (session.ar) {
-                  const canvas = session.baseLayer.context.canvas;
-                  canvas.width = this.handheld ? this.resolution.width : this.arScene.renderer.domElement.width;
-                  canvas.height = this.handheld ? this.resolution.height : this.arScene.renderer.domElement.height;
+                  const canvas = session.baseLayer._presentationCanvas;
                   this.arScene.setCanvas(canvas);
-                  if (canvas.parentElement) {
+                  if (canvas instanceof HTMLCanvasElement && canvas.parentElement) {
                       canvas.parentElement.removeChild(canvas);
                   }
               }
@@ -30699,70 +31128,19 @@ void main() {
       }
       onFrameStart(sessionId, renderState) {
           const session = this.sessions.get(sessionId);
-          const context = session.baseLayer.context;
-          const canvas = context.canvas;
-          if (session.ar && !this.handheld && this.arScene) {
-              const display = this.arScene.renderer.domElement;
-              if (canvas.width !== display.width || canvas.height !== display.height) {
-                  canvas.width = display.width;
-                  canvas.height = display.height;
-                  this.arScene.setCanvas(canvas);
-              }
-          }
           const near = renderState.depthNear;
           const far = renderState.depthFar;
-          const width = canvas.width;
-          const height = canvas.height;
-          if (session.immersive) {
-              const framebuffer = context.getParameter(context.FRAMEBUFFER_BINDING);
-              const scissor = context.isEnabled(context.SCISSOR_TEST);
-              const mask = context.getParameter(context.COLOR_WRITEMASK);
-              const depthMask = context.getParameter(context.DEPTH_WRITEMASK);
-              const stencilMask = context.getParameter(context.STENCIL_WRITEMASK);
-              const backStencilMask = context.getParameter(context.STENCIL_BACK_WRITEMASK);
-              const currentClearColor = context.getParameter(context.COLOR_CLEAR_VALUE);
-              const currentClearDepth = context.getParameter(context.DEPTH_CLEAR_VALUE);
-              const currentClearStencil = context.getParameter(context.STENCIL_CLEAR_VALUE);
-              const gl2 = context instanceof WebGL2RenderingContext ? context : null;
-              const target = gl2 ? gl2.DRAW_FRAMEBUFFER : context.FRAMEBUFFER;
-              context.bindFramebuffer(target, null);
-              context.disable(context.SCISSOR_TEST);
-              const drawBuffer = gl2 ? gl2.getParameter(gl2.DRAW_BUFFER0) : null;
-              const rasterizerDiscard = gl2 === null || gl2 === void 0 ? void 0 : gl2.isEnabled(gl2.RASTERIZER_DISCARD);
-              if (gl2) {
-                  gl2.drawBuffers([gl2.BACK]);
-                  gl2.disable(gl2.RASTERIZER_DISCARD);
-              }
-              context.colorMask(true, true, true, true);
-              context.depthMask(true);
-              context.stencilMask(0xffffffff);
-              context.clearColor(0, 0, 0, 0);
-              context.clearDepth(1);
-              context.clearStencil(0);
-              context.clear(context.DEPTH_BUFFER_BIT | context.COLOR_BUFFER_BIT | context.STENCIL_BUFFER_BIT);
-              context.clearColor(currentClearColor[0], currentClearColor[1], currentClearColor[2], currentClearColor[3]);
-              context.clearDepth(currentClearDepth);
-              context.clearStencil(currentClearStencil);
-              context.colorMask(mask[0], mask[1], mask[2], mask[3]);
-              context.depthMask(depthMask);
-              context.stencilMaskSeparate(context.FRONT, stencilMask);
-              context.stencilMaskSeparate(context.BACK, backStencilMask);
-              if (scissor)
-                  context.enable(context.SCISSOR_TEST);
-              if (gl2) {
-                  gl2.drawBuffers([drawBuffer]);
-                  if (rasterizerDiscard)
-                      gl2.enable(gl2.RASTERIZER_DISCARD);
-              }
-              context.bindFramebuffer(target, framebuffer);
-          }
+          const width = session.baseLayer.framebufferWidth;
+          const height = session.baseLayer.framebufferHeight;
           if (session.immersive && !this.handheld) {
-              const aspect = width * (this.stereoEffectEnabled ? 0.5 : 1.0) / height;
+              const aspect = Math.floor(width / 2) / height;
               perspective(this.leftProjectionMatrix, Math.PI / 2, aspect, near, far);
-              perspective(this.rightProjectionMatrix, Math.PI / 2, aspect, near, far);
+              perspective(this.rightProjectionMatrix, Math.PI / 2, (width - Math.floor(width / 2)) / height, near, far);
+              if (session.ar && this.arScene)
+                  this.arScene.applicationAspects = [aspect, (width - Math.floor(width / 2)) / height];
           }
           else if (session.ar) {
-              const aspect = this.deviceSize.width / this.deviceSize.height;
+              const aspect = width / height;
               perspective(this.projectionMatrix, Math.PI / 2, aspect, near, far);
           }
           else {
@@ -30908,32 +31286,14 @@ void main() {
           return session.enabledFeatures.has(type);
       }
       getViewport(sessionId, eye, layer, target) {
-          const session = this.sessions.get(sessionId);
-          const canvas = session.baseLayer.context.canvas;
-          const width = canvas.width;
-          const height = canvas.height;
-          if (session.ar && this.handheld) {
-              target.x = 0;
-              target.y = 0;
-              target.width = width;
-              target.height = height;
-          }
-          else {
-              if (eye === 'none') {
-                  target.x = 0;
-                  target.width = width;
-              }
-              else if (this.stereoEffectEnabled) {
-                  target.x = eye === 'left' ? 0 : width / 2;
-                  target.width = width / 2;
-              }
-              else {
-                  target.x = 0;
-                  target.width = eye === 'left' ? width : 0;
-              }
-              target.y = 0;
-              target.height = height;
-          }
+          const width = layer.framebufferWidth;
+          const height = layer.framebufferHeight;
+          const stereo = eye !== 'none' && !this.handheld;
+          const half = Math.floor(width / 2);
+          target.x = stereo && eye === 'right' ? half : 0;
+          target.y = 0;
+          target.width = stereo ? (eye === 'right' ? width - half : half) : width;
+          target.height = height;
           return true;
       }
       getProjectionMatrix(eye) {
@@ -30944,7 +31304,7 @@ void main() {
           return this.matrix;
       }
       getBaseViewMatrix(eye) {
-          if (eye === 'none' || !this.stereoEffectEnabled) {
+          if (eye === 'none') {
               return this.viewMatrix;
           }
           return eye === 'left' ? this.leftViewMatrix : this.rightViewMatrix;
@@ -30995,34 +31355,16 @@ void main() {
       }
       _appendBaseLayerCanvasToDiv(sessionId) {
           const session = this.sessions.get(sessionId);
-          const canvas = session.baseLayer.context.canvas;
-          this.originalCanvasParams.width = canvas.width;
-          this.originalCanvasParams.height = canvas.height;
+          const canvas = session.baseLayer._presentationCanvas;
           (session.enabledFeatures.has('dom-overlay') ? document.documentElement : document.body).appendChild(this.div);
-          if (!(canvas instanceof HTMLCanvasElement)) {
-              return;
-          }
-          this.originalCanvasParams.parentElement = canvas.parentElement;
-          canvas.width = window.innerWidth;
-          canvas.height = window.innerHeight;
-          this.div.appendChild(canvas);
+          if (canvas instanceof HTMLCanvasElement)
+              this.div.appendChild(canvas);
       }
       _removeBaseLayerCanvasFromDiv(sessionId) {
-          const session = this.sessions.get(sessionId);
-          const canvas = session.baseLayer.context.canvas;
-          canvas.width = this.originalCanvasParams.width;
-          canvas.height = this.originalCanvasParams.height;
+          const canvas = this.sessions.get(sessionId).baseLayer._presentationCanvas;
+          if (canvas instanceof HTMLCanvasElement && canvas.parentElement === this.div)
+              canvas.remove();
           this.div.remove();
-          if (canvas.parentElement === this.div) {
-              this.div.removeChild(canvas);
-          }
-          if (!(canvas instanceof HTMLCanvasElement)) {
-              return;
-          }
-          if (this.originalCanvasParams.parentElement) {
-              this.originalCanvasParams.parentElement.appendChild(canvas);
-          }
-          this.originalCanvasParams.parentElement = null;
       }
       _isPointerCloseEnoughToTablet() {
           const pose = this.gamepads[0].pose;
