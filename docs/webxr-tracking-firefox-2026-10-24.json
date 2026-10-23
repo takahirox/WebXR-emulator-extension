@@ -1,0 +1,4969 @@
+{
+  "issue": 45,
+  "browser": "firefox",
+  "status": "blocked-upstream",
+  "startedAt": "2026-10-23T23:47:43.166Z",
+  "command": "WEBXR_FIREFOX_EXECUTABLE=\"$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox\" WEBXR_GECKODRIVER=\"$PWD/test-results/browser-tools/geckodriver\" npm run test:tracking:firefox",
+  "revisions": {
+    "samples": "fb41c3416496974672e2c766a41c6febcba2d07e",
+    "three": "9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8",
+    "wpt": "e1859580b5fcf74940a18d2f783296b4961035e3"
+  },
+  "results": [
+    {
+      "app": "input-tracking",
+      "status": "blocked-upstream",
+      "cycles": [
+        {
+          "cycle": 0,
+          "before": {
+            "enabled": [
+              "viewer",
+              "local",
+              "local-floor"
+            ],
+            "ends": 0,
+            "events": [],
+            "frames": 35,
+            "identityChecks": 70,
+            "mode": "immersive-vr",
+            "options": {
+              "requiredFeatures": [
+                "local-floor"
+              ]
+            },
+            "poses": {
+              "left-grip": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                -0.5,
+                1.5,
+                -1,
+                1
+              ],
+              "left-ray": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                -0.5,
+                1.5,
+                -1,
+                1
+              ],
+              "right-grip": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0.5,
+                1.5,
+                -1,
+                1
+              ],
+              "right-ray": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0.5,
+                1.5,
+                -1,
+                1
+              ]
+            },
+            "viewer": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1.600000023841858,
+              0,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "pixelsBefore": {
+            "height": 809,
+            "layer": "base",
+            "presented": true,
+            "regions": [
+              {
+                "changedOutsideStats": 0,
+                "colors": 23252,
+                "foreground": 234917,
+                "hash": 259243829
+              },
+              {
+                "changedOutsideStats": 0,
+                "colors": 23212,
+                "foreground": 235112,
+                "hash": 2237142579
+              }
+            ],
+            "width": 1280
+          },
+          "tracking": [
+            {
+              "hand": "right",
+              "commanded": {
+                "position": [
+                  0.35,
+                  1.35,
+                  -0.65
+                ],
+                "yaw": 0.35,
+                "pitch": -0.2
+              },
+              "after": {
+                "enabled": [
+                  "viewer",
+                  "local",
+                  "local-floor"
+                ],
+                "ends": 0,
+                "events": [],
+                "frames": 49,
+                "identityChecks": 98,
+                "mode": "immersive-vr",
+                "options": {
+                  "requiredFeatures": [
+                    "local-floor"
+                  ]
+                },
+                "poses": {
+                  "left-grip": [
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    -0.5,
+                    1.5,
+                    -1,
+                    1
+                  ],
+                  "left-ray": [
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    -0.5,
+                    1.5,
+                    -1,
+                    1
+                  ],
+                  "right-grip": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "right-ray": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ]
+                },
+                "viewer": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  1.600000023841858,
+                  0,
+                  1
+                ],
+                "views": [
+                  {
+                    "eye": "left",
+                    "height": 809,
+                    "width": 640
+                  },
+                  {
+                    "eye": "right",
+                    "height": 809,
+                    "width": 640
+                  }
+                ]
+              },
+              "consumed": {
+                "left-addController": {
+                  "finite": true,
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    -0.5,
+                    1.5,
+                    -1,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "left-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "left-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    0,
+                    -0.5,
+                    1.5,
+                    -1,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "right-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                }
+              },
+              "beforePixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 23262,
+                    "foreground": 234917,
+                    "hash": 2628815721
+                  },
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 23223,
+                    "foreground": 235111,
+                    "hash": 3154473928
+                  }
+                ],
+                "width": 1280
+              },
+              "pixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 457,
+                    "colors": 23325,
+                    "foreground": 234911,
+                    "hash": 1541101250
+                  },
+                  {
+                    "changedOutsideStats": 402,
+                    "colors": 23285,
+                    "foreground": 235106,
+                    "hash": 1576002118
+                  }
+                ],
+                "width": 1280
+              },
+              "screenshot": "test-results/tracking-firefox-input-tracking-0-right-moved.png"
+            },
+            {
+              "hand": "left",
+              "commanded": {
+                "position": [
+                  -0.3,
+                  1.45,
+                  -0.7
+                ],
+                "yaw": -0.4,
+                "pitch": 0.15
+              },
+              "after": {
+                "enabled": [
+                  "viewer",
+                  "local",
+                  "local-floor"
+                ],
+                "ends": 0,
+                "events": [],
+                "frames": 64,
+                "identityChecks": 128,
+                "mode": "immersive-vr",
+                "options": {
+                  "requiredFeatures": [
+                    "local-floor"
+                  ]
+                },
+                "poses": {
+                  "left-grip": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "left-ray": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "right-grip": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "right-ray": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ]
+                },
+                "viewer": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  1.600000023841858,
+                  0,
+                  1
+                ],
+                "views": [
+                  {
+                    "eye": "left",
+                    "height": 809,
+                    "width": 640
+                  },
+                  {
+                    "eye": "right",
+                    "height": 809,
+                    "width": 640
+                  }
+                ]
+              },
+              "consumed": {
+                "left-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "left-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "left-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "right-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                }
+              },
+              "beforePixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 23330,
+                    "foreground": 234911,
+                    "hash": 4010414003
+                  },
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 23291,
+                    "foreground": 235106,
+                    "hash": 698986101
+                  }
+                ],
+                "width": 1280
+              },
+              "pixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 270,
+                    "colors": 23443,
+                    "foreground": 234902,
+                    "hash": 2399097313
+                  },
+                  {
+                    "changedOutsideStats": 333,
+                    "colors": 23443,
+                    "foreground": 235101,
+                    "hash": 2719955518
+                  }
+                ],
+                "width": 1280
+              },
+              "screenshot": "test-results/tracking-firefox-input-tracking-0-left-moved.png"
+            },
+            {
+              "hand": "viewer",
+              "commanded": {
+                "position": [
+                  0.12,
+                  1.7,
+                  0.15
+                ],
+                "yaw": 0.1,
+                "pitch": 0
+              },
+              "after": {
+                "enabled": [
+                  "viewer",
+                  "local",
+                  "local-floor"
+                ],
+                "ends": 0,
+                "events": [],
+                "frames": 80,
+                "identityChecks": 160,
+                "mode": "immersive-vr",
+                "options": {
+                  "requiredFeatures": [
+                    "local-floor"
+                  ]
+                },
+                "poses": {
+                  "left-grip": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "left-ray": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "right-grip": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "right-ray": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ]
+                },
+                "viewer": [
+                  0.995004177093506,
+                  0,
+                  -0.0998334139585495,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.0998334139585495,
+                  0,
+                  0.995004177093506,
+                  0,
+                  0.119999997317791,
+                  1.7000000476837158,
+                  0.15000000596046448,
+                  1
+                ],
+                "views": [
+                  {
+                    "eye": "left",
+                    "height": 809,
+                    "width": 640
+                  },
+                  {
+                    "eye": "right",
+                    "height": 809,
+                    "width": 640
+                  }
+                ]
+              },
+              "consumed": {
+                "left-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "left-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "left-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "right-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.06812328100204468,
+                    -0.3360626697540283,
+                    0,
+                    2.695118128670515e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.34289780259132385,
+                    0.18662454187870023,
+                    0.9206477999687196,
+                    0,
+                    0.3499999940395355,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                }
+              },
+              "beforePixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 23445,
+                    "foreground": 234902,
+                    "hash": 3757332417
+                  },
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 23447,
+                    "foreground": 235101,
+                    "hash": 2746884716
+                  }
+                ],
+                "width": 1280
+              },
+              "pixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 48566,
+                    "colors": 22084,
+                    "foreground": 224965,
+                    "hash": 1021598255
+                  },
+                  {
+                    "changedOutsideStats": 47971,
+                    "colors": 22072,
+                    "foreground": 224845,
+                    "hash": 3103681863
+                  }
+                ],
+                "width": 1280
+              },
+              "screenshot": "test-results/tracking-firefox-input-tracking-0-viewer-moved.png"
+            }
+          ],
+          "upstreamLimitations": [
+            "Cursor coordinates are NaN: Sample passes a transform object to matrix-array Ray and reads typed-array .x/.y/.z",
+            "Grip model lookup misses: registered _right/_left, requested meta-quest-touch-plus_right/left"
+          ],
+          "gripMeshObservation": {
+            "left-addController": {
+              "finite": true,
+              "matrix": [
+                0.9210609793663024,
+                -0.05819394811987877,
+                0.38504558801651,
+                0,
+                -2.229754381133375e-9,
+                0.9887710809707642,
+                0.14943814277648926,
+                0,
+                -0.3894183337688446,
+                -0.13764163851737976,
+                0.9107185006141664,
+                0,
+                -0.30000001192092896,
+                1.4500000476837158,
+                -0.699999988079071,
+                1
+              ],
+              "registeredMeshes": [
+                "_right",
+                "_left"
+              ],
+              "rendered": false,
+              "requestedProfile": "meta-quest-touch-plus"
+            },
+            "right-addController": {
+              "finite": true,
+              "matrix": [
+                0.939372718334198,
+                -0.06812328100204468,
+                -0.3360626697540283,
+                0,
+                2.695118128670515e-9,
+                0.9800665974617004,
+                -0.19866932928562164,
+                0,
+                0.34289780259132385,
+                0.18662454187870023,
+                0.9206477999687196,
+                0,
+                0.3499999940395355,
+                1.350000023841858,
+                -0.6499999761581421,
+                1
+              ],
+              "registeredMeshes": [
+                "_right",
+                "_left"
+              ],
+              "rendered": false,
+              "requestedProfile": "meta-quest-touch-plus"
+            }
+          },
+          "lifetime": {
+            "foreignSpace": [
+              "InvalidStateError",
+              "InvalidStateError"
+            ],
+            "identityChecks": 188,
+            "inactive": [
+              "InvalidStateError",
+              "InvalidStateError"
+            ]
+          },
+          "retiredUnchanged": true,
+          "after": {
+            "enabled": [
+              "viewer",
+              "local",
+              "local-floor"
+            ],
+            "ends": 0,
+            "events": [],
+            "frames": 96,
+            "identityChecks": 192,
+            "mode": "immersive-vr",
+            "options": {
+              "requiredFeatures": [
+                "local-floor"
+              ]
+            },
+            "poses": {
+              "left-grip": [
+                0.9210609793663024,
+                -0.05819394811987877,
+                0.38504558801651,
+                0,
+                -2.229754381133375e-9,
+                0.9887710809707642,
+                0.14943814277648926,
+                0,
+                -0.3894183337688446,
+                -0.13764163851737976,
+                0.9107185006141664,
+                0,
+                -0.30000001192092896,
+                1.4500000476837158,
+                -0.699999988079071,
+                1
+              ],
+              "left-ray": [
+                0.9210609793663024,
+                -0.05819394811987877,
+                0.38504558801651,
+                0,
+                -2.229754381133375e-9,
+                0.9887710809707642,
+                0.14943814277648926,
+                0,
+                -0.3894183337688446,
+                -0.13764163851737976,
+                0.9107185006141664,
+                0,
+                -0.30000001192092896,
+                1.4500000476837158,
+                -0.699999988079071,
+                1
+              ],
+              "right-grip": [
+                0.939372718334198,
+                -0.06812328100204468,
+                -0.3360626697540283,
+                0,
+                2.695118128670515e-9,
+                0.9800665974617004,
+                -0.19866932928562164,
+                0,
+                0.34289780259132385,
+                0.18662454187870023,
+                0.9206477999687196,
+                0,
+                0.3499999940395355,
+                1.350000023841858,
+                -0.6499999761581421,
+                1
+              ],
+              "right-ray": [
+                0.939372718334198,
+                -0.06812328100204468,
+                -0.3360626697540283,
+                0,
+                2.695118128670515e-9,
+                0.9800665974617004,
+                -0.19866932928562164,
+                0,
+                0.34289780259132385,
+                0.18662454187870023,
+                0.9206477999687196,
+                0,
+                0.3499999940395355,
+                1.350000023841858,
+                -0.6499999761581421,
+                1
+              ]
+            },
+            "viewer": [
+              0.995004177093506,
+              0,
+              -0.0998334139585495,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0.0998334139585495,
+              0,
+              0.995004177093506,
+              0,
+              0.119999997317791,
+              1.7000000476837158,
+              0.15000000596046448,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "pixelsAfter": {
+            "height": 809,
+            "layer": "base",
+            "presented": true,
+            "regions": [
+              {
+                "changedOutsideStats": 0,
+                "colors": 22089,
+                "foreground": 224965,
+                "hash": 4244730927
+              },
+              {
+                "changedOutsideStats": 0,
+                "colors": 22078,
+                "foreground": 224844,
+                "hash": 2381907797
+              }
+            ],
+            "width": 1280
+          },
+          "screenshot": "test-results/tracking-firefox-input-tracking-0-completed.png",
+          "inlineResumed": {
+            "before": 8,
+            "after": 40
+          },
+          "shutdown": {
+            "endEvents": 1,
+            "frames": 107,
+            "callbacksStopped": true
+          }
+        },
+        {
+          "cycle": 1,
+          "before": {
+            "enabled": [
+              "viewer",
+              "local",
+              "local-floor"
+            ],
+            "ends": 0,
+            "events": [],
+            "frames": 31,
+            "identityChecks": 62,
+            "mode": "immersive-vr",
+            "options": {
+              "requiredFeatures": [
+                "local-floor"
+              ]
+            },
+            "poses": {
+              "left-grip": [
+                0.9210609793663024,
+                -0.05819394811987877,
+                0.38504558801651,
+                0,
+                -2.229754381133375e-9,
+                0.9887710809707642,
+                0.14943814277648926,
+                0,
+                -0.3894183337688446,
+                -0.13764163851737976,
+                0.9107185006141664,
+                0,
+                -0.30000001192092896,
+                1.4500000476837158,
+                -0.699999988079071,
+                1
+              ],
+              "left-ray": [
+                0.9210609793663024,
+                -0.05819394811987877,
+                0.38504558801651,
+                0,
+                -2.229754381133375e-9,
+                0.9887710809707642,
+                0.14943814277648926,
+                0,
+                -0.3894183337688446,
+                -0.13764163851737976,
+                0.9107185006141664,
+                0,
+                -0.30000001192092896,
+                1.4500000476837158,
+                -0.699999988079071,
+                1
+              ],
+              "right-grip": [
+                0.939372718334198,
+                -0.06812328100204468,
+                -0.3360626697540283,
+                0,
+                2.695118128670515e-9,
+                0.9800665974617004,
+                -0.19866932928562164,
+                0,
+                0.34289780259132385,
+                0.18662454187870023,
+                0.9206477999687196,
+                0,
+                0.3499999940395355,
+                1.350000023841858,
+                -0.6499999761581421,
+                1
+              ],
+              "right-ray": [
+                0.939372718334198,
+                -0.06812328100204468,
+                -0.3360626697540283,
+                0,
+                2.695118128670515e-9,
+                0.9800665974617004,
+                -0.19866932928562164,
+                0,
+                0.34289780259132385,
+                0.18662454187870023,
+                0.9206477999687196,
+                0,
+                0.3499999940395355,
+                1.350000023841858,
+                -0.6499999761581421,
+                1
+              ]
+            },
+            "viewer": [
+              0.995004177093506,
+              0,
+              -0.0998334139585495,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0.0998334139585495,
+              0,
+              0.995004177093506,
+              0,
+              0.119999997317791,
+              1.7000000476837158,
+              0.15000000596046448,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "fresh": {
+            "layers": true,
+            "oldCanvasDetached": true,
+            "oldDisconnected": true,
+            "sources": true
+          },
+          "pixelsBefore": {
+            "height": 809,
+            "layer": "base",
+            "presented": true,
+            "regions": [
+              {
+                "changedOutsideStats": 0,
+                "colors": 22116,
+                "foreground": 224965,
+                "hash": 1149825332
+              },
+              {
+                "changedOutsideStats": 0,
+                "colors": 22109,
+                "foreground": 224845,
+                "hash": 2514476729
+              }
+            ],
+            "width": 1280
+          },
+          "tracking": [
+            {
+              "hand": "right",
+              "commanded": {
+                "position": [
+                  0.38999999999999996,
+                  1.35,
+                  -0.65
+                ],
+                "yaw": 0.39999999999999997,
+                "pitch": -0.2
+              },
+              "after": {
+                "enabled": [
+                  "viewer",
+                  "local",
+                  "local-floor"
+                ],
+                "ends": 0,
+                "events": [],
+                "frames": 43,
+                "identityChecks": 86,
+                "mode": "immersive-vr",
+                "options": {
+                  "requiredFeatures": [
+                    "local-floor"
+                  ]
+                },
+                "poses": {
+                  "left-grip": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "left-ray": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "right-grip": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "right-ray": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ]
+                },
+                "viewer": [
+                  0.995004177093506,
+                  0,
+                  -0.0998334139585495,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.0998334139585495,
+                  0,
+                  0.995004177093506,
+                  0,
+                  0.119999997317791,
+                  1.7000000476837158,
+                  0.15000000596046448,
+                  1
+                ],
+                "views": [
+                  {
+                    "eye": "left",
+                    "height": 809,
+                    "width": 640
+                  },
+                  {
+                    "eye": "right",
+                    "height": 809,
+                    "width": 640
+                  }
+                ]
+              },
+              "consumed": {
+                "left-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "left-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "left-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.05819394811987877,
+                    0.38504558801651,
+                    0,
+                    -2.229754381133375e-9,
+                    0.9887710809707642,
+                    0.14943814277648926,
+                    0,
+                    -0.3894183337688446,
+                    -0.13764163851737976,
+                    0.9107185006141664,
+                    0,
+                    -0.30000001192092896,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "right-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                }
+              },
+              "beforePixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 22118,
+                    "foreground": 224965,
+                    "hash": 3621272065
+                  },
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 22106,
+                    "foreground": 224845,
+                    "hash": 2422030784
+                  }
+                ],
+                "width": 1280
+              },
+              "pixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 407,
+                    "colors": 22119,
+                    "foreground": 224963,
+                    "hash": 4094609908
+                  },
+                  {
+                    "changedOutsideStats": 321,
+                    "colors": 22103,
+                    "foreground": 224847,
+                    "hash": 3094878020
+                  }
+                ],
+                "width": 1280
+              },
+              "screenshot": "test-results/tracking-firefox-input-tracking-1-right-moved.png"
+            },
+            {
+              "hand": "left",
+              "commanded": {
+                "position": [
+                  -0.26,
+                  1.45,
+                  -0.7
+                ],
+                "yaw": -0.35000000000000003,
+                "pitch": 0.15
+              },
+              "after": {
+                "enabled": [
+                  "viewer",
+                  "local",
+                  "local-floor"
+                ],
+                "ends": 0,
+                "events": [],
+                "frames": 62,
+                "identityChecks": 124,
+                "mode": "immersive-vr",
+                "options": {
+                  "requiredFeatures": [
+                    "local-floor"
+                  ]
+                },
+                "poses": {
+                  "left-grip": [
+                    0.939372718334198,
+                    -0.05124200880527496,
+                    0.3390474319458008,
+                    0,
+                    1.3332690507183995e-10,
+                    0.9887710809707642,
+                    0.14943812787532806,
+                    0,
+                    -0.34289780259132385,
+                    -0.14037810266017914,
+                    0.928824543952942,
+                    0,
+                    -0.25999999046325684,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "left-ray": [
+                    0.939372718334198,
+                    -0.05124200880527496,
+                    0.3390474319458008,
+                    0,
+                    1.3332690507183995e-10,
+                    0.9887710809707642,
+                    0.14943812787532806,
+                    0,
+                    -0.34289780259132385,
+                    -0.14037810266017914,
+                    0.928824543952942,
+                    0,
+                    -0.25999999046325684,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "right-grip": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "right-ray": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ]
+                },
+                "viewer": [
+                  0.995004177093506,
+                  0,
+                  -0.0998334139585495,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.0998334139585495,
+                  0,
+                  0.995004177093506,
+                  0,
+                  0.119999997317791,
+                  1.7000000476837158,
+                  0.15000000596046448,
+                  1
+                ],
+                "views": [
+                  {
+                    "eye": "left",
+                    "height": 809,
+                    "width": 640
+                  },
+                  {
+                    "eye": "right",
+                    "height": 809,
+                    "width": 640
+                  }
+                ]
+              },
+              "consumed": {
+                "left-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.05124200880527496,
+                    0.3390474319458008,
+                    0,
+                    1.3332690507183995e-10,
+                    0.9887710809707642,
+                    0.14943812787532806,
+                    0,
+                    -0.34289780259132385,
+                    -0.14037810266017914,
+                    0.928824543952942,
+                    0,
+                    -0.25999999046325684,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "left-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "left-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.05124200880527496,
+                    0.3390474319458008,
+                    0,
+                    1.3332690507183995e-10,
+                    0.9887710809707642,
+                    0.14943812787532806,
+                    0,
+                    -0.34289780259132385,
+                    -0.14037810266017914,
+                    0.928824543952942,
+                    0,
+                    -0.25999999046325684,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "right-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                }
+              },
+              "beforePixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 22128,
+                    "foreground": 224963,
+                    "hash": 1452788249
+                  },
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 22109,
+                    "foreground": 224847,
+                    "hash": 2255935255
+                  }
+                ],
+                "width": 1280
+              },
+              "pixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 143,
+                    "colors": 22127,
+                    "foreground": 224965,
+                    "hash": 2863348408
+                  },
+                  {
+                    "changedOutsideStats": 232,
+                    "colors": 22097,
+                    "foreground": 224846,
+                    "hash": 4267017053
+                  }
+                ],
+                "width": 1280
+              },
+              "screenshot": "test-results/tracking-firefox-input-tracking-1-left-moved.png"
+            },
+            {
+              "hand": "viewer",
+              "commanded": {
+                "position": [
+                  0.16,
+                  1.7,
+                  0.15
+                ],
+                "yaw": 0.15000000000000002,
+                "pitch": 0
+              },
+              "after": {
+                "enabled": [
+                  "viewer",
+                  "local",
+                  "local-floor"
+                ],
+                "ends": 0,
+                "events": [],
+                "frames": 81,
+                "identityChecks": 162,
+                "mode": "immersive-vr",
+                "options": {
+                  "requiredFeatures": [
+                    "local-floor"
+                  ]
+                },
+                "poses": {
+                  "left-grip": [
+                    0.939372718334198,
+                    -0.05124200880527496,
+                    0.3390474319458008,
+                    0,
+                    1.3332690507183995e-10,
+                    0.9887710809707642,
+                    0.14943812787532806,
+                    0,
+                    -0.34289780259132385,
+                    -0.14037810266017914,
+                    0.928824543952942,
+                    0,
+                    -0.25999999046325684,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "left-ray": [
+                    0.939372718334198,
+                    -0.05124200880527496,
+                    0.3390474319458008,
+                    0,
+                    1.3332690507183995e-10,
+                    0.9887710809707642,
+                    0.14943812787532806,
+                    0,
+                    -0.34289780259132385,
+                    -0.14037810266017914,
+                    0.928824543952942,
+                    0,
+                    -0.25999999046325684,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "right-grip": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "right-ray": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ]
+                },
+                "viewer": [
+                  0.9887710809707642,
+                  0,
+                  -0.14943812787532806,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.14943812787532806,
+                  0,
+                  0.9887710809707642,
+                  0,
+                  0.1599999964237213,
+                  1.7000000476837158,
+                  0.15000000596046448,
+                  1
+                ],
+                "views": [
+                  {
+                    "eye": "left",
+                    "height": 809,
+                    "width": 640
+                  },
+                  {
+                    "eye": "right",
+                    "height": 809,
+                    "width": 640
+                  }
+                ]
+              },
+              "consumed": {
+                "left-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.05124200880527496,
+                    0.3390474319458008,
+                    0,
+                    1.3332690507183995e-10,
+                    0.9887710809707642,
+                    0.14943812787532806,
+                    0,
+                    -0.34289780259132385,
+                    -0.14037810266017914,
+                    0.928824543952942,
+                    0,
+                    -0.25999999046325684,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "left-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "left-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.939372718334198,
+                    -0.05124200880527496,
+                    0.3390474319458008,
+                    0,
+                    1.3332690507183995e-10,
+                    0.9887710809707642,
+                    0.14943812787532806,
+                    0,
+                    -0.34289780259132385,
+                    -0.14037810266017914,
+                    0.928824543952942,
+                    0,
+                    -0.25999999046325684,
+                    1.4500000476837158,
+                    -0.699999988079071,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addController": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": [
+                    "_right",
+                    "_left"
+                  ],
+                  "rendered": false,
+                  "requestedProfile": "meta-quest-touch-plus"
+                },
+                "right-addCursor": {
+                  "finite": false,
+                  "matrix": [
+                    null,
+                    null,
+                    null
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                },
+                "right-addLaserPointer": {
+                  "finite": true,
+                  "matrix": [
+                    0.9210609793663024,
+                    -0.07736548036336899,
+                    -0.38165590167045593,
+                    0,
+                    1.754659750830001e-9,
+                    0.9800665974617004,
+                    -0.19866932928562164,
+                    0,
+                    0.3894183337688446,
+                    0.1829865723848343,
+                    0.9027010798454284,
+                    0,
+                    0.38999998569488525,
+                    1.350000023841858,
+                    -0.6499999761581421,
+                    1
+                  ],
+                  "registeredMeshes": null,
+                  "rendered": true,
+                  "requestedProfile": null
+                }
+              },
+              "beforePixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 22132,
+                    "foreground": 224965,
+                    "hash": 2231024866
+                  },
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 22098,
+                    "foreground": 224846,
+                    "hash": 2360524343
+                  }
+                ],
+                "width": 1280
+              },
+              "pixels": {
+                "height": 809,
+                "layer": "base",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 31765,
+                    "colors": 22295,
+                    "foreground": 228839,
+                    "hash": 703866037
+                  },
+                  {
+                    "changedOutsideStats": 32057,
+                    "colors": 22243,
+                    "foreground": 228682,
+                    "hash": 717527458
+                  }
+                ],
+                "width": 1280
+              },
+              "screenshot": "test-results/tracking-firefox-input-tracking-1-viewer-moved.png"
+            }
+          ],
+          "upstreamLimitations": [
+            "Cursor coordinates are NaN: Sample passes a transform object to matrix-array Ray and reads typed-array .x/.y/.z",
+            "Grip model lookup misses: registered _right/_left, requested meta-quest-touch-plus_right/left"
+          ],
+          "gripMeshObservation": {
+            "left-addController": {
+              "finite": true,
+              "matrix": [
+                0.939372718334198,
+                -0.05124200880527496,
+                0.3390474319458008,
+                0,
+                1.3332690507183995e-10,
+                0.9887710809707642,
+                0.14943812787532806,
+                0,
+                -0.34289780259132385,
+                -0.14037810266017914,
+                0.928824543952942,
+                0,
+                -0.25999999046325684,
+                1.4500000476837158,
+                -0.699999988079071,
+                1
+              ],
+              "registeredMeshes": [
+                "_right",
+                "_left"
+              ],
+              "rendered": false,
+              "requestedProfile": "meta-quest-touch-plus"
+            },
+            "right-addController": {
+              "finite": true,
+              "matrix": [
+                0.9210609793663024,
+                -0.07736548036336899,
+                -0.38165590167045593,
+                0,
+                1.754659750830001e-9,
+                0.9800665974617004,
+                -0.19866932928562164,
+                0,
+                0.3894183337688446,
+                0.1829865723848343,
+                0.9027010798454284,
+                0,
+                0.38999998569488525,
+                1.350000023841858,
+                -0.6499999761581421,
+                1
+              ],
+              "registeredMeshes": [
+                "_right",
+                "_left"
+              ],
+              "rendered": false,
+              "requestedProfile": "meta-quest-touch-plus"
+            }
+          },
+          "lifetime": {
+            "foreignSpace": [
+              "InvalidStateError",
+              "InvalidStateError"
+            ],
+            "identityChecks": 184,
+            "inactive": [
+              "InvalidStateError",
+              "InvalidStateError"
+            ]
+          },
+          "retiredUnchanged": true,
+          "after": {
+            "enabled": [
+              "viewer",
+              "local",
+              "local-floor"
+            ],
+            "ends": 0,
+            "events": [],
+            "frames": 95,
+            "identityChecks": 190,
+            "mode": "immersive-vr",
+            "options": {
+              "requiredFeatures": [
+                "local-floor"
+              ]
+            },
+            "poses": {
+              "left-grip": [
+                0.939372718334198,
+                -0.05124200880527496,
+                0.3390474319458008,
+                0,
+                1.3332690507183995e-10,
+                0.9887710809707642,
+                0.14943812787532806,
+                0,
+                -0.34289780259132385,
+                -0.14037810266017914,
+                0.928824543952942,
+                0,
+                -0.25999999046325684,
+                1.4500000476837158,
+                -0.699999988079071,
+                1
+              ],
+              "left-ray": [
+                0.939372718334198,
+                -0.05124200880527496,
+                0.3390474319458008,
+                0,
+                1.3332690507183995e-10,
+                0.9887710809707642,
+                0.14943812787532806,
+                0,
+                -0.34289780259132385,
+                -0.14037810266017914,
+                0.928824543952942,
+                0,
+                -0.25999999046325684,
+                1.4500000476837158,
+                -0.699999988079071,
+                1
+              ],
+              "right-grip": [
+                0.9210609793663024,
+                -0.07736548036336899,
+                -0.38165590167045593,
+                0,
+                1.754659750830001e-9,
+                0.9800665974617004,
+                -0.19866932928562164,
+                0,
+                0.3894183337688446,
+                0.1829865723848343,
+                0.9027010798454284,
+                0,
+                0.38999998569488525,
+                1.350000023841858,
+                -0.6499999761581421,
+                1
+              ],
+              "right-ray": [
+                0.9210609793663024,
+                -0.07736548036336899,
+                -0.38165590167045593,
+                0,
+                1.754659750830001e-9,
+                0.9800665974617004,
+                -0.19866932928562164,
+                0,
+                0.3894183337688446,
+                0.1829865723848343,
+                0.9027010798454284,
+                0,
+                0.38999998569488525,
+                1.350000023841858,
+                -0.6499999761581421,
+                1
+              ]
+            },
+            "viewer": [
+              0.9887710809707642,
+              0,
+              -0.14943812787532806,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0.14943812787532806,
+              0,
+              0.9887710809707642,
+              0,
+              0.1599999964237213,
+              1.7000000476837158,
+              0.15000000596046448,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "pixelsAfter": {
+            "height": 809,
+            "layer": "base",
+            "presented": true,
+            "regions": [
+              {
+                "changedOutsideStats": 0,
+                "colors": 22299,
+                "foreground": 228839,
+                "hash": 622377239
+              },
+              {
+                "changedOutsideStats": 0,
+                "colors": 22250,
+                "foreground": 228682,
+                "hash": 3338825613
+              }
+            ],
+            "width": 1280
+          },
+          "screenshot": "test-results/tracking-firefox-input-tracking-1-completed.png",
+          "inlineResumed": {
+            "before": 42,
+            "after": 64
+          },
+          "shutdown": {
+            "endEvents": 1,
+            "frames": 106,
+            "callbacksStopped": true
+          }
+        }
+      ],
+      "settings": {
+        "device": "Meta Quest 3",
+        "mode": "immersive-vr",
+        "overlay": false,
+        "stereo": true
+      },
+      "logs": []
+    },
+    {
+      "app": "dragging",
+      "status": "passed",
+      "cycles": [
+        {
+          "cycle": 0,
+          "before": {
+            "enabled": [
+              "viewer",
+              "local",
+              "local-floor",
+              "bounded-floor",
+              "layers"
+            ],
+            "ends": 0,
+            "events": [],
+            "frames": 33,
+            "identityChecks": 66,
+            "mode": "immersive-vr",
+            "options": {
+              "depthSensing": {
+                "dataFormatPreference": [],
+                "usagePreference": [
+                  "gpu-optimized"
+                ]
+              },
+              "optionalFeatures": [
+                "local-floor",
+                "bounded-floor",
+                "layers",
+                "depth-sensing"
+              ]
+            },
+            "poses": {
+              "left-grip": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                -0.5,
+                1.5,
+                -1,
+                1
+              ],
+              "left-ray": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                -0.5,
+                1.5,
+                -1,
+                1
+              ],
+              "right-grip": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0.5,
+                1.5,
+                -1,
+                1
+              ],
+              "right-ray": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0.5,
+                1.5,
+                -1,
+                1
+              ]
+            },
+            "viewer": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1.600000023841858,
+              0,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "pixelsBefore": {
+            "height": 809,
+            "layer": "projection",
+            "presented": true,
+            "regions": [
+              {
+                "changedOutsideStats": 0,
+                "colors": 6972,
+                "foreground": 164051,
+                "hash": 2444605220
+              },
+              {
+                "changedOutsideStats": 0,
+                "colors": 7297,
+                "foreground": 161841,
+                "hash": 2688015313
+              }
+            ],
+            "width": 1280
+          },
+          "drags": [
+            {
+              "hand": "right",
+              "target": {
+                "group": 12,
+                "id": 40,
+                "position": [
+                  1.0847665875256522,
+                  1.3176404606407173,
+                  -0.8511606679926227
+                ]
+              },
+              "aim": [
+                1.0847665875256522,
+                1.3176404606407173,
+                -0.20116066799262267
+              ],
+              "moved": [
+                1.2647665875256522,
+                1.4376404606407172,
+                -0.30116066799262264
+              ],
+              "selected": {
+                "controller": 67,
+                "geometry": "BoxGeometry",
+                "id": 40,
+                "parent": 67,
+                "world": [
+                  -1.186671571312568,
+                  0.154484891285809,
+                  -0.27648099761474587,
+                  0,
+                  -0.0717626516774985,
+                  -1.1754565212052703,
+                  -0.3487819238711931,
+                  0,
+                  -0.308476004742423,
+                  -0.32083192945760325,
+                  1.1447297363909694,
+                  0,
+                  1.0847665875256522,
+                  1.3176404606407173,
+                  -0.8511606679926227,
+                  1
+                ]
+              },
+              "held": {
+                "expected": [
+                  -1.2153764029986067,
+                  0.154484891285809,
+                  0.08655304768779926,
+                  0,
+                  -0.17162959084172172,
+                  -1.1754565212052703,
+                  -0.31199679195736724,
+                  0,
+                  0.04359238907973134,
+                  -0.32083192945760325,
+                  1.1847630081785443,
+                  0,
+                  1.07267839665495,
+                  1.4376404654090889,
+                  -0.9221293828538092,
+                  1
+                ],
+                "id": 40,
+                "parent": 67,
+                "world": [
+                  -1.2153764029986067,
+                  0.154484891285809,
+                  0.08655304768779926,
+                  0,
+                  -0.17162959084172172,
+                  -1.1754565212052703,
+                  -0.31199679195736724,
+                  0,
+                  0.04359238907973134,
+                  -0.32083192945760325,
+                  1.1847630081785443,
+                  0,
+                  1.07267839665495,
+                  1.4376404654090889,
+                  -0.922129382853809,
+                  1
+                ]
+              },
+              "released": {
+                "cleared": true,
+                "group": 12,
+                "id": 40,
+                "parent": 12,
+                "world": [
+                  -1.215376402513418,
+                  0.15448489497151996,
+                  0.08655304770425784,
+                  0,
+                  -0.17162958715601084,
+                  -1.1754565235799768,
+                  -0.31199678497859407,
+                  0,
+                  0.04359238906327274,
+                  -0.32083193643637653,
+                  1.184763006289026,
+                  0,
+                  1.07267839665495,
+                  1.4376404654090889,
+                  -0.922129382853809,
+                  1
+                ]
+              },
+              "stable": [
+                -1.215376402513418,
+                0.15448489497151996,
+                0.08655304770425784,
+                0,
+                -0.17162958715601084,
+                -1.1754565235799768,
+                -0.31199678497859407,
+                0,
+                0.04359238906327274,
+                -0.32083193643637653,
+                1.184763006289026,
+                0,
+                1.07267839665495,
+                1.4376404654090889,
+                -0.922129382853809,
+                1
+              ],
+              "heldScreenshot": "test-results/tracking-firefox-dragging-0-right-held.png",
+              "pixels": {
+                "height": 809,
+                "layer": "projection",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 887,
+                    "colors": 6890,
+                    "foreground": 164759,
+                    "hash": 1402510948
+                  },
+                  {
+                    "changedOutsideStats": 842,
+                    "colors": 7215,
+                    "foreground": 162514,
+                    "hash": 3262272956
+                  }
+                ],
+                "width": 1280
+              }
+            },
+            {
+              "hand": "left",
+              "target": {
+                "group": 12,
+                "id": 40,
+                "position": [
+                  1.07267839665495,
+                  1.4376404654090889,
+                  -0.922129382853809
+                ]
+              },
+              "aim": [
+                1.07267839665495,
+                1.4376404654090889,
+                -0.27212938285380894
+              ],
+              "moved": [
+                1.25267839665495,
+                1.5576404654090887,
+                -0.3721293828538089
+              ],
+              "selected": {
+                "controller": 68,
+                "geometry": "BoxGeometry",
+                "id": 40,
+                "parent": 68,
+                "world": [
+                  -1.2153764025134357,
+                  0.15448489497153814,
+                  0.08655304770398654,
+                  0,
+                  -0.17162958715599266,
+                  -1.1754565235804972,
+                  -0.3119967849766453,
+                  0,
+                  0.043592389063544026,
+                  -0.32083193643832536,
+                  1.1847630062884882,
+                  0,
+                  1.07267839665495,
+                  1.4376404654090889,
+                  -0.922129382853809,
+                  1
+                ]
+              },
+              "held": {
+                "expected": [
+                  -1.1355152767205647,
+                  0.15448489497153814,
+                  0.4418555838890872,
+                  0,
+                  -0.25616536835945913,
+                  -1.1754565235804972,
+                  -0.24734190733773948,
+                  0,
+                  0.39176682067563445,
+                  -0.32083193643832536,
+                  1.1189649247076867,
+                  0,
+                  1.0605902070197093,
+                  1.5576404701774604,
+                  -0.9930980944913856,
+                  1
+                ],
+                "id": 40,
+                "parent": 68,
+                "world": [
+                  -1.1355152767205647,
+                  0.15448489497153814,
+                  0.4418555838890872,
+                  0,
+                  -0.25616536835945913,
+                  -1.1754565235804972,
+                  -0.24734190733773948,
+                  0,
+                  0.39176682067563445,
+                  -0.32083193643832536,
+                  1.1189649247076867,
+                  0,
+                  1.0605902070197093,
+                  1.5576404701774604,
+                  -0.9930980944913856,
+                  1
+                ]
+              },
+              "released": {
+                "cleared": true,
+                "group": 12,
+                "id": 40,
+                "parent": 12,
+                "world": [
+                  -1.1355152760287217,
+                  0.15448489968752077,
+                  0.44185558416915616,
+                  0,
+                  -0.2561653636434767,
+                  -1.1754565260294607,
+                  -0.24734190085783483,
+                  0,
+                  0.3917668203955655,
+                  -0.32083194291823025,
+                  1.1189649229505665,
+                  0,
+                  1.0605902070197093,
+                  1.5576404701774604,
+                  -0.9930980944913856,
+                  1
+                ]
+              },
+              "stable": [
+                -1.1355152760287217,
+                0.15448489968752077,
+                0.44185558416915616,
+                0,
+                -0.2561653636434767,
+                -1.1754565260294607,
+                -0.24734190085783483,
+                0,
+                0.3917668203955655,
+                -0.32083194291823025,
+                1.1189649229505665,
+                0,
+                1.0605902070197093,
+                1.5576404701774604,
+                -0.9930980944913856,
+                1
+              ],
+              "heldScreenshot": "test-results/tracking-firefox-dragging-0-left-held.png",
+              "pixels": {
+                "height": 809,
+                "layer": "projection",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 751,
+                    "colors": 6750,
+                    "foreground": 164759,
+                    "hash": 1968532638
+                  },
+                  {
+                    "changedOutsideStats": 799,
+                    "colors": 7080,
+                    "foreground": 162514,
+                    "hash": 2417842088
+                  }
+                ],
+                "width": 1280
+              }
+            }
+          ],
+          "lifetime": {
+            "foreignSpace": [
+              "InvalidStateError",
+              "InvalidStateError"
+            ],
+            "identityChecks": 236,
+            "inactive": [
+              "InvalidStateError",
+              "InvalidStateError",
+              "InvalidStateError"
+            ]
+          },
+          "retiredUnchanged": true,
+          "after": {
+            "enabled": [
+              "viewer",
+              "local",
+              "local-floor",
+              "bounded-floor",
+              "layers"
+            ],
+            "ends": 0,
+            "events": [
+              {
+                "hand": "right",
+                "pose": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  1.0847666263580322,
+                  1.3176404237747192,
+                  -0.20116066932678223,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectstart"
+              },
+              {
+                "hand": "right",
+                "pose": [
+                  0.9553365111351012,
+                  0,
+                  -0.29552021622657776,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.29552021622657776,
+                  0,
+                  0.9553365111351012,
+                  0,
+                  1.2647665739059448,
+                  1.4376404285430908,
+                  -0.30116066336631775,
+                  1
+                ],
+                "sameSource": true,
+                "type": "select"
+              },
+              {
+                "hand": "right",
+                "pose": [
+                  0.9553365111351012,
+                  0,
+                  -0.29552021622657776,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.29552021622657776,
+                  0,
+                  0.9553365111351012,
+                  0,
+                  1.2647665739059448,
+                  1.4376404285430908,
+                  -0.30116066336631775,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectend"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  1.0726784467697144,
+                  1.4376404285430908,
+                  -0.2721293866634369,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectstart"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9553365111351012,
+                  0,
+                  -0.29552021622657776,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.29552021622657776,
+                  0,
+                  0.9553365111351012,
+                  0,
+                  1.252678394317627,
+                  1.5576404333114624,
+                  -0.3721293807029724,
+                  1
+                ],
+                "sameSource": true,
+                "type": "select"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9553365111351012,
+                  0,
+                  -0.29552021622657776,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.29552021622657776,
+                  0,
+                  0.9553365111351012,
+                  0,
+                  1.252678394317627,
+                  1.5576404333114624,
+                  -0.3721293807029724,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectend"
+              }
+            ],
+            "frames": 120,
+            "identityChecks": 240,
+            "mode": "immersive-vr",
+            "options": {
+              "depthSensing": {
+                "dataFormatPreference": [],
+                "usagePreference": [
+                  "gpu-optimized"
+                ]
+              },
+              "optionalFeatures": [
+                "local-floor",
+                "bounded-floor",
+                "layers",
+                "depth-sensing"
+              ]
+            },
+            "poses": {
+              "left-grip": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.952678382396698,
+                1.6576404571533203,
+                -0.17212937772274017,
+                1
+              ],
+              "left-ray": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.952678382396698,
+                1.6576404571533203,
+                -0.17212937772274017,
+                1
+              ],
+              "right-grip": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.964766561985016,
+                1.5376404523849487,
+                -0.10116066783666612,
+                1
+              ],
+              "right-ray": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.964766561985016,
+                1.5376404523849487,
+                -0.10116066783666612,
+                1
+              ]
+            },
+            "viewer": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1.600000023841858,
+              0,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "pixelsAfter": {
+            "height": 809,
+            "layer": "projection",
+            "presented": true,
+            "regions": [
+              {
+                "changedOutsideStats": 0,
+                "colors": 6750,
+                "foreground": 164759,
+                "hash": 1968532638
+              },
+              {
+                "changedOutsideStats": 0,
+                "colors": 7080,
+                "foreground": 162514,
+                "hash": 2417842088
+              }
+            ],
+            "width": 1280
+          },
+          "screenshot": "test-results/tracking-firefox-dragging-0-completed.png",
+          "shutdown": {
+            "endEvents": 1,
+            "frames": 131,
+            "callbacksStopped": true
+          }
+        },
+        {
+          "cycle": 1,
+          "before": {
+            "enabled": [
+              "viewer",
+              "local",
+              "local-floor",
+              "bounded-floor",
+              "layers"
+            ],
+            "ends": 0,
+            "events": [],
+            "frames": 32,
+            "identityChecks": 64,
+            "mode": "immersive-vr",
+            "options": {
+              "depthSensing": {
+                "dataFormatPreference": [],
+                "usagePreference": [
+                  "gpu-optimized"
+                ]
+              },
+              "optionalFeatures": [
+                "local-floor",
+                "bounded-floor",
+                "layers",
+                "depth-sensing"
+              ]
+            },
+            "poses": {
+              "left-grip": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.952678382396698,
+                1.6576404571533203,
+                -0.17212937772274017,
+                1
+              ],
+              "left-ray": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.952678382396698,
+                1.6576404571533203,
+                -0.17212937772274017,
+                1
+              ],
+              "right-grip": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.964766561985016,
+                1.5376404523849487,
+                -0.10116066783666612,
+                1
+              ],
+              "right-ray": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.964766561985016,
+                1.5376404523849487,
+                -0.10116066783666612,
+                1
+              ]
+            },
+            "viewer": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1.600000023841858,
+              0,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "fresh": {
+            "layers": true,
+            "oldCanvasDetached": true,
+            "oldDisconnected": true,
+            "sources": true
+          },
+          "pixelsBefore": {
+            "height": 809,
+            "layer": "projection",
+            "presented": true,
+            "regions": [
+              {
+                "changedOutsideStats": 0,
+                "colors": 6750,
+                "foreground": 164759,
+                "hash": 1968532638
+              },
+              {
+                "changedOutsideStats": 0,
+                "colors": 7080,
+                "foreground": 162514,
+                "hash": 2417842088
+              }
+            ],
+            "width": 1280
+          },
+          "drags": [
+            {
+              "hand": "right",
+              "target": {
+                "group": 12,
+                "id": 40,
+                "position": [
+                  1.0605902070197093,
+                  1.5576404701774604,
+                  -0.9930980944913856
+                ]
+              },
+              "aim": [
+                1.0605902070197093,
+                1.5576404701774604,
+                -0.3430980944913856
+              ],
+              "moved": [
+                1.2405902070197092,
+                1.6776404701774603,
+                -0.4430980944913856
+              ],
+              "selected": {
+                "controller": 67,
+                "geometry": "BoxGeometry",
+                "id": 40,
+                "parent": 67,
+                "world": [
+                  -1.135515276025603,
+                  0.15448489968632154,
+                  0.44185558417745263,
+                  0,
+                  -0.25616536364467596,
+                  -1.175456526027687,
+                  -0.247341900864775,
+                  0,
+                  0.39176682038726895,
+                  -0.3208319429112901,
+                  1.118964922955458,
+                  0,
+                  1.0605902070197093,
+                  1.5576404701774604,
+                  -0.9930980944913856,
+                  1
+                ]
+              },
+              "held": {
+                "expected": [
+                  -0.9542219443618698,
+                  0.15448489968632154,
+                  0.7576884921133181,
+                  0,
+                  -0.3178186568034103,
+                  -1.175456526027687,
+                  -0.1605927049756437,
+                  0,
+                  0.7049459033490183,
+                  -0.3208319429112901,
+                  0.9532130301075802,
+                  0,
+                  1.0485021334023787,
+                  1.677640474945832,
+                  -1.064066838643189,
+                  1
+                ],
+                "id": 40,
+                "parent": 67,
+                "world": [
+                  -0.9542219443618698,
+                  0.15448489968632154,
+                  0.7576884921133181,
+                  0,
+                  -0.3178186568034103,
+                  -1.175456526027687,
+                  -0.1605927049756437,
+                  0,
+                  0.7049459033490183,
+                  -0.3208319429112901,
+                  0.9532130301075802,
+                  0,
+                  1.0485021334023787,
+                  1.677640474945832,
+                  -1.064066838643189,
+                  1
+                ]
+              },
+              "released": {
+                "cleared": true,
+                "group": 12,
+                "id": 40,
+                "parent": 12,
+                "world": [
+                  -0.9542219433774668,
+                  0.15448490549749183,
+                  0.7576884925335734,
+                  0,
+                  -0.3178186509922404,
+                  -1.175456528673795,
+                  -0.16059269900648587,
+                  0,
+                  0.704945902928763,
+                  -0.3208319488804482,
+                  0.9532130284458756,
+                  0,
+                  1.0485021334023787,
+                  1.677640474945832,
+                  -1.064066838643189,
+                  1
+                ]
+              },
+              "stable": [
+                -0.9542219433774668,
+                0.15448490549749183,
+                0.7576884925335734,
+                0,
+                -0.3178186509922404,
+                -1.175456528673795,
+                -0.16059269900648587,
+                0,
+                0.704945902928763,
+                -0.3208319488804482,
+                0.9532130284458756,
+                0,
+                1.0485021334023787,
+                1.677640474945832,
+                -1.064066838643189,
+                1
+              ],
+              "heldScreenshot": "test-results/tracking-firefox-dragging-1-right-held.png",
+              "pixels": {
+                "height": 809,
+                "layer": "projection",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 6750,
+                    "foreground": 164759,
+                    "hash": 1968532638
+                  },
+                  {
+                    "changedOutsideStats": 55,
+                    "colors": 7088,
+                    "foreground": 162850,
+                    "hash": 3223409665
+                  }
+                ],
+                "width": 1280
+              }
+            },
+            {
+              "hand": "left",
+              "target": {
+                "group": 12,
+                "id": 40,
+                "position": [
+                  1.0485021334023787,
+                  1.677640474945832,
+                  -1.064066838643189
+                ]
+              },
+              "aim": [
+                1.0485021334023787,
+                1.677640474945832,
+                -0.41406683864318905
+              ],
+              "moved": [
+                1.2285021334023787,
+                1.797640474945832,
+                -0.514066838643189
+              ],
+              "selected": {
+                "controller": 68,
+                "geometry": "BoxGeometry",
+                "id": 40,
+                "parent": 68,
+                "world": [
+                  -0.9542219433334712,
+                  0.1544849054867521,
+                  0.7576884925902497,
+                  0,
+                  -0.3178186510029802,
+                  -1.175456528666323,
+                  -0.16059269903514112,
+                  0,
+                  0.7049459028720867,
+                  -0.32083194885179295,
+                  0.9532130284973428,
+                  0,
+                  1.0485021334023787,
+                  1.677640474945832,
+                  -1.064066838643189,
+                  1
+                ]
+              },
+              "held": {
+                "expected": [
+                  -0.6876907950300944,
+                  0.1544849054867521,
+                  1.005839356060436,
+                  0,
+                  -0.3510821503661261,
+                  -1.175456528666323,
+                  -0.05949823234476111,
+                  0,
+                  0.9551542796803292,
+                  -0.32083194885179295,
+                  0.7023134433683762,
+                  0,
+                  1.0364140612590873,
+                  1.7976404797142036,
+                  -1.1350355492139017,
+                  1
+                ],
+                "id": 40,
+                "parent": 68,
+                "world": [
+                  -0.6876907950300944,
+                  0.1544849054867521,
+                  1.005839356060436,
+                  0,
+                  -0.3510821503661261,
+                  -1.175456528666323,
+                  -0.05949823234476111,
+                  0,
+                  0.9551542796803292,
+                  -0.32083194885179295,
+                  0.7023134433683762,
+                  0,
+                  1.0364140612590873,
+                  1.7976404797142036,
+                  -1.135035549213902,
+                  1
+                ]
+              },
+              "released": {
+                "cleared": true,
+                "group": 12,
+                "id": 40,
+                "parent": 12,
+                "world": [
+                  -0.6876907937138753,
+                  0.15448491252068497,
+                  1.0058393564684274,
+                  0,
+                  -0.3510821433321938,
+                  -1.175456531673361,
+                  -0.059498226922485485,
+                  0,
+                  0.9551542792723378,
+                  -0.320831954274069,
+                  0.7023134416775564,
+                  0,
+                  1.0364140612590873,
+                  1.7976404797142036,
+                  -1.135035549213902,
+                  1
+                ]
+              },
+              "stable": [
+                -0.6876907937138753,
+                0.15448491252068497,
+                1.0058393564684274,
+                0,
+                -0.3510821433321938,
+                -1.175456531673361,
+                -0.059498226922485485,
+                0,
+                0.9551542792723378,
+                -0.320831954274069,
+                0.7023134416775564,
+                0,
+                1.0364140612590873,
+                1.7976404797142036,
+                -1.135035549213902,
+                1
+              ],
+              "heldScreenshot": "test-results/tracking-firefox-dragging-1-left-held.png",
+              "pixels": {
+                "height": 809,
+                "layer": "projection",
+                "presented": true,
+                "regions": [
+                  {
+                    "changedOutsideStats": 0,
+                    "colors": 6762,
+                    "foreground": 165012,
+                    "hash": 1850351672
+                  },
+                  {
+                    "changedOutsideStats": 19,
+                    "colors": 7080,
+                    "foreground": 163625,
+                    "hash": 1014840750
+                  }
+                ],
+                "width": 1280
+              }
+            }
+          ],
+          "lifetime": {
+            "foreignSpace": [
+              "InvalidStateError",
+              "InvalidStateError"
+            ],
+            "identityChecks": 218,
+            "inactive": [
+              "InvalidStateError",
+              "InvalidStateError",
+              "InvalidStateError"
+            ]
+          },
+          "retiredUnchanged": true,
+          "after": {
+            "enabled": [
+              "viewer",
+              "local",
+              "local-floor",
+              "bounded-floor",
+              "layers"
+            ],
+            "ends": 0,
+            "events": [
+              {
+                "hand": "right",
+                "pose": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  1.060590147972107,
+                  1.5576404333114624,
+                  -0.34309810400009155,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectstart"
+              },
+              {
+                "hand": "right",
+                "pose": [
+                  0.9553365111351012,
+                  0,
+                  -0.29552021622657776,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.29552021622657776,
+                  0,
+                  0.9553365111351012,
+                  0,
+                  1.240590214729309,
+                  1.677640438079834,
+                  -0.4430980980396271,
+                  1
+                ],
+                "sameSource": true,
+                "type": "select"
+              },
+              {
+                "hand": "right",
+                "pose": [
+                  0.9553365111351012,
+                  0,
+                  -0.29552021622657776,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.29552021622657776,
+                  0,
+                  0.9553365111351012,
+                  0,
+                  1.240590214729309,
+                  1.677640438079834,
+                  -0.4430980980396271,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectend"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  1.0485020875930786,
+                  1.677640438079834,
+                  -0.4140668511390686,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectstart"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9553365111351012,
+                  0,
+                  -0.29552021622657776,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.29552021622657776,
+                  0,
+                  0.9553365111351012,
+                  0,
+                  1.2285021543502808,
+                  1.7976404428482056,
+                  -0.5140668153762817,
+                  1
+                ],
+                "sameSource": true,
+                "type": "select"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9553365111351012,
+                  0,
+                  -0.29552021622657776,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0.29552021622657776,
+                  0,
+                  0.9553365111351012,
+                  0,
+                  1.2285021543502808,
+                  1.7976404428482056,
+                  -0.5140668153762817,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectend"
+              }
+            ],
+            "frames": 111,
+            "identityChecks": 222,
+            "mode": "immersive-vr",
+            "options": {
+              "depthSensing": {
+                "dataFormatPreference": [],
+                "usagePreference": [
+                  "gpu-optimized"
+                ]
+              },
+              "optionalFeatures": [
+                "local-floor",
+                "bounded-floor",
+                "layers",
+                "depth-sensing"
+              ]
+            },
+            "poses": {
+              "left-grip": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.9285021424293518,
+                1.8976404666900637,
+                -0.3140668272972107,
+                1
+              ],
+              "left-ray": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.9285021424293518,
+                1.8976404666900637,
+                -0.3140668272972107,
+                1
+              ],
+              "right-grip": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.94059020280838,
+                1.777640461921692,
+                -0.24309809505939484,
+                1
+              ],
+              "right-ray": [
+                0.9800665974617004,
+                0,
+                0.19866932928562164,
+                0,
+                0,
+                1,
+                0,
+                0,
+                -0.19866932928562164,
+                0,
+                0.9800665974617004,
+                0,
+                0.94059020280838,
+                1.777640461921692,
+                -0.24309809505939484,
+                1
+              ]
+            },
+            "viewer": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1.600000023841858,
+              0,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "pixelsAfter": {
+            "height": 809,
+            "layer": "projection",
+            "presented": true,
+            "regions": [
+              {
+                "changedOutsideStats": 0,
+                "colors": 6762,
+                "foreground": 165012,
+                "hash": 1850351672
+              },
+              {
+                "changedOutsideStats": 0,
+                "colors": 7080,
+                "foreground": 163625,
+                "hash": 1014840750
+              }
+            ],
+            "width": 1280
+          },
+          "screenshot": "test-results/tracking-firefox-dragging-1-completed.png",
+          "shutdown": {
+            "endEvents": 1,
+            "frames": 121,
+            "callbacksStopped": true
+          }
+        }
+      ],
+      "settings": {
+        "device": "Meta Quest 3",
+        "mode": "immersive-vr",
+        "overlay": false,
+        "stereo": true
+      },
+      "logs": [
+        {
+          "level": "warn",
+          "type": "console",
+          "text": "THREE.WARNING: Multiple instances of Three.js being imported.",
+          "context": "ff60ae45-a619-4fdd-bd2a-960dce073b5f"
+        },
+        {
+          "level": "warn",
+          "type": "console",
+          "text": "Could not find menu_pressed_min in the model",
+          "context": "ff60ae45-a619-4fdd-bd2a-960dce073b5f"
+        },
+        {
+          "level": "warn",
+          "type": "console",
+          "text": "Could not find menu_pressed_min in the model",
+          "context": "ff60ae45-a619-4fdd-bd2a-960dce073b5f"
+        }
+      ]
+    }
+  ],
+  "failures": [],
+  "blockers": [
+    "Pinned Input Tracking computes NaN cursors and does not apply grip transforms to its registered generic meshes; see docs/webxr-tracking.md"
+  ],
+  "skips": [],
+  "unperformed": [
+    "Full WPT suite; other applications, devices and browser versions"
+  ],
+  "units": {
+    "position": "metres",
+    "rotation": "radians",
+    "matrixTolerance": 0.0001,
+    "releaseTolerance": 0.00001
+  },
+  "tools": {
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "playwright": "1.64.0",
+    "three": "0.186.1"
+  },
+  "versions": {
+    "browser": "157.0",
+    "buildID": "20260924084938",
+    "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+    "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+    "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+    "platform": "mac",
+    "platformVersion": "25.6.0",
+    "node": "v24.12.0"
+  },
+  "extensionChecks": "passed",
+  "cleanup": {
+    "temporaryAddonRemoved": true,
+    "sessionDeleted": true,
+    "browserStopped": true,
+    "driverStopped": true,
+    "profileRemoved": true
+  },
+  "browserFetches": [
+    {
+      "url": "http://127.0.0.1:50203/csp",
+      "status": 200,
+      "mimeType": "text/html",
+      "bytes": 434
+    },
+    {
+      "url": "http://127.0.0.1:50203/fixture.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 9420
+    },
+    {
+      "url": "http://127.0.0.1:50203/favicon.ico",
+      "status": 204,
+      "mimeType": "text/plain",
+      "bytes": 111
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/input-tracking.html",
+      "status": 200,
+      "mimeType": "text/html",
+      "bytes": 9001
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/css/common.css",
+      "status": 200,
+      "mimeType": "text/css",
+      "bytes": 1548
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/util/webxr-button.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 16776
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/scenes/scene.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 11486
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/core/renderer.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 48973
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/nodes/gltf2.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 2753
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/nodes/skybox.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 5706
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/math/gl-matrix.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 2146
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/math/ray.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 3956
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/util/inline-viewer-helper.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 4833
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/util/query-args.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 3086
+    },
+    {
+      "url": "data:font/woff2;base64,d09GMgABAAAAAAScAAsAAAAACfAAAARNAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAABmAAhBIRCAqGMIRJATYCJAMsCxgABCAFhF4HaBsuCMgehXEsLOlXaXd7sgbPQ172fjLwdhYFM92mABaiTuRVdO5/mx9I5UJiJom3phLRQw/TSF2M/vo25+pNyWkNws81NrUDAAf0QOdfcf7nmPEyBPZtCbbZEDuosskKZG922ZhBenh05qcSXktf6s3Oy9dAkWsyDzMoM5QTKcwKNjFayUPSREGFhUMrdE8MJsH052qGcYNO3pbEaYIBoDTItIKGAqhDdKHRD0kkKg6QGSCWEfueTNr3P6OvYaIbDH/8ULEAbjQtUt+hT/qmX/SH/twwMLDqN4jxzXjy4PHtltSA6lINqkpRd7N7onVBP20y7YBWyDIHFEBjqKBFMmECfQcTZtD3MmEB/SATVtCPM2ED/TQTdtCfS0/pEsN4ySin3r8q8xHE+0D0XMg8gJi4YrNpNv3qetXuDyeo6OBNZrq5gi7ouC1zcmB2Fd+FewIhcUIfszpF1hzXhrmMCwxaznRyZjig6Y2W7+bBn2DL8fJu/2oHbWc6X80+LUTXcVzv8O3IOy4qKVyFw/DHaMtfzNQEi5gbFT/EDpiofbpkYq2dQui6WcpfxrVBEJ/KxbLA4ZroZoVx+iE+QeTIiI7oKuoUIk/a1ekEOoNFjozm0suYYUelq13/88K1c3PTH9O9Q0d5LZbu7+J2aT7XP23KyQs+34WTU7r8d/k0l6dLl98Dn+/BSUZc7U0mm7FqhSMO9EHV/j5FB4qYX4aXNaKwz/4RRfAWsW8xGW+hvr8PTAf6IP9mRpkDwwv7QFz9HRuOeGWfd8rkyYsWTVy4vpG/pgVNWzBx0aTeIgeq58XFVfZXVduwuOq51a77aT0XLVw4v1PBFjRsQzO+tVeVp3KIwqfKbd6sdjzGvFSuPMquGpMT29lkrhwbE5uz6cGHhIETB06oUk+6tHLJgfnu/3nVnJzYxiXNjQNjYqsu+vCgYKDla5uUOzTNDZg46eCBd3d3gSk9Kz/bFiv8hvOzCT5eqyjBGerT+EiG/JGqwbC+UQ6Bv9bmKGWMj8Yn+fPVRJxKBGqTFXQyM9DhHSlvEHmLVxyYjY/Fdd3hACfLyP3VVZLvVR7B0pxSsGIBqHhwT5sSMOMkRG0BJhpsWMkEO24KwE0pqp3tIYTWCIjJjuBiGNTKTj8JoBLKAn4TmPFnj9oywZwFGx4egp1g3oObeLHdwUO2pFcYTITZCa2c1GQbNg6RCsu9bpikThhAWnLaBi3LM8+5VbMU6rUn30owOC83ULcfBlClb5BBre46BinaWRal85SUvlCbUx1Nbyj2HWCxBTkEgWScQKzsTioJW0IanAYRZqET4mZLSKU2JABII9np01lQ7lOt3srtM1KAeqgQPhYJSMCZJRuAukRZB1CF35gB1MJBr4ilIPZchNyIlDkpRt+3s96cz9K8XKQvCdZfcqWxgtLoXZ2AoKAyVSRRxSRmsYjVOriP089q3z6gdMjE5KI7kzumWzpnAwAAAA==",
+      "status": 200,
+      "mimeType": "font/woff2",
+      "bytes": 0
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/webxr-polyfill/build/webxr-polyfill.module.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 250622
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/nodes/input-renderer.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 16737
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/nodes/stats-viewer.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 9435
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/core/node.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 11544
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/common.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 1329
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/mat2.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 9909
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/mat2d.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 11023
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/mat3.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 18641
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/mat4.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 47432
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/loaders/gltf2.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 13345
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/quat.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 16186
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/vec3.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 18534
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/quat2.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 21818
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/core/material.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 6732
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/vec4.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 14112
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/third-party/gl-matrix/src/gl-matrix/vec2.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 13845
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/core/program.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 5062
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/core/primitive.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 2338
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/nodes/seven-segment-text.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 6481
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/core/texture.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 5328
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/js/render/materials/pbr.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 7931
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/motion-controllers@1.0/dist/motion-controllers.module.js",
+      "status": 200,
+      "mimeType": "application/javascript;charset=utf-8",
+      "bytes": 4190,
+      "etag": "W/\"c03-58f3016463d76407\""
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/media/gltf/controller/controller.gltf",
+      "status": 200,
+      "mimeType": "model/gltf+json",
+      "bytes": 23614
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/media/gltf/cave/cave.gltf",
+      "status": 200,
+      "mimeType": "model/gltf+json",
+      "bytes": 66729
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/media/gltf/controller/controller-left.gltf",
+      "status": 200,
+      "mimeType": "model/gltf+json",
+      "bytes": 23887
+    },
+    {
+      "url": "https://fonts.gstatic.com/s/karla/v5/Zi_e6rBgGqv33BWF8WTq8g.woff2",
+      "status": 200,
+      "mimeType": "font/woff2",
+      "bytes": 7071
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/media/gltf/controller/controller.bin",
+      "status": 200,
+      "mimeType": "application/octet-stream",
+      "bytes": 22050
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/media/gltf/cave/cave.bin",
+      "status": 200,
+      "mimeType": "application/octet-stream",
+      "bytes": 407319
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/media/gltf/controller/controller.bin",
+      "status": 200,
+      "mimeType": "application/octet-stream",
+      "bytes": 22050
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/media/textures/eilenriede-park-2k.png",
+      "status": 200,
+      "mimeType": "image/png",
+      "bytes": 3329008
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/favicon-32x32.png",
+      "status": 200,
+      "mimeType": "image/png",
+      "bytes": 1230
+    },
+    {
+      "url": "http://127.0.0.1:50203/samples/favicon-96x96.png",
+      "status": 200,
+      "mimeType": "image/png",
+      "bytes": 3404
+    },
+    {
+      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEYklEQVRYR52XXWwUVRiGn292293tD61tsVGxSDCKaSBFWlqLF6AxKhK9KhcY21KSmkhIalTQGBNIjH/EiwatTUkJJBqUEhICcoGJhJ80NUKqoLRRGu0WqCTQP5HAdnaOmd2Zw7Kd3e72uZnzvd/ZfE9OZmZ3hSR6N20qsUyz3VJq4E4w+OVzXV2TujkHVEODj+LiBizrFQxjl+ze3aubgOiVw5mWlpct0zwcK0QmfZa1K2Ka7Wv277/ubMkI1dqaEzXNV5XIe2JZjyGCiHT4urs3601eAn0tLU9HTPO0DuLcRKQzmp//+ZqOjn906oHasiUwPTGx0YKtIrIoFtrD7Z7P91Fgz573na0xZgicaGsr9o+NjSmPnkAE+C4UDO6o7uoa0g1n8K0bN5pE5AOl1AIR5+POcPtqGMaGwL59++ONODOG2Jxqagqj1MM6SEJEplHq29xA4MOVExNXp2CTiGxD5AGn727Uw+2rFQotLezu/i3ejOMt0Nj4PbBWBx6IUuOhcPiXeaOjt+ZXVi7B51scy1MMF5FIQTRaKD099ilqPAXONDZ+bMG7OkhEqeuh4eHfy/r6lhuRyLxR+BtYWFhRcba8qipP/P5KTwmRX4sPHKiKN+7iLdDcvMGyrG90YM+FK4WDg0Ol587VEI2G3NwWUPCIW+eXl1+Yv3z5bX8oVJN4Asowvi47ePA1d5+Lp0Bvc/NS07LO22tRKlx08eJwUX9/HZaV4+5xSRZwiYksW3bbn5dXrUTEbxjbSg4d+kxvcPAUUA0Nub25uWfn9fePFw0MrFJK+XQziVQCLsHS0j/LqqomAgUF2+8/fPiYbjjMEPgLlhiwE1inwzTMJpDAoAHv1MJRnSQLhKFFQScw46hTkYVADIG9fmithmmnjjMCaxUc9XoBpSNbARsF7fXQZq/1sDD8rKDarTNlLgKAWQALlsI1LTAcf81mfPQucxQgF55dAT8mCgwCj7t1psxVIAcerYahxHtgqwWfunWmzEVA4EQdPOOs41yG0mjsQtDNMmGOAg11cNBZ3yUMexU06SADshVQMJoLC2c8hjajsDICP+kgA7IVMGB7Lexw63sEbLJ9HLMUMO299XDFDbwENirYo4NZyEbAgJ5aWK8DLwEFoREYUVCqwzRkI6BgdT2c1IGXgM0I7LTgbR2kIVMBgYFaqJSYx108Ba7B4jvwh4qdWnoyFfDB5pXQoQMHTwGbEThmwYs6SEGGAjcFHqqDKZ04pBS4DOuicEQH3vx7FexfTqt04oEBX9XCGzpIIKWAffxhuATE/1wkIfBfDrx0Cc774LikeXQVLKuHCzpIIKWAzTBsAz7RgYM93P7ZXgGn7PoEFAfhOFDj7kng5FOwWldJpBWYgrLx2O1wz/fDlAXPL4I+naSRULC+Hnp0kERaAZswdCp43SknLXghebhLL5QI/AA86URDOfCE+973YlaBISjywxcCFX5460E4q5senIb7/HHpsgC8uSJ+k6bkf2a4fDCgcGfuAAAAAElFTkSuQmCC",
+      "status": 200,
+      "mimeType": "image/png",
+      "bytes": 0
+    },
+    {
+      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAOEklEQVR4XuWdf3wU5Z3H38/sZiGkgTQ/hCgQOax6FgLVYH6IVq6vu7bXXlvvTk/gml/IXa+UVs5W64+e6F3rVWlra61INaaHHGDgrJ4vr73rq0gE+SEiFaovfIHmB1aoGINJNCHZee71ZHcfQ7KzO7M7sztp3/+w83mSZ2e+bzI788wzs4I0eW7ZskKZkxO8bO3a3+vwjwAJgsbGUqBHNDX1pLrJQr9yyJ4VK4oGeno2AJ9Uy0LK10QgsHawr++BRS0tvbGf+0NDNjSUEAqtwjTrkVIJkAixnu7u5aKl5bTT7U1ZQGt9/QOY5pd08AFvG4bxw8GCgvsW3Xtvt07HObKx8WwzEPi6YZr/ICFv5OYIISAQuEE8+OD3dWiT1AXU1nYC03UwCgHvCsP48eDAwA8Wbdx4UjeMM+SKFWVmf/+NQspGCRNHr/5w8SN7gF+LpqZPRGPbpCNgEAjqwJo+AQ/mTpy4pmLdujd16nPksmXnmaZ5sxTii0iZE291Y8WPvn7FePjhi3Rgk3QEvAUU6yAJAtT+cXPuxIl3VKxbd1Q3+AzZ0HDRYDj8TSHEYilE0KpAI4s/jBC7gk1NNXrZJlb9J+XZurpDUsqP6sAmQohBpNwkgsFvL2xqOqwbssxAbW25gK8DSyQEEMKyOGOKH8meCD7yyBd0YJOxPdmktbb2F7EjoBQZMoTYZA4N3XXFhg0v6zTDnF66tEoGg7dhmn85fGipcFh8hQEPBH/2sy/rwCbxe7PBzoaGNeFw+AYdpIgQwkTKp8OGceeVzc3P6waPGWxsXDg4NHSTMM3P6lBhVXyrXKHahFgRam7+ic5sYtlnMrY3NNSJcLhZBy4g4Fc5odC3qh56aLcOXWZw8eKFQ4HAainl2CMWqyJb5YpoWygYvFw0Ne3QuU0s+03GroaGiwfD4Rd04CJCiJ0I8d3Lm5v/W4dpoHYt7y1e/FkCgVsxzUrdECN2KBldPAMbxRcgQ0VFhSKF8x7LvpPx9MqVEz506pQ647VzKJoSMRELm5ufUhupG2wipTTeW7LkMxJul3BJ3I1Ns/jR1x2569eXxRadYNm/HVpra9WH55/qwCOkEAcM0/zOwvXrt9gRoQrfe+21f4MQd8jo+sXdUDeKH+GpSRs2/JVecoDle9hhR13dZlPKa3TgNUIcFIHAmjd7ejZc09IS1nkUefXVoXdzcq4V4fCtUsrzkxV4+J/o4hmMLXAEq9+R8q68jRtv0csOGNOXE7Y3NNwmwuF/1UGGEEKoE7m7h2bNalq0evWQXLlywqnjx+sQ4jaknDG8GlbFUli1WeWKBG1GILBk0qOPbtSBA+L1Z5sdjY2fM4eGntBBphHiYOmBA83F5523CiE+GJdKUCzLNqtckawtGJybv379IZ05IG6fdtl+3XWzxOnTr+kgQwgheiZ2du4v2bVr7jvvv38wnJt70dSPfezlvNLSBQgxSa3GmA2LFnH4pX4VJVmBE7QZMJA3eXK+WLdOjY05Jm6/dlGHdztqa7slTNahl0h5Mre9/bfFu3fPN06fnqKiLtjeDx9Xr4O5uW+XzJ9/aEpp6TwpREH0t9wv/ohcwG/yN2+eH21xzJi+ndJaW7sTcDwI5QQp5bH8I0cOF+3dW004PPw/PMZIATFEMNhTUl6+d0pZ2RxhGFOHs1jjSKwKrLBqG5ULw1g/edOm2uiiY8b075Qd9fVrTdP8Rx24iGGa7fmvvHK04MUXazDNMWPxingCYgjD6C2eM2dvwezZFwohztYNiiQFHn6pX0WJ8zsG3Di5peUeHThkzHs4ZXtd3Qoh5Y914AKGaR4uOHjwZP5LL1UiZcITvUQCYgQM470PX3DBjoILL5wtYHa8Qg7jsPgKU4hPF7W0qIHJlBjdn2Oeqa+/3DDNVh2kgTE0dODDL7zwTv7hw1cMDwnbwI6AGGooPL+sbEdxeflZgUDgzKH0FIqv8nAweE7Jpk2/05lDxvTplG3XX18Q7Orq0kO5KRAYGDhYsG9ff/7RoxVO+3EiIIYAM3/mzBeKystzA8HgHMsCK6za1MmaEF2FW7YU6SwFxvSbCq11dR36BMgmakjB6O/fU9Tampd7/Phc3eCQVASMJG/q1INFF1/cF5owoUqHCht/EUj5TPHjjy+KLKTGmL5TobWu7imk/IwOEqDG/4O9vbtKtm0ryOnqcnxFbTTpCoiRW1h44KyKir6c3NwaOeKqy5gCjRBjGMaPirZu/ZoOUmBM/6mwo7b2LhO+qYM4qGvCwe7u50taW0tzurv/RDekiVsCYoQKCw9PmzfvZM7kyWrY+swDgFF/FYaUy4ueeOIhHaaAOwLq65eYpqkmacWjb8Jbb6ldzYU5fX1nHgq6gNsCYuTk5XWcNW9e24Ti4ktR01Hi7JKMYLCqeOvWPdHFlHBFwLZly+YEBgcP6kAhZe/EEyf2F+/ceUGgr2/4ZMgLvBIQIzBp0hvT5s8/GiourhCgTwLVrrQkFJoi0pwF6I6A1auDgddf70XKCWpmXG5b26GRwwVe4rWAGIFQ6O3CefMO5ZeWzpdSThFCHJn65JMf0T+QIq4IUDy7dOmvPvTqq8HC/fsXjB4u8JJMCYghcnJ6i+bOPZQ3bdprZz/99FLdkCJpCzgG55twswS1MnFnkHlJpgXEENBnwE9Pwz0LIfMnYkdhZhBuFaDmTCYcLvCSbAmIoY7uTGjOh3+ZCyd0g00c/wWoYneAmg+0evjoIMtkW0AMAacMuH0B3KfOtHVDEhwJ6ISPmPAYkPL4t9v4RUAMAf93GpZeAWrubFJsC/gdfGoQ1HXPDy50+AC/CVAI6AzA5xfAi8lKZEtAJ3zahMcBdZjpK/woQGFAdxg+WQN7ExUsqYBOqDRhux+Lr/CrAIWAkxIWVEPbcBCHhAJeh4IAHJJwjg59hp8FKCTsOwZV18CYeUyKhAI64T4TvqIDH+J3AVG+Vg0/ilc+SwEnYGp/5E8n64eaiRgPAgSceB/OXQT9esWjWApog28IuFsHPmU8CFAYcFUl/Hx0GS0FdMAvZHp3wGSE8SJAwv01cXbnlgLaUaMNuHbhxCvGiwADflkJn9IrHiWRgAF1gUgHPmW8CJDw2xqYM7qMiQS847ez3niMIwH7amCBXvEolgLa4DcCynXgU8aLAAN+XglXjS6jpYD2yHHrSh34lPEiQMKqGrh3dBktBUSHIDy7W9EtxomAIQnn1sAbesWjWApQdMDzEip04EPGiYDHquHv4pUvmYAGCU068CHjQYAJH78M4s6fTShAQm4ndEpIa/6jl/hdgICXK2GO1d2dCQUojsGacOQSpC/xuwDgy9XwgFXxkgo4AbMH4FU5PJzhP3wuoEfA9Cp416pySQUo2uB/RJzTaD/gZwFW4z8jsSWgHdRd4E/qwEf4WYAJcy+DhLev2hKgdj8dcASYpUOf4FcBAp6pgqT3DtgSoGiHm4B/14FP8LGAq6tgS7Iy2RbwLhS/M3yC7K8rZH4UIOHNEJRVQNKbt20LULTDfwBf1IEP8KMAA1ZXwh12yuNIwOtQZcAuHfgAHwqwHPeJhyMBCr+ND/lNgAEtlWD7ET6pCFCzoR/WQZbxmwAJV9ZEJrLZwrGA6PjQMQmFOswifhIg4JVK+KjVuE88HAtQtMH3BPyzDrKInwQEYMWl4OjRlSkJ8NP4kI8E9Ao4J9G4TzxSEqDwy7whvwgQ8JMqWKELZJOUBbwBnxuC7D2uLIpfBEgor4Ezb9W1QcoC/DI+5BMB26vhSl0cB6QsQNEeeTzBXTrIAn4QIOGaGmhJZfPTEuCH8aFsC3Ay7hOPtAQo2mE98Pc6yDDZFgDcUR25YzQl0hZwDKrD8JwOMkyWBTga94lH2gIU7bAPuEQHGSSbAiRsqYGr09lcVwS0wXUCfqqDDJJNAQL+rAq2pbO5rgjI5vhQtgSkMu4TD1cEKNrg+wJW6SBDZFHAV6rg/nQ30zUB2RofypKAlMZ94uGaAEUH/FLCX+ggA2RDgPrGpEpw/I1J8XBVwBvw+aE4dwJ6STYEpDruEw9XBain3R6D10yYqUOP6YIt/fC3OvAYCc/WwBU6SBNXBSiOwS1h+LYOPCQA33sObpoJzTJzZ+PXVsNmvRJp4rqAHijpGv448Hb+kAFrZsA31OvHIJAJCQKOV0JZ9HsxXcF1AYp2eJTIM+Q8YWTxYygJ0+ER4eG8pQDceSncrgMX8ERAG9QIUF/s4AX3lMGNemkEHksYEjCrangv6x6eCFB4ND50d1lkjqolSkIZNJmQ8rdaxEPA1ioPPuw9E9AJy01Yp4P0SVr8GErCjMjcpTodpkkIPnEJ/FoHLuGZAAmToveXuTF/6LtlSR4OPhp1yXR35AbDtCW4Ne4TD88EKDrgBxKu10FqOC5+DLckGPDVSrhPBy7iqYDfw3n9cDjV+8vULOMZNmcZW6Heew88LKFeh87ozYHpFXBKJy7iqQBFB/yvhD/XgU3cKH4M9bUouyMz1r6kQ/usrYZ/0ksukwkBX5CRR17aRj2BdgbcqQMXUBL2wv2mw2KGYN4l8JIOXMZzAWp8qB1eFnC+ftcESPjWufBvOnCR6GeCOjJbpsMEqKfgVnk8uuu5AEUnXGXCf0Xf05IA3DodvqMDD4hKeBC4TodxEDAYhKoK2K9DD8iIAEU7/BD4avR943FLWYYmeUU/mNdKWK7ffRReHvmMJGMC1D64IzJ/5uaR3zMgQH0FyPKZsCmWZQK1PnvgBhmRPvLx+70GrKqEtL6cxy4ZExBDHZoOwF+HYVoA2qbAf06Gk/oHMsw+mGnCkiGYBhwJwdYKeDNTq/H/3ZdxnVHgK24AAAAASUVORK5CYII=",
+      "status": 200,
+      "mimeType": "image/png",
+      "bytes": 0
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/examples/webxr_xr_dragging.html",
+      "status": 200,
+      "mimeType": "text/html",
+      "bytes": 7882
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/examples/main.css",
+      "status": 200,
+      "mimeType": "text/css",
+      "bytes": 1552
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/build/three.module.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 662937
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/examples/jsm/controls/OrbitControls.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 40919
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/examples/jsm/webxr/XRControllerModelFactory.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 10349
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/examples/jsm/webxr/XRButton.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 5122
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/examples/jsm/loaders/GLTFLoader.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 117735
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/examples/jsm/libs/motion-controllers.module.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 13656
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/examples/jsm/utils/BufferGeometryUtils.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 37876
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/examples/jsm/utils/SkeletonUtils.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 11699
+    },
+    {
+      "url": "http://127.0.0.1:50203/three/build/three.core.js",
+      "status": 200,
+      "mimeType": "application/javascript",
+      "bytes": 1458279
+    },
+    {
+      "url": "http://127.0.0.1:50203/favicon.ico",
+      "status": 204,
+      "mimeType": "text/plain",
+      "bytes": 0
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/profilesList.json",
+      "status": 200,
+      "mimeType": "application/json;charset=utf-8",
+      "bytes": 1548,
+      "etag": "W/\"1b1-17e38ce62a4bdd7d\""
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/profilesList.json",
+      "status": 200,
+      "mimeType": "application/json;charset=utf-8",
+      "bytes": 0,
+      "etag": "W/\"1b1-17e38ce62a4bdd7d\""
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/profile.json",
+      "status": 200,
+      "mimeType": "application/json;charset=utf-8",
+      "bytes": 1741,
+      "etag": "W/\"262-013cac8de42b2515\""
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/profile.json",
+      "status": 200,
+      "mimeType": "application/json;charset=utf-8",
+      "bytes": 0,
+      "etag": "W/\"262-013cac8de42b2515\""
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/right.glb",
+      "status": 200,
+      "mimeType": "model/gltf-binary",
+      "bytes": 160527,
+      "etag": "W/\"26ea4-de6817a7592073f0\""
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/left.glb",
+      "status": 200,
+      "mimeType": "model/gltf-binary",
+      "bytes": 163265,
+      "etag": "W/\"27954-be269cbd91c50fee\""
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/profilesList.json",
+      "status": 200,
+      "mimeType": "application/json;charset=utf-8",
+      "bytes": 0,
+      "etag": "W/\"1b1-17e38ce62a4bdd7d\""
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/profilesList.json",
+      "status": 200,
+      "mimeType": "application/json;charset=utf-8",
+      "bytes": 0,
+      "etag": "W/\"1b1-17e38ce62a4bdd7d\""
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/profile.json",
+      "status": 200,
+      "mimeType": "application/json;charset=utf-8",
+      "bytes": 0,
+      "etag": "W/\"262-013cac8de42b2515\""
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/profile.json",
+      "status": 200,
+      "mimeType": "application/json;charset=utf-8",
+      "bytes": 0,
+      "etag": "W/\"262-013cac8de42b2515\""
+    }
+  ],
+  "externalAssets": [
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/motion-controllers@1.0/dist/motion-controllers.module.js",
+      "sha256": "c2d631f67ff39ef82abccb21f680e1f64337b63ebe744d2b39d779e27c28c7bb",
+      "bytes": 13492,
+      "method": "separate source retrieval after observed browser fetch; original browser response metadata retained"
+    },
+    {
+      "url": "https://fonts.gstatic.com/s/karla/v5/Zi_e6rBgGqv33BWF8WTq8g.woff2",
+      "sha256": "7a42c4a99bde59e3e96a55119ed3a4a97ef97fd6b1f944cebfbed98f3478a002",
+      "bytes": 6260,
+      "method": "separate source retrieval after observed browser fetch; original browser response metadata retained"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/profilesList.json",
+      "sha256": "fe0442d7b206e74d1d3d597ed5a28759e9f0a26d5814dabd179acdf1560b4ad4",
+      "bytes": 3173,
+      "method": "separate source retrieval after observed browser fetch; original browser response metadata retained"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/profile.json",
+      "sha256": "f69041753f555fb91c36d97fd4a58885f3ceb35e2273b179f59cedd464aec688",
+      "bytes": 11430,
+      "method": "separate source retrieval after observed browser fetch; original browser response metadata retained"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/right.glb",
+      "sha256": "5126d638fb1d03e05d16d8eec3b31b9588df88eaa8b42cc21b857fac3bd44916",
+      "bytes": 213868,
+      "method": "separate source retrieval after observed browser fetch; original browser response metadata retained"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/left.glb",
+      "sha256": "41a35b80221398d37029cbfaa9e39084ccd43e0206be72a5e8460f52e7882cb4",
+      "bytes": 217984,
+      "method": "separate source retrieval after observed browser fetch; original browser response metadata retained"
+    }
+  ],
+  "provenance": [
+    {
+      "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/xrInputSource_sameObject.https.html",
+      "sha256": "926589696c52cfc80756537a9c74d5f3936c7110e489471f5639226271f2ef56",
+      "bytes": 2421
+    },
+    {
+      "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/xrFrame_lifetime.https.html",
+      "sha256": "5ed970e5e1a01ed1bce7361ae1390074c8d87070bfddeddfbd25a5d62d62c77f",
+      "bytes": 2140
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/input-tracking.html",
+      "sha256": "59197342cf6a90dca17a16f0036bbb869498bb32e82c5aa0f4eb4082e43e10e0",
+      "bytes": 8851
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/css/common.css",
+      "sha256": "c48cb825f38c76a91059f64307dba35baa2447da724906d0bdbbd2ae6f75543f",
+      "bytes": 1399
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/util/webxr-button.js",
+      "sha256": "dde97b7c00937a5b006e39d33d657aadc9ab8d4e1188d6275e3ba33a99d9bffa",
+      "bytes": 16612
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/scenes/scene.js",
+      "sha256": "c4301324f3e3048746f2601c8d9fb239945e0d5503cf1e3d2958ba5bd2457dc0",
+      "bytes": 11322
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/renderer.js",
+      "sha256": "32bd0e86ff60255154092d033f0d1ae204711356e7dc3a0020e5875d04aed7a7",
+      "bytes": 48809
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/gltf2.js",
+      "sha256": "c2b0465b27c4b0fefeb5a84f32e3f7915963d42d135506db6f59288992a1ddc9",
+      "bytes": 2590
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/skybox.js",
+      "sha256": "1c065caf99dd77c41f29e76fb040a07299a783b9156effd4617b2b3f76f65af9",
+      "bytes": 5543
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/math/gl-matrix.js",
+      "sha256": "46d208aaefac9f7a6318069d5e8ad45cc04261b1e1b82b06a3c4a0baf1b427f1",
+      "bytes": 1983
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/math/ray.js",
+      "sha256": "bfee42564036c994734fb54a7315a4d6f52a7a0f7153a8fe24cbc506a3cda0d4",
+      "bytes": 3793
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/util/inline-viewer-helper.js",
+      "sha256": "98030c6cd73274982b28719068984bdceb1aa0b6e7361e9575c0c779e7125292",
+      "bytes": 4670
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/util/query-args.js",
+      "sha256": "94f505620a29d223dc4fa7aaab7cac6e3f01dae54ad409ee4f659edb9ebfc5cb",
+      "bytes": 2923
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/webxr-polyfill/build/webxr-polyfill.module.js",
+      "sha256": "2deaa09358236a7e89ded5af4c1352c97cd4b6ad364c2be63c4745bac235ccc1",
+      "bytes": 250457
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/input-renderer.js",
+      "sha256": "ebae97ac3269e0a6c8c52668e67be46176f6d106b33628fc6ad094c9d4fd24be",
+      "bytes": 16573
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/stats-viewer.js",
+      "sha256": "cef054a235391fda1b232b04b4032c913120c7e368070c9d2b3df87b9149fb31",
+      "bytes": 9272
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/node.js",
+      "sha256": "db2bf44eec53a054c84633858597446e4536cca0e91c084ce90d875874f3414b",
+      "bytes": 11380
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/common.js",
+      "sha256": "b0f9bb0bc31f427496460755e3e31b3d4646e86a0db92f45b25cdef03bf385f0",
+      "bytes": 1166
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat2.js",
+      "sha256": "29bf449c52c4e26f7ed79034a078c2d609d945a8eb209c0d7630754e58e91aac",
+      "bytes": 9746
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat2d.js",
+      "sha256": "41a55e96c03ca2dc3e48f00b7365992289a77cb42838e7725c8955404cee848a",
+      "bytes": 10859
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat3.js",
+      "sha256": "c710530d89bc3b4575ae390f191612ef1134e3196541f857997d7196b4a9da0c",
+      "bytes": 18477
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat4.js",
+      "sha256": "07366167394e53cd7e445c951d1dedc8b0cfed1aae1ef487c6c5455d6bddb7fa",
+      "bytes": 47268
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/loaders/gltf2.js",
+      "sha256": "ed82ed03853a8bb4b2fcb6aa9ac7db21a01bc8163b6f136c1e471d3984b7da4b",
+      "bytes": 13181
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/quat.js",
+      "sha256": "2233a07eb77a1badf378e9c1a828084a63c5d0003bbaba74be6a27841303bd01",
+      "bytes": 16022
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec3.js",
+      "sha256": "75f3bf3fb8086611bd8713b46edcf9e469de010a6f5a0816ee466ff9e5554388",
+      "bytes": 18370
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/quat2.js",
+      "sha256": "43a7eee9928b0a10ceba9cddce47259ab11617bc6007d342ab3941fd62c07ad7",
+      "bytes": 21654
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/material.js",
+      "sha256": "5826a3b57e0be4cafe871d17893ebdaa9539000160280ed7a74f95c487d7d121",
+      "bytes": 6569
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec4.js",
+      "sha256": "0755ef3edc3a924ded08714c4e8b540e6a5a684bf46c4edad0a2afc8a12293fe",
+      "bytes": 13948
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec2.js",
+      "sha256": "8338dd76a3cd05a62893b5aad5487c544c4e07d19deddafa300490b675227d34",
+      "bytes": 13681
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/program.js",
+      "sha256": "e03b5fb22c773001d20411ace5c1efa3322e8874fea269fcea1c9ccde4e9307b",
+      "bytes": 4899
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/primitive.js",
+      "sha256": "bb29fce08b2587a16da4d9558ebb1860f2ac1b4e70d0348f738cfe1d9becfd98",
+      "bytes": 2175
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/seven-segment-text.js",
+      "sha256": "371e89192f2ee967110b983afbd846cd8e782e3fcba09bef70bb1dda550f8697",
+      "bytes": 6318
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/texture.js",
+      "sha256": "2de9a0609b542e2a99c2008c9a839b7eade0983f0aa1630d8c3191d79201e76d",
+      "bytes": 5165
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/materials/pbr.js",
+      "sha256": "24ff40accb92ce643d4b4615ae0571c64ecd5fb880480d4650ac0f531596f772",
+      "bytes": 7768
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/controller/controller.gltf",
+      "sha256": "12ff555dcca77bd9f004c1f95100dd7284e924e4197d3abc67eec86eca74309f",
+      "bytes": 23457
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/cave/cave.gltf",
+      "sha256": "33ce4a94a9cf93b3ba59757d9137d72f6c06bc3d55fd5c68f0ff68294c3315b5",
+      "bytes": 66572
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/controller/controller-left.gltf",
+      "sha256": "2055e1379a702a1c5e0359567259c2f0070ece14121d9bc024fc49513f576978",
+      "bytes": 23730
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/textures/eilenriede-park-2k.png",
+      "sha256": "b8c025cb9036cbe7e4769631809f1c3a6bdcb2f212c5f617d28a0a25706c90d6",
+      "bytes": 3328855
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/controller/controller.bin",
+      "sha256": "88df69a2b45b4706cc83b952c2ddaa05c44a40fb4a8a44d49f50e94febb84b36",
+      "bytes": 21884
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/cave/cave.bin",
+      "sha256": "8a8dec3fc8e0a8c3473d7ef227000e57c43857d61dd78c2e90d3baa5d47fe67e",
+      "bytes": 407152
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/favicon-32x32.png",
+      "sha256": "fc48a339fe368a190776128ea224deee9f8614c7be976067fc4eb095621818fc",
+      "bytes": 1080
+    },
+    {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/favicon-96x96.png",
+      "sha256": "b03d633ab6757819148165756379869b1ba3962e9c9d49ed315efcff0f067b96",
+      "bytes": 3254
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/webxr_xr_dragging.html",
+      "sha256": "402bfe6ea88b7ad9df1df85d25dfa68b34b5c1d1b3b4bf8241a56a6156f516fb",
+      "bytes": 7732
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/main.css",
+      "sha256": "57bbd270f4befef0dc767537cd803c30cab549f84aac1bbe86c748520bdfc3fe",
+      "bytes": 1403
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/build/three.module.js",
+      "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea",
+      "bytes": 662772
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/controls/OrbitControls.js",
+      "sha256": "3d79d07ecb686b4e5d93232eedab255331c1beef711e13164eaa1f68655a5f2b",
+      "bytes": 40755
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/XRControllerModelFactory.js",
+      "sha256": "401dcb638ca3de94dd0a7744dd7a1c0d20374c73695b3d4e890eac6100e56877",
+      "bytes": 10185
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/XRButton.js",
+      "sha256": "13ceb022e450bfc8ff48e7af8e39faceacf08fea84a844fb82858a126c4e0249",
+      "bytes": 4959
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/loaders/GLTFLoader.js",
+      "sha256": "131c0f78c01d19368ae495caa65b3adaa10487810a36a05bb5901b769a35ac16",
+      "bytes": 117570
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/libs/motion-controllers.module.js",
+      "sha256": "4bf534b98dbb0f3e90b1332ac4d49c7d7747253768970abc7e4133b7700b75b1",
+      "bytes": 13492
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/build/three.core.js",
+      "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+      "bytes": 1458113
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/utils/BufferGeometryUtils.js",
+      "sha256": "9fb63427ce6641fa14fd0baff9cc4d1b5f9c3d85fd084bf2e90e803c44ec1797",
+      "bytes": 37712
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/utils/SkeletonUtils.js",
+      "sha256": "b1632a703206c3d830de9fcbe515696770d04b71a15ee6b50afa6d2c3298c86f",
+      "bytes": 11535
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/motion-controllers@1.0/dist/motion-controllers.module.js",
+      "sha256": "c2d631f67ff39ef82abccb21f680e1f64337b63ebe744d2b39d779e27c28c7bb",
+      "bytes": 13492
+    },
+    {
+      "url": "https://fonts.gstatic.com/s/karla/v5/Zi_e6rBgGqv33BWF8WTq8g.woff2",
+      "sha256": "7a42c4a99bde59e3e96a55119ed3a4a97ef97fd6b1f944cebfbed98f3478a002",
+      "bytes": 6260
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/profilesList.json",
+      "sha256": "fe0442d7b206e74d1d3d597ed5a28759e9f0a26d5814dabd179acdf1560b4ad4",
+      "bytes": 3173
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/profile.json",
+      "sha256": "f69041753f555fb91c36d97fd4a58885f3ceb35e2273b179f59cedd464aec688",
+      "bytes": 11430
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/right.glb",
+      "sha256": "5126d638fb1d03e05d16d8eec3b31b9588df88eaa8b42cc21b857fac3bd44916",
+      "bytes": 213868
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/left.glb",
+      "sha256": "41a35b80221398d37029cbfaa9e39084ccd43e0206be72a5e8460f52e7882cb4",
+      "bytes": 217984
+    }
+  ],
+  "sources": {
+    "package.json": "bbe53b871121c108b39b6c68ddf7c99914938ddb4d061e9a126802096262ad28",
+    "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+    "tests/tracking.ts": "504ea5a82e46e0336ae9e5f7ae2c4a62b618021d1ad2e3b5f06ae89a41e5da44",
+    "tests/tracking-browser.ts": "381e49ea21632f14666b0953545344ece9f2b681367c6c4b6d03f4d9608aab19",
+    "tests/tracking-observation.ts": "5532f5533ac780274e8953f8e0e2599c3aa31a54f86bee3ab23acf0718292b2d",
+    "tests/firefox-driver.ts": "343cb76bd8014d368f89518413e6e0560bf426327ef1b4a658db7c39eb9dc363",
+    "tests/firefox-upstream.ts": "6c7d3364cfa2b3e4ac3a3f58181b0d60548fe8dbcf4b8c3ded2df787bcfc2f01",
+    "tests/firefox-scenes.js": "375b5b68b93860fba25b79868ae19d315b7788bd60402c7d42855d8e85b595b4",
+    "src/polyfill/api/runtime.ts": "07c6f0102a3f20d93c0b2176d325b07d6a36379d63d66c1f3d6326f60a44ece0",
+    "src/polyfill/api/layers.ts": "e7fbc99b4c20685ffd0b6477b046f64136b34b108d954324f93539d17bcc636f",
+    "src/polyfill/EmulatedXRDevice.ts": "32287d2242ac79c58176cb0c9c146568dfada82d40eb3c4959c53e100e7b8d5b",
+    "src/polyfill/device-adapter.ts": "1f3092689314a44fbb3d8b55194a1a5416a020b49ef3a074d78e316a79b81e01",
+    "polyfill/webxr-polyfill.js": "bb7baa7fcdee10675c9f356fac17f4905ce19de173d7ce03665f78b04cf585b0",
+    "build/firefox/polyfill/webxr-polyfill.js": "bb7baa7fcdee10675c9f356fac17f4905ce19de173d7ce03665f78b04cf585b0",
+    "dist/app/panel.js": "d35cbadc59959301f9e8555f2dbc3db73e35f1adace211fe5898a688b13c6ac1"
+  },
+  "completedAt": "2026-10-23T23:48:23.651Z"
+}
