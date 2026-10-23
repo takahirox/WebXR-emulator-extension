@@ -219,19 +219,11 @@
                 break;
         }
     });
-    let contextWatch = 0;
-    window.addEventListener('device-enter-immersive', () => {
-        window.clearInterval(contextWatch);
-        contextWatch = window.setInterval(() => {
-            var _a;
-            if ((_a = chrome.runtime) === null || _a === void 0 ? void 0 : _a.id)
-                return;
-            window.clearInterval(contextWatch);
-            dispatchCustomEvent('webxr-exit-immersive', {});
-        }, 1000);
+    window.addEventListener('webxr-extension-check', () => {
+        var _a;
+        if ((_a = chrome.runtime) === null || _a === void 0 ? void 0 : _a.id)
+            dispatchCustomEvent('webxr-extension-alive', {});
     });
-    window.addEventListener('device-leave-immersive', () => window.clearInterval(contextWatch));
-    window.addEventListener('pagehide', () => window.clearInterval(contextWatch));
     window.addEventListener('device-pose', event => {
         if (!isDeviceMessage({ ...event.detail, action: 'device-pose' }))
             return;

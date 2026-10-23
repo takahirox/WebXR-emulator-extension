@@ -1,0 +1,1508 @@
+{
+  "issue": 37,
+  "evaluationBaseline": "f9222484780d9993ce9202f3728c07ec00e6faea",
+  "status": "working",
+  "date": "2026-10-24",
+  "platform": "macOS arm64",
+  "commands": [
+    {
+      "command": "npm ci",
+      "status": "passed",
+      "installedPackages": 54
+    },
+    {
+      "command": "npm run build:firefox",
+      "status": "passed",
+      "includes": [
+        "strict typecheck",
+        "TypeScript emission",
+        "Rollup build",
+        "Firefox event-page package"
+      ]
+    },
+    {
+      "command": "WEBXR_FIREFOX_EXECUTABLE=<official Firefox 157.0 executable> WEBXR_GECKODRIVER=<geckodriver 0.37.1 executable> npm run test:firefox",
+      "status": "passed",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:extension-lifetime",
+      "status": "passed",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "browserArchive": {
+    "url": "https://archive.mozilla.org/pub/firefox/releases/157.0/mac/en-US/Firefox%20157.0.dmg",
+    "sha256": "df6d8c79b6126bcf24cb70ebab9371916a662028e2d706e462d432e78fdf396c",
+    "sourceStamp": "8eb25af4acf031ab1e06abf1a912275083c820ed"
+  },
+  "driverArchive": {
+    "url": "https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-macos-aarch64.tar.gz",
+    "sha256": "d02b3f7003f999caf90974a2ef5da0286c05d01cee19112c86846d759fdba4f5"
+  },
+  "revisions": {
+    "samples": "fb41c3416496974672e2c766a41c6febcba2d07e",
+    "three": "9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8",
+    "wpt": "e1859580b5fcf74940a18d2f783296b4961035e3"
+  },
+  "execution": {
+    "status": "passed",
+    "startedAt": "2026-10-23T21:31:04.252Z",
+    "results": [
+      {
+        "profile": "quest-vr",
+        "app": "/samples/immersive-vr-session.html",
+        "reticlePixels": null,
+        "pixels": {
+          "height": 809,
+          "layer": "base",
+          "regions": [
+            {
+              "colored": 517760,
+              "colors": 9631,
+              "height": 809,
+              "transparent": 0,
+              "width": 640
+            },
+            {
+              "colored": 517760,
+              "colors": 9592,
+              "height": 809,
+              "transparent": 0,
+              "width": 640
+            }
+          ],
+          "width": 1280
+        },
+        "presented": {
+          "connected": true,
+          "height": 809,
+          "width": 1280
+        },
+        "inputEffect": {
+          "cylinders": 0,
+          "sampleCloneCalls": null,
+          "shots": null,
+          "viewer": [
+            0,
+            0,
+            0
+          ]
+        },
+        "probe": {
+          "enabledFeatures": [
+            "viewer",
+            "local"
+          ],
+          "ends": 0,
+          "events": [
+            "selectstart",
+            "select",
+            "selectend"
+          ],
+          "frames": 159,
+          "hits": 0,
+          "inputModes": [
+            "tracked-pointer",
+            "tracked-pointer",
+            "tracked-pointer"
+          ],
+          "requests": [
+            {
+              "depthSensing": null,
+              "domOverlayRoot": null,
+              "mode": "immersive-vr",
+              "optionalFeatures": [],
+              "requiredFeatures": []
+            }
+          ],
+          "views": [
+            {
+              "eye": "left",
+              "height": 809,
+              "width": 640
+            },
+            {
+              "eye": "right",
+              "height": 809,
+              "width": 640
+            }
+          ]
+        },
+        "logs": [],
+        "shutdown": {
+          "endEvents": 1,
+          "frames": 167,
+          "callbacksStopped": true
+        },
+        "restart": {
+          "frames": 38,
+          "freshInputs": true
+        }
+      },
+      {
+        "profile": "quest-vr",
+        "app": "/three/examples/webxr_xr_ballshooter.html",
+        "reticlePixels": null,
+        "pixels": {
+          "height": 809,
+          "layer": "projection",
+          "regions": [
+            {
+              "colored": 517760,
+              "colors": 24791,
+              "height": 809,
+              "transparent": 0,
+              "width": 640
+            },
+            {
+              "colored": 517760,
+              "colors": 24711,
+              "height": 809,
+              "transparent": 0,
+              "width": 640
+            }
+          ],
+          "width": 1280
+        },
+        "presented": {
+          "connected": true,
+          "height": 809,
+          "width": 1280
+        },
+        "inputEffect": {
+          "cylinders": 0,
+          "sampleCloneCalls": null,
+          "shots": [
+            [
+              0.699999988079071,
+              1.399999976158142,
+              -0.800000011920929
+            ],
+            [
+              0.699999988079071,
+              1.399999976158142,
+              -0.800000011920929
+            ],
+            [
+              0.699999988079071,
+              1.399999976158142,
+              -0.800000011920929
+            ]
+          ],
+          "viewer": [
+            0.15000000596046448,
+            1.649999976158142,
+            0
+          ]
+        },
+        "probe": {
+          "enabledFeatures": [
+            "viewer",
+            "local",
+            "local-floor",
+            "bounded-floor",
+            "layers"
+          ],
+          "ends": 0,
+          "events": [
+            "selectstart",
+            "select",
+            "selectend"
+          ],
+          "frames": 159,
+          "hits": 0,
+          "inputModes": [
+            "tracked-pointer",
+            "tracked-pointer",
+            "tracked-pointer"
+          ],
+          "requests": [
+            {
+              "depthSensing": {
+                "dataFormatPreference": [],
+                "usagePreference": [
+                  "gpu-optimized"
+                ]
+              },
+              "domOverlayRoot": null,
+              "mode": "immersive-vr",
+              "optionalFeatures": [
+                "local-floor",
+                "bounded-floor",
+                "layers",
+                "depth-sensing"
+              ],
+              "requiredFeatures": []
+            }
+          ],
+          "views": [
+            {
+              "eye": "left",
+              "height": 809,
+              "width": 640
+            },
+            {
+              "eye": "right",
+              "height": 809,
+              "width": 640
+            }
+          ]
+        },
+        "logs": [
+          {
+            "level": "warn",
+            "type": "console",
+            "text": "THREE.WARNING: Multiple instances of Three.js being imported.",
+            "context": "cb6784f3-705e-4a9c-bded-1394f64a9757"
+          },
+          {
+            "level": "warn",
+            "type": "console",
+            "text": "using deprecated parameters for the initialization function; pass a single object instead",
+            "context": "cb6784f3-705e-4a9c-bded-1394f64a9757"
+          },
+          {
+            "level": "warn",
+            "type": "console",
+            "text": "Could not find menu_pressed_min in the model",
+            "context": "cb6784f3-705e-4a9c-bded-1394f64a9757"
+          }
+        ],
+        "shutdown": {
+          "endEvents": 1,
+          "frames": 166,
+          "callbacksStopped": true
+        },
+        "restart": {
+          "frames": 36,
+          "freshInputs": true
+        }
+      },
+      {
+        "profile": "quest-mr",
+        "app": "/samples/hit-test.html",
+        "reticlePixels": {
+          "height": 1618,
+          "layer": "base",
+          "regions": [
+            {
+              "colored": 508,
+              "colors": 15,
+              "height": 1618,
+              "transparent": 2070532,
+              "width": 1280
+            },
+            {
+              "colored": 508,
+              "colors": 15,
+              "height": 1618,
+              "transparent": 2070532,
+              "width": 1280
+            }
+          ],
+          "width": 2560
+        },
+        "pixels": {
+          "height": 1618,
+          "layer": "base",
+          "regions": [
+            {
+              "colored": 1099,
+              "colors": 272,
+              "height": 1618,
+              "transparent": 2069941,
+              "width": 1280
+            },
+            {
+              "colored": 1100,
+              "colors": 268,
+              "height": 1618,
+              "transparent": 2069940,
+              "width": 1280
+            }
+          ],
+          "width": 2560
+        },
+        "presented": [
+          {
+            "closest": [
+              129,
+              124,
+              86,
+              255
+            ],
+            "correlation": 2267,
+            "difference": 0,
+            "expected": [
+              129,
+              124,
+              86,
+              255
+            ],
+            "foregroundContrast": 45,
+            "nearbyRoom": [
+              140,
+              135,
+              131,
+              255
+            ],
+            "room": [
+              119,
+              109,
+              102,
+              255
+            ]
+          },
+          {
+            "closest": [
+              131,
+              125,
+              87,
+              255
+            ],
+            "correlation": 2117,
+            "difference": 0,
+            "expected": [
+              131,
+              125,
+              87,
+              255
+            ],
+            "foregroundContrast": 44,
+            "nearbyRoom": [
+              140,
+              135,
+              131,
+              255
+            ],
+            "room": [
+              119,
+              108,
+              102,
+              255
+            ]
+          }
+        ],
+        "inputEffect": {
+          "cylinders": 0,
+          "sampleCloneCalls": 9,
+          "shots": null,
+          "viewer": [
+            0,
+            0,
+            0
+          ]
+        },
+        "probe": {
+          "enabledFeatures": [
+            "viewer",
+            "local",
+            "hit-test"
+          ],
+          "ends": 0,
+          "events": [
+            "selectstart",
+            "select",
+            "selectend"
+          ],
+          "frames": 95,
+          "hits": 1,
+          "inputModes": [
+            "tracked-pointer",
+            "tracked-pointer",
+            "tracked-pointer"
+          ],
+          "requests": [
+            {
+              "depthSensing": null,
+              "domOverlayRoot": null,
+              "mode": "immersive-ar",
+              "optionalFeatures": [],
+              "requiredFeatures": [
+                "local",
+                "hit-test"
+              ]
+            }
+          ],
+          "views": [
+            {
+              "eye": "left",
+              "height": 1618,
+              "width": 1280
+            },
+            {
+              "eye": "right",
+              "height": 1618,
+              "width": 1280
+            }
+          ]
+        },
+        "logs": [],
+        "shutdown": {
+          "endEvents": 1,
+          "frames": 99,
+          "callbacksStopped": true
+        },
+        "restart": {
+          "frames": 33,
+          "freshInputs": true
+        }
+      },
+      {
+        "profile": "quest-mr",
+        "app": "/three/examples/webxr_ar_hittest.html",
+        "reticlePixels": {
+          "height": 1618,
+          "layer": "projection",
+          "regions": [
+            {
+              "colored": 777,
+              "colors": 1,
+              "height": 1618,
+              "transparent": 2070263,
+              "width": 1280
+            },
+            {
+              "colored": 777,
+              "colors": 1,
+              "height": 1618,
+              "transparent": 2070263,
+              "width": 1280
+            }
+          ],
+          "width": 2560
+        },
+        "pixels": {
+          "height": 1618,
+          "layer": "projection",
+          "regions": [
+            {
+              "colored": 1266,
+              "colors": 5,
+              "height": 1618,
+              "transparent": 2069774,
+              "width": 1280
+            },
+            {
+              "colored": 1266,
+              "colors": 5,
+              "height": 1618,
+              "transparent": 2069774,
+              "width": 1280
+            }
+          ],
+          "width": 2560
+        },
+        "presented": [
+          {
+            "closest": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "correlation": 43001,
+            "difference": 0,
+            "expected": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "foregroundContrast": 124,
+            "nearbyRoom": [
+              140,
+              135,
+              131,
+              255
+            ],
+            "room": [
+              119,
+              109,
+              102,
+              255
+            ]
+          },
+          {
+            "closest": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "correlation": 43001,
+            "difference": 0,
+            "expected": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "foregroundContrast": 124,
+            "nearbyRoom": [
+              140,
+              135,
+              131,
+              255
+            ],
+            "room": [
+              119,
+              108,
+              102,
+              255
+            ]
+          }
+        ],
+        "inputEffect": {
+          "cylinders": 1,
+          "sampleCloneCalls": null,
+          "shots": null,
+          "viewer": [
+            0,
+            0,
+            0
+          ]
+        },
+        "probe": {
+          "enabledFeatures": [
+            "viewer",
+            "local",
+            "hit-test"
+          ],
+          "ends": 0,
+          "events": [
+            "selectstart",
+            "select",
+            "selectend"
+          ],
+          "frames": 92,
+          "hits": 1,
+          "inputModes": [
+            "tracked-pointer",
+            "tracked-pointer",
+            "tracked-pointer"
+          ],
+          "requests": [
+            {
+              "depthSensing": null,
+              "domOverlayRoot": "DIV",
+              "mode": "immersive-ar",
+              "optionalFeatures": [
+                "dom-overlay"
+              ],
+              "requiredFeatures": [
+                "hit-test"
+              ]
+            }
+          ],
+          "views": [
+            {
+              "eye": "left",
+              "height": 1618,
+              "width": 1280
+            },
+            {
+              "eye": "right",
+              "height": 1618,
+              "width": 1280
+            }
+          ]
+        },
+        "logs": [
+          {
+            "level": "warn",
+            "type": "console",
+            "text": "THREE.WARNING: Multiple instances of Three.js being imported.",
+            "context": "cb6784f3-705e-4a9c-bded-1394f64a9757"
+          }
+        ],
+        "shutdown": {
+          "endEvents": 1,
+          "frames": 96,
+          "callbacksStopped": true
+        },
+        "restart": {
+          "frames": 33,
+          "freshInputs": true
+        }
+      },
+      {
+        "profile": "android-ar",
+        "app": "/samples/hit-test.html",
+        "reticlePixels": {
+          "height": 1920,
+          "layer": "base",
+          "regions": [
+            {
+              "colored": 728,
+              "colors": 20,
+              "height": 1920,
+              "transparent": 2072872,
+              "width": 1080
+            }
+          ],
+          "width": 1080
+        },
+        "pixels": {
+          "height": 1920,
+          "layer": "base",
+          "regions": [
+            {
+              "colored": 1565,
+              "colors": 283,
+              "height": 1920,
+              "transparent": 2072035,
+              "width": 1080
+            }
+          ],
+          "width": 1080
+        },
+        "presented": [
+          {
+            "closest": [
+              130,
+              168,
+              190,
+              255
+            ],
+            "correlation": 3616,
+            "difference": 51,
+            "expected": [
+              79,
+              150,
+              182,
+              255
+            ],
+            "foregroundContrast": 47,
+            "nearbyRoom": [
+              154,
+              151,
+              143,
+              255
+            ],
+            "room": [
+              126,
+              114,
+              106,
+              255
+            ]
+          }
+        ],
+        "inputEffect": {
+          "cylinders": 0,
+          "sampleCloneCalls": 9,
+          "shots": null,
+          "viewer": [
+            0,
+            0,
+            -0.07500000298023224
+          ]
+        },
+        "probe": {
+          "enabledFeatures": [
+            "viewer",
+            "local",
+            "hit-test"
+          ],
+          "ends": 0,
+          "events": [
+            "selectstart",
+            "select",
+            "selectend"
+          ],
+          "frames": 147,
+          "hits": 1,
+          "inputModes": [
+            "screen",
+            "screen",
+            "screen"
+          ],
+          "requests": [
+            {
+              "depthSensing": null,
+              "domOverlayRoot": null,
+              "mode": "immersive-ar",
+              "optionalFeatures": [],
+              "requiredFeatures": [
+                "local",
+                "hit-test"
+              ]
+            }
+          ],
+          "views": [
+            {
+              "eye": "none",
+              "height": 1920,
+              "width": 1080
+            }
+          ]
+        },
+        "logs": [],
+        "shutdown": {
+          "endEvents": 1,
+          "frames": 153,
+          "callbacksStopped": true
+        },
+        "restart": {
+          "frames": 37,
+          "freshInputs": true
+        }
+      },
+      {
+        "profile": "android-ar",
+        "app": "/three/examples/webxr_ar_hittest.html",
+        "reticlePixels": {
+          "height": 1920,
+          "layer": "projection",
+          "regions": [
+            {
+              "colored": 1096,
+              "colors": 1,
+              "height": 1920,
+              "transparent": 2072504,
+              "width": 1080
+            }
+          ],
+          "width": 1080
+        },
+        "pixels": {
+          "height": 1920,
+          "layer": "projection",
+          "regions": [
+            {
+              "colored": 1784,
+              "colors": 5,
+              "height": 1920,
+              "transparent": 2071816,
+              "width": 1080
+            }
+          ],
+          "width": 1080
+        },
+        "presented": [
+          {
+            "closest": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "correlation": 24145,
+            "difference": 0,
+            "expected": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "foregroundContrast": 93,
+            "nearbyRoom": [
+              169,
+              165,
+              162,
+              255
+            ],
+            "room": [
+              126,
+              114,
+              106,
+              255
+            ]
+          }
+        ],
+        "inputEffect": {
+          "cylinders": 1,
+          "sampleCloneCalls": null,
+          "shots": null,
+          "viewer": [
+            0,
+            0,
+            -0.07500000298023224
+          ]
+        },
+        "probe": {
+          "enabledFeatures": [
+            "viewer",
+            "local",
+            "hit-test"
+          ],
+          "ends": 0,
+          "events": [
+            "selectstart",
+            "select",
+            "selectend"
+          ],
+          "frames": 150,
+          "hits": 1,
+          "inputModes": [
+            "screen",
+            "screen",
+            "screen"
+          ],
+          "requests": [
+            {
+              "depthSensing": null,
+              "domOverlayRoot": "DIV",
+              "mode": "immersive-ar",
+              "optionalFeatures": [
+                "dom-overlay"
+              ],
+              "requiredFeatures": [
+                "hit-test"
+              ]
+            }
+          ],
+          "views": [
+            {
+              "eye": "none",
+              "height": 1920,
+              "width": 1080
+            }
+          ]
+        },
+        "logs": [
+          {
+            "level": "warn",
+            "type": "console",
+            "text": "THREE.WARNING: Multiple instances of Three.js being imported.",
+            "context": "cb6784f3-705e-4a9c-bded-1394f64a9757"
+          }
+        ],
+        "shutdown": {
+          "endEvents": 1,
+          "frames": 156,
+          "callbacksStopped": true
+        },
+        "restart": {
+          "frames": 34,
+          "freshInputs": true
+        }
+      }
+    ],
+    "versions": {
+      "browser": "157.0",
+      "buildID": "20260924084938",
+      "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+      "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+      "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+      "platform": "mac",
+      "platformVersion": "25.6.0",
+      "node": "v24.12.0"
+    },
+    "contract": {
+      "passed": [
+        "first-script XR globals and navigator under restrictive CSP",
+        "fresh immersive request without activation rejects SecurityError",
+        "page cannot access privileged extension APIs",
+        "Meta Quest 3 immersive-vr: mode support",
+        "Meta Quest 3 immersive-vr: real inline animation and mono view",
+        "Meta Quest 3 immersive-vr: unavailable mode/required feature rejection and optional omission with activation",
+        "Meta Quest 3 immersive-ar: mode support",
+        "Meta Quest 3 immersive-ar: real inline animation and mono view",
+        "Meta Quest 3 immersive-ar: unavailable mode/required feature rejection and optional omission with activation",
+        "Generic Android Phone (ARCore) immersive-ar: mode support",
+        "Generic Android Phone (ARCore) immersive-ar: real inline animation and mono view",
+        "Generic Android Phone (ARCore) immersive-ar: unavailable mode/required feature rejection and optional omission with activation",
+        "injected child frame first-script XR",
+        "real panel TransformControls moves viewer",
+        "cloneInto pose bridge reaches inspected page and injected child",
+        "panel input isolated from another tab",
+        "real panel TransformControls moves tracked controller",
+        "tracked select/squeeze sequencing",
+        "explicit end stops XR callbacks",
+        "restart has fresh unpressed inputs",
+        "active mode switch ends prior presentation once",
+        "page reload retains selected mode",
+        "panel reload retains selected configuration",
+        "privileged virtual-room ArrayBuffer crosses cloneInto bridge",
+        "foreign-session spaces and retained inactive frame reject InvalidStateError",
+        "pinned navigator_xr_sameObject assertion"
+      ],
+      "wpt": {
+        "status": 0,
+        "tests": [
+          {
+            "message": null,
+            "name": "Navigator.xr meets [SameObject] requirement",
+            "status": 0
+          }
+        ]
+      },
+      "inputBefore": {
+        "ended": false,
+        "errors": [],
+        "eventOrder": [
+          "added"
+        ],
+        "events": {},
+        "framebuffer": {
+          "height": 809,
+          "width": 1280
+        },
+        "frames": 40,
+        "hitPosition": null,
+        "hits": 0,
+        "inputModes": [
+          "tracked-pointer",
+          "tracked-pointer"
+        ],
+        "inputPositions": {
+          "left": [
+            -0.5,
+            -0.10000002384185792,
+            -1
+          ],
+          "right": [
+            0.5,
+            -0.10000002384185792,
+            -1
+          ]
+        },
+        "overridesNativeXR": true,
+        "startupSessionError": "SecurityError",
+        "synchronousGlobals": true,
+        "synchronousXR": true,
+        "transientHits": 0,
+        "viewerPosition": [
+          0.20000000298023224,
+          0.10000002384185792,
+          -0.10000000149011612
+        ],
+        "views": [
+          {
+            "eye": "left",
+            "projection": 1.264062523841858,
+            "viewport": {
+              "height": 809,
+              "width": 640,
+              "x": 0,
+              "y": 0
+            },
+            "x": 0.18000000715255737
+          },
+          {
+            "eye": "right",
+            "projection": 1.264062523841858,
+            "viewport": {
+              "height": 809,
+              "width": 640,
+              "x": 640,
+              "y": 0
+            },
+            "x": 0.2199999988079071
+          }
+        ]
+      },
+      "sequence": [
+        "added",
+        "selectstart",
+        "select",
+        "selectend",
+        "squeezestart",
+        "squeeze",
+        "squeezeend"
+      ]
+    },
+    "extensionUnload": {
+      "ended": true,
+      "frames": 37,
+      "callbacksStopped": true
+    },
+    "cleanup": {
+      "temporaryAddonRemoved": true,
+      "sessionDeleted": true,
+      "browserStopped": true,
+      "driverStopped": true,
+      "profileRemoved": true
+    },
+    "provenance": [
+      {
+        "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/navigator_xr_sameObject.https.html",
+        "sha256": "ee4c36a1f90257619114b178f3f532bfed047e9be9ffb8877c6a7511e4d24a92",
+        "bytes": 1000
+      },
+      {
+        "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/resources/webxr_test_constants.js",
+        "sha256": "6fd216e2544b7a15cef6f9b07b5faaf806eacf176b35da067e457a3b1f19668d",
+        "bytes": 6325
+      },
+      {
+        "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/resources/testharness.js",
+        "sha256": "7a108d7cfa98ac413ddb38f82fd509fb2037dfcc25ccf466567520cbb6bdf1fa",
+        "bytes": 198420
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/immersive-vr-session.html",
+        "sha256": "c8f567e51cc77fbf469cf1c895f41bf7675d5710d4a268a7153f5f2e4c6edc93",
+        "bytes": 10010
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/css/common.css",
+        "sha256": "c48cb825f38c76a91059f64307dba35baa2447da724906d0bdbbd2ae6f75543f",
+        "bytes": 1399
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/scenes/scene.js",
+        "sha256": "c4301324f3e3048746f2601c8d9fb239945e0d5503cf1e3d2958ba5bd2457dc0",
+        "bytes": 11322
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/util/webxr-button.js",
+        "sha256": "dde97b7c00937a5b006e39d33d657aadc9ab8d4e1188d6275e3ba33a99d9bffa",
+        "bytes": 16612
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/renderer.js",
+        "sha256": "32bd0e86ff60255154092d033f0d1ae204711356e7dc3a0020e5875d04aed7a7",
+        "bytes": 48809
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/gltf2.js",
+        "sha256": "c2b0465b27c4b0fefeb5a84f32e3f7915963d42d135506db6f59288992a1ddc9",
+        "bytes": 2590
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/skybox.js",
+        "sha256": "1c065caf99dd77c41f29e76fb040a07299a783b9156effd4617b2b3f76f65af9",
+        "bytes": 5543
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/util/query-args.js",
+        "sha256": "94f505620a29d223dc4fa7aaab7cac6e3f01dae54ad409ee4f659edb9ebfc5cb",
+        "bytes": 2923
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/webxr-polyfill/build/webxr-polyfill.module.js",
+        "sha256": "2deaa09358236a7e89ded5af4c1352c97cd4b6ad364c2be63c4745bac235ccc1",
+        "bytes": 250457
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/node.js",
+        "sha256": "db2bf44eec53a054c84633858597446e4536cca0e91c084ce90d875874f3414b",
+        "bytes": 11380
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/math/gl-matrix.js",
+        "sha256": "46d208aaefac9f7a6318069d5e8ad45cc04261b1e1b82b06a3c4a0baf1b427f1",
+        "bytes": 1983
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/stats-viewer.js",
+        "sha256": "cef054a235391fda1b232b04b4032c913120c7e368070c9d2b3df87b9149fb31",
+        "bytes": 9272
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/input-renderer.js",
+        "sha256": "ebae97ac3269e0a6c8c52668e67be46176f6d106b33628fc6ad094c9d4fd24be",
+        "bytes": 16573
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/math/ray.js",
+        "sha256": "bfee42564036c994734fb54a7315a4d6f52a7a0f7153a8fe24cbc506a3cda0d4",
+        "bytes": 3793
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/material.js",
+        "sha256": "5826a3b57e0be4cafe871d17893ebdaa9539000160280ed7a74f95c487d7d121",
+        "bytes": 6569
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/primitive.js",
+        "sha256": "bb29fce08b2587a16da4d9558ebb1860f2ac1b4e70d0348f738cfe1d9becfd98",
+        "bytes": 2175
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/program.js",
+        "sha256": "e03b5fb22c773001d20411ace5c1efa3322e8874fea269fcea1c9ccde4e9307b",
+        "bytes": 4899
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/loaders/gltf2.js",
+        "sha256": "ed82ed03853a8bb4b2fcb6aa9ac7db21a01bc8163b6f136c1e471d3984b7da4b",
+        "bytes": 13181
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/texture.js",
+        "sha256": "2de9a0609b542e2a99c2008c9a839b7eade0983f0aa1630d8c3191d79201e76d",
+        "bytes": 5165
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/common.js",
+        "sha256": "b0f9bb0bc31f427496460755e3e31b3d4646e86a0db92f45b25cdef03bf385f0",
+        "bytes": 1166
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat2.js",
+        "sha256": "29bf449c52c4e26f7ed79034a078c2d609d945a8eb209c0d7630754e58e91aac",
+        "bytes": 9746
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat2d.js",
+        "sha256": "41a55e96c03ca2dc3e48f00b7365992289a77cb42838e7725c8955404cee848a",
+        "bytes": 10859
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat3.js",
+        "sha256": "c710530d89bc3b4575ae390f191612ef1134e3196541f857997d7196b4a9da0c",
+        "bytes": 18477
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat4.js",
+        "sha256": "07366167394e53cd7e445c951d1dedc8b0cfed1aae1ef487c6c5455d6bddb7fa",
+        "bytes": 47268
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/quat.js",
+        "sha256": "2233a07eb77a1badf378e9c1a828084a63c5d0003bbaba74be6a27841303bd01",
+        "bytes": 16022
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/quat2.js",
+        "sha256": "43a7eee9928b0a10ceba9cddce47259ab11617bc6007d342ab3941fd62c07ad7",
+        "bytes": 21654
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec2.js",
+        "sha256": "8338dd76a3cd05a62893b5aad5487c544c4e07d19deddafa300490b675227d34",
+        "bytes": 13681
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/seven-segment-text.js",
+        "sha256": "371e89192f2ee967110b983afbd846cd8e782e3fcba09bef70bb1dda550f8697",
+        "bytes": 6318
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec3.js",
+        "sha256": "75f3bf3fb8086611bd8713b46edcf9e469de010a6f5a0816ee466ff9e5554388",
+        "bytes": 18370
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/materials/pbr.js",
+        "sha256": "24ff40accb92ce643d4b4615ae0571c64ecd5fb880480d4650ac0f531596f772",
+        "bytes": 7768
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec4.js",
+        "sha256": "0755ef3edc3a924ded08714c4e8b540e6a5a684bf46c4edad0a2afc8a12293fe",
+        "bytes": 13948
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/favicon-96x96.png",
+        "sha256": "b03d633ab6757819148165756379869b1ba3962e9c9d49ed315efcff0f067b96",
+        "bytes": 3254
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/favicon-32x32.png",
+        "sha256": "fc48a339fe368a190776128ea224deee9f8614c7be976067fc4eb095621818fc",
+        "bytes": 1080
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/space/space.gltf",
+        "sha256": "a7833f22e37c3c41a84787d660e06548bb06f299b6d0035fe16f6b6d26275011",
+        "bytes": 34886
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/textures/milky-way-4k.png",
+        "sha256": "d8ac3c9696975f819747afa18dc4a268736c2c7941637bf760bcd4eb9a4c06a5",
+        "bytes": 3653516
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/space/space.bin",
+        "sha256": "d32be128ba366d7fc289ae049cbb13d64951ecf852bf70b48a7d885e1a439b2f",
+        "bytes": 1134140
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/webxr_xr_ballshooter.html",
+        "sha256": "35a33def2c7e94c8acd452e51b2dc79c238e559d8493d9f43cd9008cd9a4c738",
+        "bytes": 8474
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/main.css",
+        "sha256": "57bbd270f4befef0dc767537cd803c30cab549f84aac1bbe86c748520bdfc3fe",
+        "bytes": 1403
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/geometries/BoxLineGeometry.js",
+        "sha256": "5f4bd99627f84e1fe81cf1927ca867ac2968c9354d5e54b11849d0887170ad51",
+        "bytes": 3082
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/XRControllerModelFactory.js",
+        "sha256": "401dcb638ca3de94dd0a7744dd7a1c0d20374c73695b3d4e890eac6100e56877",
+        "bytes": 10185
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/XRButton.js",
+        "sha256": "13ceb022e450bfc8ff48e7af8e39faceacf08fea84a844fb82858a126c4e0249",
+        "bytes": 4959
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/build/three.module.js",
+        "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea",
+        "bytes": 662772
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/physics/RapierPhysics.js",
+        "sha256": "a91add24f444bf1156a922be970c9643b72cb206405c831e58bb209bd59b8374",
+        "bytes": 11339
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/controls/OrbitControls.js",
+        "sha256": "3d79d07ecb686b4e5d93232eedab255331c1beef711e13164eaa1f68655a5f2b",
+        "bytes": 40755
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/libs/motion-controllers.module.js",
+        "sha256": "4bf534b98dbb0f3e90b1332ac4d49c7d7747253768970abc7e4133b7700b75b1",
+        "bytes": 13492
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/loaders/GLTFLoader.js",
+        "sha256": "131c0f78c01d19368ae495caa65b3adaa10487810a36a05bb5901b769a35ac16",
+        "bytes": 117570
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/build/three.core.js",
+        "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+        "bytes": 1458113
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/utils/SkeletonUtils.js",
+        "sha256": "b1632a703206c3d830de9fcbe515696770d04b71a15ee6b50afa6d2c3298c86f",
+        "bytes": 11535
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/utils/BufferGeometryUtils.js",
+        "sha256": "9fb63427ce6641fa14fd0baff9cc4d1b5f9c3d85fd084bf2e90e803c44ec1797",
+        "bytes": 37712
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/hit-test.html",
+        "sha256": "a9cc4b49b9b5e31dde1a84957fded74580d1ea9578212b062f87b1ea9fefcfaa",
+        "bytes": 7592
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/drop-shadow.js",
+        "sha256": "c7732ef4be3b850e48955682671e369c091f4b288ab77fc9899a0648687b3440",
+        "bytes": 3664
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/geometry/primitive-stream.js",
+        "sha256": "dab4b181bebca431c4592bda18de6c5eaaa5f4c3eb0c9166399ae95f47d50607",
+        "bytes": 7627
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/sunflower/sunflower.gltf",
+        "sha256": "bbeb23685fba75904fcad8169c07a694bd70044b6f446242659bf54b915f8240",
+        "bytes": 4932
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/reticle/reticle.gltf",
+        "sha256": "65c94ff4ab478b4222728e0eff4321f422b5a6693ca0ce9caf9b3f8c330600b6",
+        "bytes": 3774
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/sunflower/sunflower.bin",
+        "sha256": "abce43943ead1e3a939911dac5d6d8fafbb5a848809f2fd5b0ebe6bbc31d70b7",
+        "bytes": 23928
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/reticle/reticle.bin",
+        "sha256": "e75e72160bec85b8ed4918a493128a669b4b992fe6621b9fb9b8bc84c18bd022",
+        "bytes": 5364
+      },
+      {
+        "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/sunflower/PUSHILIN_sunflower.png",
+        "sha256": "c24d604944d888414071163527fdbb1ae3730a3c60c32648acf3b2f52aec7c75",
+        "bytes": 159079
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/webxr_ar_hittest.html",
+        "sha256": "27dce6b4854c673e4ee2c794b7567383058b504a6b43fce3377d38a28a536351",
+        "bytes": 4312
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/ARButton.js",
+        "sha256": "ee83c9c0ee1add5f4ebe14fb192fa31e603e98de6cce83a246fbf81407387401",
+        "bytes": 5485
+      }
+    ],
+    "browserFetches": [
+      {
+        "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/motion-controllers@1.0/dist/motion-controllers.module.js",
+        "status": 200,
+        "mimeType": "application/javascript;charset=utf-8",
+        "bytes": 0,
+        "etag": "W/\"c03-58f3016463d76407\""
+      },
+      {
+        "url": "https://fonts.gstatic.com/s/karla/v5/Zi_e6rBgGqv33BWF8WTq8g.woff2",
+        "status": 200,
+        "mimeType": "font/woff2",
+        "bytes": 7071
+      },
+      {
+        "url": "https://cdn.skypack.dev/@dimforge/rapier3d-compat@0.17.3",
+        "status": 200,
+        "mimeType": "application/javascript;charset=utf-8",
+        "bytes": 1600,
+        "etag": "W/\"3c2-HlkYWQulO95HD/G3IcJV1CRByv8\""
+      },
+      {
+        "url": "https://cdn.skypack.dev/-/@dimforge/rapier3d-compat@v0.17.3-FUCSrNAHwqhNthXm5MIq/dist=es2019,mode=imports/optimized/@dimforge/rapier3d-compat.js",
+        "status": 200,
+        "mimeType": "application/javascript;charset=utf-8",
+        "bytes": 893835,
+        "etag": "W/\"2556fd-esQlmEFanfZv8/7IxOUxef5J7bI\""
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/profilesList.json",
+        "status": 200,
+        "mimeType": "application/json;charset=utf-8",
+        "bytes": 0,
+        "etag": "W/\"1b1-17e38ce62a4bdd7d\""
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/profile.json",
+        "status": 200,
+        "mimeType": "application/json;charset=utf-8",
+        "bytes": 0,
+        "etag": "W/\"262-013cac8de42b2515\""
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/left.glb",
+        "status": 200,
+        "mimeType": "model/gltf-binary",
+        "bytes": 163259,
+        "etag": "W/\"27954-be269cbd91c50fee\""
+      },
+      {
+        "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/meta-quest-touch-plus/right.glb",
+        "status": 200,
+        "mimeType": "model/gltf-binary",
+        "bytes": 160521,
+        "etag": "W/\"26ea4-de6817a7592073f0\""
+      }
+    ],
+    "completedAt": "2026-10-23T21:31:40.211Z"
+  },
+  "chromiumLifetimeRegression": [
+    {
+      "browser": "156.0.8078.4",
+      "deviceKey": "Meta Quest 3",
+      "questMode": "immersive-vr",
+      "frames": 388,
+      "workerSuspension": "passed",
+      "unload": "passed"
+    },
+    {
+      "browser": "156.0.8078.4",
+      "deviceKey": "Meta Quest 3",
+      "questMode": "immersive-ar",
+      "frames": 305,
+      "workerSuspension": "passed",
+      "unload": "passed"
+    },
+    {
+      "browser": "156.0.8078.4",
+      "deviceKey": "Generic Android Phone (ARCore)",
+      "questMode": "immersive-ar",
+      "frames": 170,
+      "workerSuspension": "passed",
+      "unload": "passed"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "docs/validation/issue-37/firefox-quest-vr-sample.png",
+      "sha256": "db13184f5b8094592ac160e1cf58ae886a7515e698b4d7396ba939129681f560",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/validation/issue-37/firefox-quest-vr-three.png",
+      "sha256": "ba2524fbf93aaec16e28882f065b0066ecfefceff4a7dd2a2092fae38fd1be64",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/validation/issue-37/firefox-quest-mr-sample.png",
+      "sha256": "4130f94fcb88c4802f3cd77e7fe9013cc93eb7f81d72297e89c9454f84413142",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/validation/issue-37/firefox-quest-mr-three.png",
+      "sha256": "b8dcc347094667f62e30d6a202ed27ca2b1147f08c1074ddc25ee6bf8fcd58e6",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/validation/issue-37/firefox-android-ar-sample.png",
+      "sha256": "b1c2abe6376d694dd97b85085259cc61b660e3f50fdbc00724f25e7576547909",
+      "visuallyInspected": true
+    },
+    {
+      "path": "docs/validation/issue-37/firefox-android-ar-three.png",
+      "sha256": "89d23ee4c07c0cfda78092c576b4c1ce0fc02ad1f73b752227e814a14f556aa0",
+      "visuallyInspected": true
+    }
+  ],
+  "sourceHashes": {
+    "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+    "manifest.json": "1540d94df185c2e13437f56f517bd19f69e796fa3655c51178be723e60782712",
+    "build/firefox/manifest.json": "bd83eba1e3f9005cc829ccf171e8f2dc9e6abdd1c039b2746053330955b10264",
+    "src/extension/main-world.ts": "5a8701cfa4106e0179db082be22800060ede2300ee85064a493c8cc549707d9a",
+    "src/extension/content-script.ts": "cd85358fd11bec784da7647881ed07d5b87b163b622b233ba33b3453b5a0f05b",
+    "src/types/contracts.ts": "76eb91bf86d8b3cd2774bbf19b380371b1d295bbeb5f5623c5b3d351590f552a",
+    "dist/extension/main-world.js": "389287952b0c0f884d1726c387dd36276c850ee59df51d357d2ff7d004b56ab2",
+    "dist/extension/content-script.js": "d05c9f920ba46630d486e72381f3b9c0ac602244d3f5a8f01b16e72a81b53fd6",
+    "tests/firefox.ts": "59ae30d50ccb5027a1845ebbfc2ef299a960438a2ea3ac06e189c4bbfee039a1",
+    "tests/firefox-driver.ts": "343cb76bd8014d368f89518413e6e0560bf426327ef1b4a658db7c39eb9dc363",
+    "tests/firefox-contract.ts": "d352c35bda224d8353b6dadde89c6de946b22e7877de0fb03443f5e7b7328a1e",
+    "tests/firefox-upstream.ts": "6c7d3364cfa2b3e4ac3a3f58181b0d60548fe8dbcf4b8c3ded2df787bcfc2f01",
+    "tests/firefox-observation.ts": "ff8b1dfd9a640393b5df97f0131d07f047c3c05f42bfc18518b919cbcd7e6844",
+    "tests/firefox-scenes.js": "375b5b68b93860fba25b79868ae19d315b7788bd60402c7d42855d8e85b595b4",
+    "tests/extension-lifetime.ts": "8440867e82a4492147b34cd781ebae31c073f3f6335d586cade3ad22f13524c7",
+    "assets/hall_empty.glb": "6015b860cbe8fc2cf777bc3a20bc1ce69a2f639b84aa9b3de2c0039dc6a29e40",
+    "src/devices.json": "4244afd5cbdd443405455e7b19e98f768d82444356dce158a7afecf91513fcc7",
+    "polyfill/webxr-polyfill.js": "273c09edfa3ab2af5b3a920f4c3d0e0df79d1318a1f00760acabfdf578a8fc7c",
+    "dist/app/panel.js": "d35cbadc59959301f9e8555f2dbc3db73e35f1adace211fe5898a688b13c6ac1",
+    "dist/extension/background.js": "ef55018540e6e789949774dd440047d67dcebf4506ae36ec0778ead2fa679069"
+  },
+  "provenancePolicy": "Local upstream bytes are served unchanged and hashed, including cached pinned resources. Browser-external dependencies/assets are recorded from actual BiDi network response events with URL/status/MIME/ETag, not claimed to be content-hashed or rewritten. No browser dependency or asset source is substituted.",
+  "historicalFailures": [
+    "Issue #5: Playwright Firefox 157 timed out at about:debugging before installation; not a runtime pass.",
+    "Exploratory geckodriver control of cached Playwright Firefox emitted Juggler errors. Final browser is the selected official Firefox archive.",
+    "Exploratory remote actor/resource/file observer routes failed. Final route uses the genuine panel Marionette actor and a disclosed test-only process-script observer.",
+    "Harness corrections: absent default storage key, cross-realm ArrayBuffer instanceof, sandbox module instance isolation, required right-button phone interaction, compositor-internal viewer-relative pose observation, observer serialization helpers and matching the actual phone control rather than the observer camera.",
+    "Initial direct source-texel comparison failed on phone minification. Final evidence retains raw differences, measures resampled foreground contrast against neighboring room pixels and includes presented screenshots; MR exact opaque-texel checks remain.",
+    "Before the production lifetime fix, Firefox uninstall left active presentation running. The final MAIN-world bridge watchdog passes unload and Chromium worker-suspension regressions.",
+    "The targeted Chromium harness initially treated chrome-extension URL.origin as an HTTP origin; corrected to protocol/host before the passing run.",
+    "Intermediate TypeScript/harness assertion failures were corrected before the final build and focused runner; failed acceptance attempts used cleanup and left no owned browser/profile."
+  ],
+  "warnings": {
+    "applicationWarningsPreservedInExecution": true,
+    "applicationErrors": 0,
+    "driverDiagnostics": [
+      "Firefox privileged UI/RemoteAgent emitted its own Realm/WeakMap/DevToolsProcess shutdown diagnostics.",
+      "The test-only data-URI process observer emits an unsafe-filename diagnostic while the real panel observation still executes. This is not production injection or an application error."
+    ]
+  },
+  "skips": [],
+  "unperformed": [
+    "Other Firefox releases and operating systems",
+    "Physical Quest/Android hardware",
+    "Broader official applications required by the parent goal",
+    "Full WPT/IDL/permissions conformance",
+    "Deferred modules listed in docs/webxr-conformance.md",
+    "No additional generic Chromium suite rerun or independent AI re-review"
+  ],
+  "requiredPostMergeVerification": [],
+  "tools": {
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "playwrightForChromiumRegression": "1.64.0"
+  }
+}

@@ -52,20 +52,12 @@ chrome.runtime.onMessage.addListener((envelope: RuntimeMessage) => {
   }
 });
 
-// A reloaded/disabled extension invalidates its old isolated context, while the
-// page's MAIN-world renderer can remain alive. Checking the local runtime ID
-// needs no worker ping/keepalive and does not treat worker suspension as reload.
-let contextWatch = 0;
-window.addEventListener('device-enter-immersive', () => {
-  window.clearInterval(contextWatch);
-  contextWatch = window.setInterval(() => {
-    if (chrome.runtime?.id) return;
-    window.clearInterval(contextWatch);
-    dispatchCustomEvent('webxr-exit-immersive', {});
-  }, 1000);
+// MAIN owns the active-session lifetime timer. Firefox destroys isolated-world
+// timers/listeners on unload, so an isolated timer cannot detect its own removal.
+// This synchronous reply uses no worker ping, port or background keepalive.
+window.addEventListener('webxr-extension-check', () => {
+  if (chrome.runtime?.id) dispatchCustomEvent('webxr-extension-alive', {});
 });
-window.addEventListener('device-leave-immersive', () => window.clearInterval(contextWatch));
-window.addEventListener('pagehide', () => window.clearInterval(contextWatch));
 
 // Set up listeners for events coming from EmulatedXRDevice.
 // Transfer to panel via background.
