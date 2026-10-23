@@ -159,6 +159,7 @@ export class XRSession extends interfaceBrands.SessionObject {
   private presentationChanged = false;
   private activeRenderState: XRRenderState;
   private endedValue = false;
+  private pendingReferenceRequests = new Set<() => void>();
   private visibility: 'visible' | 'visible-blurred' | 'hidden' = document.hidden ? 'hidden' : 'visible';
   private sources: readonly XRInputSource[] = Object.freeze([]);
   private readonly inputSourceArray = new XRInputSourceArray(() => this.sources);
@@ -203,14 +204,31 @@ export class XRSession extends interfaceBrands.SessionObject {
     // Capture this injection's constructors, Promise and task queue. Borrowed
     // operations must allocate in the session's relevant realm (Device §6.2).
     interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
+      let settled = false;
+      let task: ReturnType<typeof setTimeout> | undefined;
+      const settle = (action: () => void) => {
+        if (settled) return;
+        settled = true;
+        if (task !== undefined) clearTimeout(task);
+        this.pendingReferenceRequests.delete(cancel);
+        try { action(); } catch (error) { reject(error); }
+      };
+      const cancel = () => settle(() => reject(new DOMException('The session has ended.', 'InvalidStateError')));
+      // Binding conversion has completed. A shutdown during coercion precedes
+      // this Promise, so only requests created before shutdown are cancellable.
+      if (!this.ended) this.pendingReferenceRequests.add(cancel);
+      const queue = (action: () => void) => {
+        if (settled) return; // Ignore delayed adapter success/failure after cancellation.
+        task = setTimeout(() => settle(action), 0);
+      };
       if (!enabled.has(type)) {
-        setTimeout(() => reject(new DOMException(`Reference space ${type} was not enabled.`, 'NotSupportedError')), 0);
+        queue(() => reject(new DOMException(`Reference space ${type} was not enabled.`, 'NotSupportedError')));
         return;
       }
-      const ready = type === 'viewer' ? Promise.resolve(null) : _device.requestFrameOfReferenceTransform(type, undefined);
-      void ready.then(inverse => {
-        setTimeout(() => {
-          try {
+      try {
+        const ready = type === 'viewer' ? Promise.resolve(null) : _device.requestFrameOfReferenceTransform(type, undefined);
+        void ready.then(inverse => {
+          queue(() => {
             if (type === 'viewer') {
               resolve(new XRReferenceSpace(this, type, () => mat4.clone(_device.getBasePoseMatrix())));
             } else {
@@ -219,9 +237,9 @@ export class XRSession extends interfaceBrands.SessionObject {
                 ? new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA)
                 : new XRReferenceSpace(this, type, () => world));
             }
-          } catch (error) { reject(error); }
-        }, 0);
-      }, error => { setTimeout(() => reject(error), 0); });
+          });
+        }, error => { queue(() => reject(error)); });
+      } catch (error) { queue(() => reject(error)); }
     }));
     for (const type of inputEvents) {
       const listener = (detail: InputSignal) => { if (detail.sessionId === _id) this.signals.push({type, source: detail.inputSource}); };
@@ -330,6 +348,7 @@ export class XRSession extends interfaceBrands.SessionObject {
     if (this.ended) return;
     this.overlay?.dispose(); this.overlay = null;
     this.endedValue = true;
+    for (const cancel of this.pendingReferenceRequests) cancel();
     for (const layer of this._webglLayers) layer._dispose();
     this._device.cancelAnimationFrame(this.frameHandle);
     for (const [type, listener] of this.listeners) this._device.removeEventListener(type, listener);

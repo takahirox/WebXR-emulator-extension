@@ -1,0 +1,502 @@
+{
+  "issue": 41,
+  "issue_url": "https://github.com/takahirox/WebXR-emulator-extension/issues/41",
+  "status": "passed",
+  "date": "2026-10-24",
+  "evaluation_baseline": "938adc9e5acd7d164c394fc27dbbc89593adbda3",
+  "tested_worktree_base": "fb2b594db4956360a94d834728f55f064b0d0eef",
+  "revision_note": "Final implementation, tests and generated bundle were built and exercised in the assigned worktree before committing this record. SHA-256 values identify validated bytes. No push, PR, merge or GitHub comment was performed.",
+  "execution_owner": "Coordinator in this worktree; no subagents or independent AI re-review",
+  "requirement_correction": {
+    "original_assumption": "Every request on an ended session must reject with InvalidStateError.",
+    "previous_correction_and_error": "Issues #39/#40 correctly removed a blanket ended gate but incorrectly extended support-based settlement to requests already pending at shutdown.",
+    "corrected_requirement": "Shutdown rejects outstanding reference-space promises, granted and ungranted, with InvalidStateError; end() promises retain their lifecycle. Already settled outcomes remain unchanged. Separately initiated post-shutdown requests retain support-based task settlement. Argument conversion precedes creation/registration of the new Promise, including when coercion shuts down the session.",
+    "primary_reference": "https://www.w3.org/TR/2026/CRD-webxr-20260609/#xrsession-interface",
+    "supporting_references": [
+      "https://www.w3.org/TR/2026/CRD-webxr-20260609/#dom-xrsession-requestreferencespace",
+      "https://www.w3.org/TR/2026/CRD-webxr-20260609/#xrreferencespace-interface"
+    ],
+    "rationale": "The absence of an ended gate in request/support algorithms does not override the separate shutdown requirement. Cancelled startup continuations must not allocate spaces or resume disposed presentation/input.",
+    "historical_report": "docs/webxr-reference-space-validation-2026-10-24.json",
+    "historical_note": "Original historical results are unchanged except for an explicit correction reference. Their 995 assertions per browser included incorrect pending-at-end expectations and do not validate this correction."
+  },
+  "environment": {
+    "os": "macOS 26.6.2 (25G83)",
+    "architecture": "arm64",
+    "node": "v24.12.0",
+    "npm": "11.6.2",
+    "typescript": "5.9.3",
+    "tsx": "4.23.15",
+    "playwright": "1.64.0",
+    "rollup": "4.64.6",
+    "gl-matrix": "3.4.4",
+    "three": "0.186.1"
+  },
+  "commands": [
+    {
+      "command": "npm ci",
+      "exit_code": 0,
+      "result": "54 locked packages installed; zero reported vulnerabilities; no dependency changes"
+    },
+    {
+      "command": "npm run build:firefox",
+      "exit_code": 0,
+      "result": "Typecheck, TypeScript emission, root extension/panel/polyfill bundling and Firefox packaging passed"
+    },
+    {
+      "command": "npm run test:reference-space:chromium",
+      "exit_code": 0,
+      "result": "5 scenarios; 1160 assertions; no failures, skips or page runtime errors"
+    },
+    {
+      "command": "WEBXR_FIREFOX_EXECUTABLE=<worktree>/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox WEBXR_GECKODRIVER=<worktree>/test-results/browser-tools/geckodriver npm run test:reference-space:firefox",
+      "exit_code": 0,
+      "result": "5 scenarios; 1160 assertions; no failures, skips or application error logs"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "Passed; checked again after creating this record, with the staged diff also checked"
+    }
+  ],
+  "browsers": {
+    "chromium": {
+      "status": "passed",
+      "startedAt": "2026-10-23T22:39:07.748Z",
+      "completedAt": "2026-10-23T22:39:17.700Z",
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "distribution": "Playwright Chromium revision 1248; headed fresh profile; --enable-unsafe-swiftshader",
+      "total_assertions": 1160,
+      "scenarios": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "immersive-vr",
+          "assertions": 256,
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "failures": [],
+          "skips": [],
+          "errors": []
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 256,
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "failures": [],
+          "skips": [],
+          "errors": []
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 256,
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "failures": [],
+          "skips": [],
+          "errors": []
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "inline",
+          "assertions": 196,
+          "positions": [],
+          "failures": [],
+          "skips": [],
+          "errors": []
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "inline",
+          "assertions": 196,
+          "positions": [],
+          "failures": [],
+          "skips": [],
+          "errors": []
+        }
+      ],
+      "failures": [],
+      "skips": [],
+      "cleanup": {
+        "contextClosed": true,
+        "profileRemoved": true
+      },
+      "local_report": "test-results/reference-space-chromium.json",
+      "local_report_sha256": "4ea936f953c30e1cd7caafcaad8f1501a87102e496ed1d58729dc7530ad17eb9"
+    },
+    "firefox": {
+      "status": "passed",
+      "startedAt": "2026-10-23T22:39:06.572Z",
+      "completedAt": "2026-10-23T22:40:24.878Z",
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "distribution": "Official Mozilla Firefox 157.0 macOS en-US; official geckodriver 0.37.1 macOS aarch64; fresh profile",
+      "total_assertions": 1160,
+      "scenarios": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "assertions": 256,
+          "failures": [],
+          "mode": "immersive-vr",
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "skips": [],
+          "errors": []
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "assertions": 256,
+          "failures": [],
+          "mode": "immersive-ar",
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "skips": [],
+          "errors": []
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "assertions": 256,
+          "failures": [],
+          "mode": "immersive-ar",
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "skips": [],
+          "errors": []
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "assertions": 196,
+          "failures": [],
+          "mode": "inline",
+          "positions": [],
+          "skips": [],
+          "errors": []
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "assertions": 196,
+          "failures": [],
+          "mode": "inline",
+          "positions": [],
+          "skips": [],
+          "errors": []
+        }
+      ],
+      "failures": [],
+      "skips": [],
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      },
+      "local_report": "test-results/reference-space-firefox.json",
+      "local_report_sha256": "0a203cf115d44e1c59552d3509eb704a1cc1201de08dcf92eaa6c06ae165fb70"
+    }
+  },
+  "instrumentation": [
+    "Inspect session pendingReferenceRequests sizes for release; access _device/_id only for targeted races.",
+    "Temporarily replace adapter transform method with controlled Promises; restore in finally.",
+    "Capture real timer callbacks through calling-task microtasks; restore timers, shut down, then replay cancelled callbacks.",
+    "Proxy transform matrix counts numeric allocation reads; count timer calls from late adapter continuations.",
+    "Call real device endSession; inline additionally emits its presentation-end notification because it has no presentation."
+  ],
+  "instrumentation_scope": "Real installed extension, actual DevTools panel and activation clicks in every scenario. No native fake-device service or manual polyfill injection. Transform delay/success/failure races apply to the three immersive scenarios; viewer-only inline cannot enter the non-viewer transform adapter. Inline device shutdown explicitly emits the adapter presentation-end notification after endSession because inline has no presentation. Other inline cancellation races are executed. Existing pose bridge drives geometry assertions.",
+  "browser_tools": {
+    "firefox_download": "https://archive.mozilla.org/pub/firefox/releases/157.0/mac/en-US/Firefox%20157.0.dmg",
+    "firefox_dmg_sha256": "df6d8c79b6126bcf24cb70ebab9371916a662028e2d706e462d432e78fdf396c",
+    "geckodriver_download": "https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-macos-aarch64.tar.gz",
+    "geckodriver_archive_sha256": "d02b3f7003f999caf90974a2ef5da0286c05d01cee19112c86846d759fdba4f5",
+    "note": "Downloaded into ignored local test-results; disk image detached after copying the owned application; all browser sessions and temporary profiles cleaned up."
+  },
+  "source_and_bundle_sha256": {
+    "src/polyfill/api/runtime.ts": "39b3c31a6533587ed93a32e61e3d24714575228c1d3fb71307b5b4fb06c9ec94",
+    "src/polyfill/api/interface-brand.ts": "7389f11759eb2ee38bcf01a7a34efc7d281352ad71237dc72d0ec11fd6a90eb9",
+    "src/polyfill/api/geometry.ts": "cba53b618856cc6f3281f9cb8b3c0de2accec6993b806086a3ec028b46069abb",
+    "src/polyfill/EmulatedXRDevice.ts": "32287d2242ac79c58176cb0c9c146568dfada82d40eb3c4959c53e100e7b8d5b",
+    "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+    "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+    "tests/reference-space-browser.ts": "f27dbc569afcc631b942f76d1c6078812797e30fc35560fda90f2583f04a5e21",
+    "polyfill/webxr-polyfill.js": "abf52a97eee23cfb2b23de4301877b173e5b723734abc51a69d2edae672658ce",
+    "build/firefox/polyfill/webxr-polyfill.js": "abf52a97eee23cfb2b23de4301877b173e5b723734abc51a69d2edae672658ce",
+    "package.json": "f2b2a687c51be289dffcb9b09469012f233ea42d300d1c9e1979674a678b7bf5",
+    "tsconfig.json": "c17a6aeb98df9c3cdf9ff753435c767cbf15bcc202502e6ae3f67fb8a7f8d33e",
+    "build.ts": "87dee5f5acf79f860967347b1929c8253f2d41dae1afda94aa510cc47e6b8dca",
+    "build-firefox.ts": "dee45f42d1e0542257d86c813d076f4e9cc8745094d31d19084ae6c393c5a0e6",
+    "manifest.json": "1540d94df185c2e13437f56f517bd19f69e796fa3655c51178be723e60782712",
+    "tests/firefox-driver.ts": "343cb76bd8014d368f89518413e6e0560bf426327ef1b4a658db7c39eb9dc363",
+    "tests/firefox-contract.ts": "d352c35bda224d8353b6dadde89c6de946b22e7877de0fb03443f5e7b7328a1e",
+    "tests/firefox-upstream.ts": "6c7d3364cfa2b3e4ac3a3f58181b0d60548fe8dbcf4b8c3ded2df787bcfc2f01",
+    "tests/cdp-target.ts": "4f6030268765d569a68edd45d5654fd1627dc7c1b0989f6e8c4928ce7b9ccd0e",
+    "build/firefox/manifest.json": "bd83eba1e3f9005cc829ccf171e8f2dc9e6abdd1c039b2746053330955b10264",
+    "dist/extension/main-world.js": "389287952b0c0f884d1726c387dd36276c850ee59df51d357d2ff7d004b56ab2",
+    "dist/extension/content-script.js": "d05c9f920ba46630d486e72381f3b9c0ac602244d3f5a8f01b16e72a81b53fd6",
+    "dist/extension/background.js": "ef55018540e6e789949774dd440047d67dcebf4506ae36ec0778ead2fa679069",
+    "dist/extension/devtools.js": "f2b55f48936235bcec083b53c78fb6c901599463dd334ff41c2e57ee8d883ec6",
+    "dist/app/panel.js": "d35cbadc59959301f9e8555f2dbc3db73e35f1adace211fe5898a688b13c6ac1"
+  },
+  "executed_assertion_labels": [
+    "WebIDL operation descriptor",
+    "operation name and required arity",
+    "invalid receiver: returns Promise",
+    "invalid receiver: rejection preserved",
+    "invalid receiver before missing argument: returns Promise",
+    "invalid receiver before missing argument: rejection preserved",
+    "receiver brand precedes conversion without property access",
+    "same-origin popup opened",
+    "realm 0: Promise belongs to session realm",
+    "realm 0: borrowed allocation belongs to session realm",
+    "realm 0: offset remains independently usable",
+    "Proxy around genuine session rejected: returns Promise",
+    "Proxy around genuine session rejected: rejection preserved",
+    "realm 0: pending borrowed Promise realm",
+    "realm 0: borrowed cancellation uses owning realm",
+    "realm 0: shutdown does not cancel another session",
+    "realm 1: Promise belongs to session realm",
+    "realm 1: borrowed allocation belongs to session realm",
+    "realm 1: offset remains independently usable",
+    "realm 1: pending borrowed Promise realm",
+    "realm 1: borrowed cancellation uses owning realm",
+    "realm 1: shutdown does not cancel another session",
+    "realm 2: Promise belongs to session realm",
+    "realm 2: borrowed allocation belongs to session realm",
+    "realm 2: offset remains independently usable",
+    "realm 2: pending borrowed Promise realm",
+    "realm 2: borrowed cancellation uses owning realm",
+    "realm 2: shutdown does not cancel another session",
+    "default grants preserved",
+    "viewer: support/allocation remains pending through calling-task microtasks",
+    "viewer: default support result",
+    "local: support/allocation remains pending through calling-task microtasks",
+    "local: default support result",
+    "local-floor: support/allocation remains pending through calling-task microtasks",
+    "local-floor: default support result",
+    "bounded-floor: support/allocation remains pending through calling-task microtasks",
+    "bounded-floor: default support result",
+    "unbounded: support/allocation remains pending through calling-task microtasks",
+    "unbounded: default support result",
+    "binding failure settles in calling-task microtasks",
+    "thrown coercion value: returns Promise",
+    "thrown coercion value: rejection preserved",
+    "throwing conversion occurs once",
+    "enum uses string hint",
+    "enum conversion occurs once synchronously",
+    "coercible object and boxed string produce fresh spaces",
+    "queued work retains converted enum",
+    "settlement releases successful and unsupported pending records",
+    "immediate shutdown cancels granted and ungranted requests before adapter continuations",
+    "shutdown preserves previously settled success and failure",
+    "ended binding error precedes support: returns Promise",
+    "ended binding error precedes support: rejection preserved",
+    "ended ungranted support: returns Promise",
+    "ended ungranted support: rejection preserved",
+    "unrelated repeated-end gate retained: returns Promise",
+    "unrelated repeated-end gate retained: rejection preserved",
+    "viewer: coercion shutdown precedes new pending registration",
+    "viewer: coercion shutdown cancels older request",
+    "viewer: post-coercion promise retains binding/support result",
+    "bounded-floor: coercion shutdown precedes new pending registration",
+    "bounded-floor: coercion shutdown cancels older request",
+    "bounded-floor: post-coercion promise retains binding/support result",
+    "invalid: coercion shutdown precedes new pending registration",
+    "invalid: coercion shutdown cancels older request",
+    "invalid: post-coercion promise retains binding/support result",
+    "throw: coercion shutdown precedes new pending registration",
+    "throw: coercion shutdown cancels older request",
+    "throw: post-coercion promise retains binding/support result",
+    "viewer: required/default grant works",
+    "local: required/default grant works",
+    "local-floor: required/default grant works",
+    "bounded-floor: required/default grant works",
+    "unbounded: required/default grant works",
+    "unavailable optional feature omitted",
+    "inline optional local/floor/bounded/unbounded remain omitted",
+    "viewer: fresh concurrent and sequential identities with correct subclass",
+    "viewer: borrowed Promise realm",
+    "viewer: borrowed main-session allocation realm",
+    "local: fresh concurrent and sequential identities with correct subclass",
+    "local: borrowed Promise realm",
+    "local: borrowed main-session allocation realm",
+    "local-floor: fresh concurrent and sequential identities with correct subclass",
+    "local-floor: borrowed Promise realm",
+    "local-floor: borrowed main-session allocation realm",
+    "bounded-floor: fresh concurrent and sequential identities with correct subclass",
+    "bounded-floor: borrowed Promise realm",
+    "bounded-floor: borrowed main-session allocation realm",
+    "unbounded: fresh concurrent and sequential identities with correct subclass",
+    "unbounded: borrowed Promise realm",
+    "unbounded: borrowed main-session allocation realm",
+    "live presentation exposes expected framebuffer before disposal",
+    "fresh viewer pose remains identity after movement",
+    "independent viewer origins agree",
+    "rotated successive offsets compose independently",
+    "second viewer offset remains independent",
+    "active frame rejects foreign source",
+    "active frame rejects foreign base",
+    "fresh viewer follows virtual world movement",
+    "local and floor origins preserved",
+    "unbounded retains fixed local origin through distant navigation",
+    "fresh bounded geometry frozen",
+    "fresh bounded polygon retains authored vertices",
+    "bounded and floor origins agree",
+    "inactive same-session frame rejected separately",
+    "all non-delayed outcomes queued before shutdown",
+    "every concurrent request registered to owning session",
+    "shutdown rejection reactions observed for all pending outcomes",
+    "shutdown releases all pending operation records",
+    "cancelled adapter continuations queue no settlement tasks",
+    "cancelled queued and delayed adapter success never reads allocation matrix",
+    "concurrent other-session request survives immersive or inline shutdown",
+    "after-end requests still queue task settlement",
+    "viewer: after-end support and fresh allocation",
+    "local: after-end support and fresh allocation",
+    "local-floor: after-end support and fresh allocation",
+    "bounded-floor: after-end support and fresh allocation",
+    "unbounded: after-end support and fresh allocation",
+    "requests neither restart callbacks/input nor duplicate shutdown",
+    "all observed requests settle once",
+    "settlement does not recreate presentation canvases or disposed framebuffers",
+    "ended rendering cannot resume",
+    "ended frame gate preserved",
+    "device-driven shutdown cancels owning session requests",
+    "device-driven shutdown releases pending records",
+    "device-driven shutdown retains repeated end gate: returns Promise",
+    "device-driven shutdown retains repeated end gate: rejection preserved",
+    "post-device-shutdown request still follows support",
+    "inline required local remains unavailable: returns Promise",
+    "inline required local remains unavailable: rejection preserved",
+    "local: optional omission rejects: returns Promise",
+    "local: optional omission rejects: rejection preserved",
+    "local-floor: optional omission rejects: returns Promise",
+    "local-floor: optional omission rejects: rejection preserved",
+    "bounded-floor: optional omission rejects: returns Promise",
+    "bounded-floor: optional omission rejects: rejection preserved",
+    "unbounded: optional omission rejects: returns Promise",
+    "unbounded: optional omission rejects: rejection preserved"
+  ],
+  "failures": [],
+  "skips": [],
+  "execution_notes": [
+    "Initial required build and Chromium run passed with 1160 assertions. After adding provenance/instrumentation reporting, the final build and both browser scripts passed. No runtime or harness failures required retries."
+  ],
+  "unperformed_checks": [
+    "No generic application rerun or independent AI re-review, as scoped by Issue #41. No native-browser conformance or physical Quest/Android certification claimed."
+  ],
+  "required_post_merge_verification": "None"
+}

@@ -26289,6 +26289,7 @@ void main() {
           this.presentation = null;
           this.presentationChanged = false;
           this.endedValue = false;
+          this.pendingReferenceRequests = new Set();
           this.visibility = document.hidden ? 'hidden' : 'visible';
           this.sources = Object.freeze([]);
           this.inputSourceArray = new XRInputSourceArray(() => this.sources);
@@ -26437,14 +26438,38 @@ void main() {
           this.activeRenderState = new XRRenderState({ inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null });
           this._viewer = new XRReferenceSpace(this, 'viewer', () => clone$1(_device.getBasePoseMatrix()));
           interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
+              let settled = false;
+              let task;
+              const settle = (action) => {
+                  if (settled)
+                      return;
+                  settled = true;
+                  if (task !== undefined)
+                      clearTimeout(task);
+                  this.pendingReferenceRequests.delete(cancel);
+                  try {
+                      action();
+                  }
+                  catch (error) {
+                      reject(error);
+                  }
+              };
+              const cancel = () => settle(() => reject(new DOMException('The session has ended.', 'InvalidStateError')));
+              if (!this.ended)
+                  this.pendingReferenceRequests.add(cancel);
+              const queue = (action) => {
+                  if (settled)
+                      return;
+                  task = setTimeout(() => settle(action), 0);
+              };
               if (!enabled.has(type)) {
-                  setTimeout(() => reject(new DOMException(`Reference space ${type} was not enabled.`, 'NotSupportedError')), 0);
+                  queue(() => reject(new DOMException(`Reference space ${type} was not enabled.`, 'NotSupportedError')));
                   return;
               }
-              const ready = type === 'viewer' ? Promise.resolve(null) : _device.requestFrameOfReferenceTransform(type, undefined);
-              void ready.then(inverse => {
-                  setTimeout(() => {
-                      try {
+              try {
+                  const ready = type === 'viewer' ? Promise.resolve(null) : _device.requestFrameOfReferenceTransform(type, undefined);
+                  void ready.then(inverse => {
+                      queue(() => {
                           if (type === 'viewer') {
                               resolve(new XRReferenceSpace(this, type, () => clone$1(_device.getBasePoseMatrix())));
                           }
@@ -26454,12 +26479,12 @@ void main() {
                                   ? new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA)
                                   : new XRReferenceSpace(this, type, () => world));
                           }
-                      }
-                      catch (error) {
-                          reject(error);
-                      }
-                  }, 0);
-              }, error => { setTimeout(() => reject(error), 0); });
+                      });
+                  }, error => { queue(() => reject(error)); });
+              }
+              catch (error) {
+                  queue(() => reject(error));
+              }
           }));
           for (const type of inputEvents) {
               const listener = (detail) => { if (detail.sessionId === _id)
@@ -26605,6 +26630,8 @@ void main() {
           (_a = this.overlay) === null || _a === void 0 ? void 0 : _a.dispose();
           this.overlay = null;
           this.endedValue = true;
+          for (const cancel of this.pendingReferenceRequests)
+              cancel();
           for (const layer of this._webglLayers)
               layer._dispose();
           this._device.cancelAnimationFrame(this.frameHandle);

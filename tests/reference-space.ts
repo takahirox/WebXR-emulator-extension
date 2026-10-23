@@ -2,7 +2,8 @@ import type {SessionMode} from '../src/types/contracts';
 
 /** Self-contained so both real extension runners execute identical page code.
  * WPT adaptations and deliberate inline-policy differences are documented in
- * docs/webxr-reference-space.md. No fake device or private XR fields are used. */
+ * docs/webxr-reference-space.md. Shutdown races use the narrowly scoped adapter,
+ * timer and pending-record instrumentation disclosed there. */
 export async function referenceSpaceCases(mode: SessionMode) {
   const w = window as any;
   const passed: string[] = [];
@@ -88,8 +89,21 @@ export async function referenceSpaceCases(mode: SessionMode) {
         check(Object.getPrototypeOf(offset) === realm.XRReferenceSpace.prototype && offset !== space, `realm ${index}: offset remains independently usable`);
       }
       await rejection(() => Reflect.apply(request, new Proxy(session, {}), ['viewer']), 'TypeError', 'Proxy around genuine session rejected');
+      const peer = await w.navigator.xr.requestSession('inline'); sessions.push(peer);
+      const peerRequest = observe(peer.requestReferenceSpace('viewer'));
+      const cancelled = ['viewer', 'local'].map(type => {
+        const promise: Promise<any> = Reflect.apply(request, session, [type]);
+        check(Object.getPrototypeOf(promise) === realm.Promise.prototype, `realm ${index}: pending borrowed Promise realm`);
+        return observe(promise);
+      });
+      const ending = session.end();
+      await Promise.all(cancelled.map(p => p.done));
+      check(cancelled.every(p => p.result.count === 1 && p.result.error instanceof realm.DOMException && p.result.error.name === 'InvalidStateError'), `realm ${index}: borrowed cancellation uses owning realm`);
+      await ending; await peerRequest.done;
+      check(peerRequest.result.value instanceof w.XRReferenceSpace && !peer.ended, `realm ${index}: shutdown does not cancel another session`);
+      await peer.end();
     }
-    for (const session of sessions) await session.end();
+    for (const session of sessions) if (!session.ended) await session.end();
     sessions.length = 0;
     // Retain the foreign operations before closing windows; their closures must
     // still allocate main-session objects, including the bounded subclass.
@@ -128,10 +142,36 @@ export async function referenceSpaceCases(mode: SessionMode) {
     const captured = defaults.requestReferenceSpace(delayed);
     delayed.toString = () => { throw new Error('converted argument reread'); };
     check(await captured instanceof w.XRReferenceSpace && lateCalls === 1, 'queued work retains converted enum');
+    const settledSuccess = observe(defaults.requestReferenceSpace('viewer'));
+    const settledFailure = observe(defaults.requestReferenceSpace('bounded-floor'));
+    await Promise.all([settledSuccess.done, settledFailure.done]);
+    const settledSpace = settledSuccess.result.value, settledError = settledFailure.result.error;
+    check(defaults.pendingReferenceRequests.size === 0, 'settlement releases successful and unsupported pending records');
+    const immediate = types.map(type => observe(defaults.requestReferenceSpace(type)));
     await defaults.end();
+    await Promise.all(immediate.map(p => p.done));
+    check(immediate.every(p => p.result.count === 1 && p.result.error?.name === 'InvalidStateError'), 'immediate shutdown cancels granted and ungranted requests before adapter continuations');
+    check(settledSuccess.result.count === 1 && settledSuccess.result.value === settledSpace && settledFailure.result.count === 1 && settledFailure.result.error === settledError && settledError.name === 'NotSupportedError', 'shutdown preserves previously settled success and failure');
     await rejection(() => defaults.requestReferenceSpace(null), 'TypeError', 'ended binding error precedes support');
     await rejection(() => defaults.requestReferenceSpace('bounded-floor'), 'NotSupportedError', 'ended ungranted support');
     await rejection(() => defaults.end(), 'InvalidStateError', 'unrelated repeated-end gate retained');
+
+    for (const conversion of ['viewer', 'bounded-floor', 'invalid', 'throw']) {
+      const converting = await w.navigator.xr.requestSession('inline'); sessions.push(converting);
+      const outstanding = observe(converting.requestReferenceSpace('viewer'));
+      const sentinel = {conversion}; let calls = 0, ending: Promise<void> | undefined;
+      const converted = observe(converting.requestReferenceSpace({toString() {
+        calls++; ending = converting.end();
+        if (conversion === 'throw') throw sentinel;
+        return conversion;
+      }}));
+      check(calls === 1 && converting.ended && converting.pendingReferenceRequests.size === 0, `${conversion}: coercion shutdown precedes new pending registration`);
+      await Promise.all([outstanding.done, converted.done, ending]);
+      check(outstanding.result.error?.name === 'InvalidStateError', `${conversion}: coercion shutdown cancels older request`);
+      check(conversion === 'viewer' ? converted.result.value instanceof w.XRReferenceSpace
+        : conversion === 'throw' ? converted.result.error === sentinel
+        : converted.result.error?.name === (conversion === 'invalid' ? 'TypeError' : 'NotSupportedError'), `${conversion}: post-coercion promise retains binding/support result`);
+    }
 
     if (mode === 'inline') {
       await rejection(() => start(mode, {requiredFeatures: ['local']}), 'NotSupportedError', 'inline required local remains unavailable');
@@ -206,24 +246,68 @@ export async function referenceSpaceCases(mode: SessionMode) {
       });
     }
     throws(() => retained.getPose(viewer[0], viewer[1]), 'inactive same-session frame rejected separately');
-    await foreign.end();
     let callbacks = 0, inputEvents = 0, ends = 0;
     session.addEventListener('end', () => ends++);
     for (const event of ['inputsourceschange','selectstart','select','selectend']) session.addEventListener(event, () => inputEvents++);
     session.requestAnimationFrame(() => callbacks++);
-    const pending = types.map(type => observe(session.requestReferenceSpace(type)));
-    const ending = session.end(); // Occurs before any queued request can settle.
-    await microtasks();
-    check(pending.every(p => p.result.count === 0), 'ending does not settle pending requests in microtasks');
+    // Capture real queued callbacks only through this task's microtasks. Replay
+    // them after cancellation too, so guards are tested even if timers clear.
+    const timer = w.setTimeout;
+    const queued: (() => void)[] = [];
+    const adapter = session._device;
+    const transform = adapter.requestFrameOfReferenceTransform;
+    const late: {resolve: (value: any) => void; reject: (reason: any) => void}[] = [];
+    let matrixReads = 0;
+    const watchedMatrix = new Proxy(identity, {get(target, key, receiver) {
+      if (typeof key === 'string' && /^\d+$/.test(key)) matrixReads++;
+      return Reflect.get(target, key, receiver);
+    }});
+    const pending: ReturnType<typeof observe>[] = [];
+    try {
+      w.setTimeout = (callback: (...args: any[]) => void, delay: number, ...args: any[]) => {
+        queued.push(() => callback(...args));
+        return timer(callback, delay, ...args);
+      };
+      pending.push(...types.map(type => observe(session.requestReferenceSpace(type))));
+      pending.push(...borrowed.map(method => observe(Reflect.apply(method, session, ['viewer']))));
+      if (mode !== 'inline') {
+        adapter.requestFrameOfReferenceTransform = () => new w.Promise((resolve: (value: any) => void, reject: (reason: any) => void) => late.push({resolve, reject}));
+        pending.push(observe(session.requestReferenceSpace('local')), observe(session.requestReferenceSpace('bounded-floor')));
+        adapter.requestFrameOfReferenceTransform = () => w.Promise.resolve(watchedMatrix);
+        pending.push(observe(session.requestReferenceSpace('bounded-floor')));
+        adapter.requestFrameOfReferenceTransform = () => w.Promise.reject(new Error('queued adapter failure'));
+        pending.push(observe(session.requestReferenceSpace('local')));
+      }
+      await microtasks();
+    } finally { w.setTimeout = timer; adapter.requestFrameOfReferenceTransform = transform; }
+    check(queued.length === pending.length - late.length && pending.every(p => p.result.count === 0), 'all non-delayed outcomes queued before shutdown');
+    check(session.pendingReferenceRequests.size === pending.length, 'every concurrent request registered to owning session');
+    const isolated = observe(foreign.requestReferenceSpace('viewer'));
+    const ending = session.end();
+    await Promise.all(pending.map(p => p.done));
+    check(pending.every(p => p.result.count === 1 && p.result.error instanceof w.DOMException && p.result.error.name === 'InvalidStateError'), 'shutdown rejection reactions observed for all pending outcomes');
+    check(session.pendingReferenceRequests.size === 0, 'shutdown releases all pending operation records');
     await ending;
     const endedCanvasCount = document.querySelectorAll('canvas').length;
-    await Promise.all(pending.map(p => p.done));
-    for (const [i, {result}] of pending.entries()) check(result.count === 1 && (session.enabledFeatures.includes(types[i]) ? result.value instanceof w.XRReferenceSpace : result.error?.name === 'NotSupportedError'), `${types[i]}: pending-at-end settles by support exactly once`);
+    queued.forEach(callback => callback());
+    let lateTasks = 0;
+    try {
+      w.setTimeout = (...args: any[]) => { lateTasks++; return Reflect.apply(timer, w, args); };
+      late[0]?.resolve(watchedMatrix); late[1]?.reject(new Error('delayed adapter failure'));
+      await microtasks();
+    } finally { w.setTimeout = timer; }
+    check(lateTasks === 0, 'cancelled adapter continuations queue no settlement tasks');
+    check(matrixReads === 0, 'cancelled queued and delayed adapter success never reads allocation matrix');
+    await isolated.done;
+    check(isolated.result.value instanceof w.XRReferenceSpace && !foreign.ended, 'concurrent other-session request survives immersive or inline shutdown');
+    await foreign.end();
     const after = types.map(type => observe(session.requestReferenceSpace(type)));
     await microtasks();
     check(after.every(p => p.result.count === 0), 'after-end requests still queue task settlement');
     await Promise.all(after.map(p => p.done));
-    for (const [i, {result}] of after.entries()) check(result.count === 1 && (session.enabledFeatures.includes(types[i]) ? result.value instanceof w.XRReferenceSpace && result.value !== pending[i].result.value : result.error?.name === 'NotSupportedError'), `${types[i]}: after-end support and fresh allocation`);
+    for (const [i, {result}] of after.entries()) {
+      check(result.count === 1 && (session.enabledFeatures.includes(types[i]) ? Object.getPrototypeOf(result.value) === (types[i] === 'bounded-floor' ? w.XRBoundedReferenceSpace : w.XRReferenceSpace).prototype && !spaces.get(types[i])!.includes(result.value) : result.error?.name === 'NotSupportedError'), `${types[i]}: after-end support and fresh allocation`);
+    }
     await new Promise(resolve => setTimeout(resolve, 100));
     check(callbacks === 0 && inputEvents === 0 && ends === 1 && session.inputSources.length === 0 && session.requestAnimationFrame(() => callbacks++) === 0, 'requests neither restart callbacks/input nor duplicate shutdown');
     check(pending.every(p => p.result.count === 1) && after.every(p => p.result.count === 1), 'all observed requests settle once');
@@ -232,6 +316,18 @@ export async function referenceSpaceCases(mode: SessionMode) {
     throws(() => retained.getViewerPose(viewer[0]), 'ended frame gate preserved');
     canvas.remove();
     move([0,1.6,0], [0,0,0,1]);
+    // Use the adapter's real termination path. Inline has no presentation-end
+    // notification, so emit that same private notification after ending it.
+    const deviceEnded = await start(mode); sessions.push(deviceEnded);
+    const devicePending = types.map(type => observe(deviceEnded.requestReferenceSpace(type)));
+    const deviceBorrowed = observe(Reflect.apply(borrowed[0], deviceEnded, ['viewer']));
+    deviceEnded._device.endSession(deviceEnded._id);
+    if (mode === 'inline') deviceEnded._device.dispatchEvent('@@webxr-polyfill/vr-present-end', deviceEnded._id);
+    await Promise.all([...devicePending, deviceBorrowed].map(p => p.done));
+    check(deviceEnded.ended && [...devicePending, deviceBorrowed].every(p => p.result.count === 1 && p.result.error?.name === 'InvalidStateError'), 'device-driven shutdown cancels owning session requests');
+    check(deviceEnded.pendingReferenceRequests.size === 0, 'device-driven shutdown releases pending records');
+    await rejection(() => deviceEnded.end(), 'InvalidStateError', 'device-driven shutdown retains repeated end gate');
+    check(await deviceEnded.requestReferenceSpace('viewer') instanceof w.XRReferenceSpace, 'post-device-shutdown request still follows support');
     return {mode, assertions: passed.length, passed, positions, failures: [], skips: []};
   } finally {
     for (const session of sessions) if (!session.ended) await session.end();

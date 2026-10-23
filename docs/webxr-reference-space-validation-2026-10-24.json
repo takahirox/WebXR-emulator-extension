@@ -1,4 +1,9 @@
 {
+  "correction": {
+    "issue": 41,
+    "record": "webxr-reference-space-shutdown-validation-2026-10-24.json",
+    "note": "Historical execution results below are preserved. Their pending-at-end support-based expectations were incorrect: Device CRD 2026-06-09 section 4.1 shutdown rejects outstanding session promises with InvalidStateError, excluding end(). The 995 passes per browser do not validate that correction. Separately initiated post-shutdown support behavior remains applicable."
+  },
   "issue": 39,
   "issue_url": "https://github.com/takahirox/WebXR-emulator-extension/issues/39",
   "status": "passed",
