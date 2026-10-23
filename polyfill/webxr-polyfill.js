@@ -917,6 +917,10 @@ function WebXRPolyfillInjection() {
       Object.freeze(InputSourceObject.prototype);
       Object.freeze(InputSourceObject);
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
+          eventSessions: new WeakMap(),
+          eventInputs: new WeakMap(),
+          eventChanges: new WeakMap(),
+          eventHandlers: new WeakMap(),
           sessions: Object.freeze({ has: (value) => sessions.has(value) }),
           inputSources: Object.freeze({ has: (value) => inputSources.has(value) }),
           frames: Object.freeze({ has: (value) => frames.has(value) }),
@@ -25541,9 +25545,7 @@ void main() {
           throw new TypeError('Invalid XR event receiver.');
       return value;
   }
-  const sessions = new WeakMap();
-  const inputs = new WeakMap();
-  const changes = new WeakMap();
+  const { eventSessions: sessions, eventInputs: inputs, eventChanges: changes } = interfaceBrands;
   class XRSessionEvent extends Event {
       constructor(type, eventInitDict) {
           const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
@@ -25585,7 +25587,7 @@ void main() {
       for (const key of keys)
           Object.defineProperty(prototype, key, { ...Object.getOwnPropertyDescriptor(prototype, key), enumerable: true });
 
-  const handlers = new WeakMap();
+  const handlers = interfaceBrands.eventHandlers;
   const add = EventTarget.prototype.addEventListener;
   const remove = EventTarget.prototype.removeEventListener;
   const preventDefault = Event.prototype.preventDefault;

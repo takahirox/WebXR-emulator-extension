@@ -177,6 +177,63 @@ export async function runEvents(page: Page, mode: SessionMode, handheld: boolean
         const sequence = new w.XRInputSourcesChangeEvent('x', {session, added: iterable, removed: new Set([source])});
         check(iterations === 1 && sequence.added.length === 2 && sequence.removed[0] === source, 'one-shot iterable and Set conversion');
       }
+      function borrowedHandlers(owner: API, borrower: API, target: Runtime.XRSession, label: string) {
+        for (const name of sessionNames) {
+          const key = `on${name}`, order: string[] = [];
+          const own = Object.getOwnPropertyDescriptor(owner.XRSession.prototype, key)!;
+          const borrowed = Object.getOwnPropertyDescriptor(borrower.XRSession.prototype, key)!;
+          const prefix = `${label}.${key}`;
+          const before = () => { order.push('before'); }, after = () => { order.push('after'); };
+          const a = () => { order.push('A'); };
+          const b = function(this: EventTarget, event: Event) {
+            try { context(event, target, this, prefix); order.push('B'); } catch (error) { failures.push(error); }
+          };
+          const dispatch = (expected: string) => {
+            target.dispatchEvent(new owner.Event(name)); clean();
+            check(order.join() === expected, `${prefix}: shared listener order ${expected}`); order.length = 0;
+          };
+          check(own.get!.call(target) === null && borrowed.get!.call(target) === null, `${prefix}: shared initial null`);
+          target.addEventListener(name, before);
+          try {
+            own.set!.call(target, a);
+            target.addEventListener(name, after);
+            check(borrowed.get!.call(target) === a, `${prefix}: borrowed getter retains callback identity`);
+            dispatch('before,A,after');
+            borrowed.set!.call(target, b);
+            check(own.get!.call(target) === b && borrowed.get!.call(target) === b, `${prefix}: borrowed replacement visible to both accessors`);
+            dispatch('before,B,after');
+            const object = {handleEvent() { throw new Error('Must not invoke non-callable property handler'); }};
+            own.set!.call(target, object);
+            check(borrowed.get!.call(target) === object, `${prefix}: shared non-callable object identity`);
+            dispatch('before,after');
+            borrowed.set!.call(target, b); dispatch('before,B,after');
+            borrowed.set!.call(target, null);
+            check(own.get!.call(target) === null && borrowed.get!.call(target) === null, `${prefix}: borrowed null removes shared value`);
+            dispatch('before,after');
+            borrowed.set!.call(target, a); dispatch('before,after,A');
+            own.set!.call(target, b); dispatch('before,after,B');
+            own.set!.call(target, null); dispatch('before,after');
+            for (const fake of [Object.create(owner.XRSession.prototype), new Proxy(target, {})]) {
+              throws(() => borrowed.get!.call(fake), 'TypeError', `${prefix}: borrowed getter rejects forgery/proxy`);
+              throws(() => borrowed.set!.call(fake, a), 'TypeError', `${prefix}: borrowed setter rejects forgery/proxy`);
+            }
+          } finally {
+            own.set!.call(target, null); borrowed.set!.call(target, null);
+            target.removeEventListener(name, before); target.removeEventListener(name, after);
+          }
+        }
+      }
+      function borrowedEventGetters(owner: API, borrower: API, event: Event, C: 'XRSessionEvent' | 'XRInputSourceEvent' | 'XRInputSourcesChangeEvent', keys: string[], label: string) {
+        for (const key of keys) {
+          const own = Object.getOwnPropertyDescriptor(owner[C].prototype, key)!;
+          const borrowed = Object.getOwnPropertyDescriptor(borrower[C].prototype, key)!;
+          const value = own.get!.call(event);
+          check(borrowed.get!.call(event) === value && borrowed.get!.call(event) === borrowed.get!.call(event), `${label}.${C}.${key}: borrowed getter preserves identity`);
+          for (const fake of [Object.create(owner[C].prototype), new Proxy(event, {})]) throws(() => borrowed.get!.call(fake), 'TypeError', `${label}.${C}.${key}: borrowed getter rejects forgery/proxy`);
+          const wrong = C === 'XRSessionEvent' ? new owner.XRInputSourcesChangeEvent('x', {session: live.session, added: [], removed: []}) : new owner.XRSessionEvent('x', {session: live.session});
+          throws(() => borrowed.get!.call(wrong), 'TypeError', `${label}.${C}.${key}: borrowed getter rejects other event interfaces`);
+        }
+      }
       const sessionNames = ['end', 'visibilitychange', 'inputsourceschange', 'selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend'];
       handlers(w.navigator.xr, ['devicechange']);
       const live = await setup(window, mode);
@@ -274,14 +331,24 @@ export async function runEvents(page: Page, mode: SessionMode, handheld: boolean
           check(!!foreignSource, `${label}: real allocated foreign input source`);
           check(foreign.session instanceof other.EventTarget && !(foreign.session instanceof w.XRSession), `${label}: session retains its realm prototype`);
           check(foreignSource instanceof other.Object && !(foreignSource instanceof w.XRInputSource), `${label}: input source retains its realm prototype`);
+          borrowedHandlers(other, w, foreign.session, `${label} to parent`);
+          const local = await w.navigator.xr.requestSession('inline');
+          try { borrowedHandlers(w, other, local, `parent to ${label}`); }
+          finally { await local.end(); }
           // Cross-session, inactive-frame and ended-session values are all legal init data.
           const combinations: [Runtime.XRSession, Runtime.XRFrame, Runtime.XRInputSource][] = [[live.session, foreignFrame, source], [foreign.session, held, foreignSource]];
           for (const api of [w, other]) for (const [session, frame, inputSource] of combinations) {
-            check(new api.XRSessionEvent('x', {session}).session === session, `${label}: session conversion across realms/end`);
+            const sessionEvent = new api.XRSessionEvent('x', {session});
+            check(sessionEvent.session === session, `${label}: session conversion across realms/end`);
             const event = new api.XRInputSourceEvent('x', {frame, inputSource});
             check(event.frame === frame && event.inputSource === inputSource, `${label}: mixed-session inactive interfaces accepted`);
             const change: Runtime.XRInputSourcesChangeEvent = new api.XRInputSourcesChangeEvent('x', {session, added: [source, foreignSource, source], removed: new Set([foreignSource])});
             check(change.session === session && change.added[1] === foreignSource && change.removed[0] === foreignSource, `${label}: cross-realm sequence identities`);
+            const borrower = api === w ? other : w;
+            const direction = api === w ? `parent to ${label}` : `${label} to parent`;
+            borrowedEventGetters(api, borrower, sessionEvent, 'XRSessionEvent', ['session'], direction);
+            borrowedEventGetters(api, borrower, event, 'XRInputSourceEvent', ['frame', 'inputSource'], direction);
+            borrowedEventGetters(api, borrower, change, 'XRInputSourcesChangeEvent', ['session', 'added', 'removed'], direction);
             for (const fake of [Object.create(other.XRSession.prototype), new Proxy(foreign.session, {})]) throws(() => Reflect.construct(api.XRSessionEvent, ['x', {session: fake}]), 'TypeError', `${label}: foreign session forgery/proxy`);
             for (const fake of [Object.create(other.XRFrame.prototype), new Proxy(foreignFrame, {})]) throws(() => Reflect.construct(api.XRInputSourceEvent, ['x', {frame: fake, inputSource}]), 'TypeError', `${label}: foreign frame forgery/proxy`);
             for (const fake of [Object.create(other.XRInputSource.prototype), new Proxy(foreignSource, {})]) throws(() => Reflect.construct(api.XRInputSourcesChangeEvent, ['x', {session, added: [fake], removed: []}]), 'TypeError', `${label}: foreign input source forgery/proxy`);

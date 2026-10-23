@@ -1,8 +1,10 @@
+import {interfaceBrands} from './interface-brand';
+
 // HTML b342939 event-handler activation/processing, scoped to XR IDL attributes.
 // A listener keeps its registration position while its callback value changes.
 export type EventHandler = ((event: Event) => unknown) | object | null;
 type Handler = {value: EventHandler; listener: EventListener};
-const handlers = new WeakMap<object, Map<string, Handler>>();
+const handlers = interfaceBrands.eventHandlers;
 const add = EventTarget.prototype.addEventListener;
 const remove = EventTarget.prototype.removeEventListener;
 const preventDefault = Event.prototype.preventDefault;

@@ -23,9 +23,7 @@ function data<T>(map: WeakMap<object, T>, receiver: object): T {
   if (!value) throw new TypeError('Invalid XR event receiver.');
   return value;
 }
-const sessions = new WeakMap<object, {session: XRSession}>();
-const inputs = new WeakMap<object, {frame: XRFrame; inputSource: XRInputSource}>();
-const changes = new WeakMap<object, {session: XRSession; added: readonly XRInputSource[]; removed: readonly XRInputSource[]}>();
+const {eventSessions: sessions, eventInputs: inputs, eventChanges: changes} = interfaceBrands;
 
 export class XRSessionEvent extends Event {
   constructor(type: string, eventInitDict: EventInit & {session: XRSession}) {
