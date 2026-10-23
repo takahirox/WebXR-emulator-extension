@@ -1106,6 +1106,7 @@ function WebXRPolyfillInjection() {
       Object.freeze(InputSourceObject);
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
           layerAllocations: createLayerAllocations(sessions),
+          referenceSpaceRequests: new WeakMap(),
           eventSessions: new WeakMap(),
           eventInputs: new WeakMap(),
           eventChanges: new WeakMap(),
@@ -26435,6 +26436,31 @@ void main() {
           this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
           this.activeRenderState = new XRRenderState({ inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null });
           this._viewer = new XRReferenceSpace(this, 'viewer', () => clone$1(_device.getBasePoseMatrix()));
+          interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
+              if (!enabled.has(type)) {
+                  setTimeout(() => reject(new DOMException(`Reference space ${type} was not enabled.`, 'NotSupportedError')), 0);
+                  return;
+              }
+              const ready = type === 'viewer' ? Promise.resolve(null) : _device.requestFrameOfReferenceTransform(type, undefined);
+              void ready.then(inverse => {
+                  setTimeout(() => {
+                      try {
+                          if (type === 'viewer') {
+                              resolve(new XRReferenceSpace(this, type, () => clone$1(_device.getBasePoseMatrix())));
+                          }
+                          else {
+                              const world = invert(create$3(), inverse);
+                              resolve(type === 'bounded-floor'
+                                  ? new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA)
+                                  : new XRReferenceSpace(this, type, () => world));
+                          }
+                      }
+                      catch (error) {
+                          reject(error);
+                      }
+                  }, 0);
+              }, error => { setTimeout(() => reject(error), 0); });
+          }));
           for (const type of inputEvents) {
               const listener = (detail) => { if (detail.sessionId === _id)
                   this.signals.push({ type, source: detail.inputSource }); };
@@ -26507,20 +26533,23 @@ void main() {
           this._require('plane-detection');
           this.roomCaptureCompleted = true;
       }
-      async requestReferenceSpace(type) {
-          this._assertLive();
-          if (!['viewer', 'local', 'local-floor', 'bounded-floor', 'unbounded'].includes(type))
-              throw new TypeError('Invalid XRReferenceSpaceType.');
-          if (!this.enabledFeatures.includes(type))
-              unsupported(`Reference space ${type} was not enabled.`);
-          if (type === 'viewer')
-              return this._viewer;
-          const inverse = await this._device.requestFrameOfReferenceTransform(type, undefined);
-          this._assertLive();
-          const world = invert(create$3(), inverse);
-          if (type === 'bounded-floor')
-              return new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA);
-          return new XRReferenceSpace(this, type, () => world);
+      requestReferenceSpace(type) {
+          try {
+              if (!sessionObjects.has(this))
+                  throw new TypeError('Expected XRSession receiver.');
+              const request = interfaceBrands.referenceSpaceRequests.get(this);
+              if (!request)
+                  throw new TypeError('Expected XRSession receiver.');
+              if (arguments.length === 0)
+                  throw new TypeError('XRReferenceSpaceType is required.');
+              const converted = `${type}`;
+              if (!['viewer', 'local', 'local-floor', 'bounded-floor', 'unbounded'].includes(converted))
+                  throw new TypeError('Invalid XRReferenceSpaceType.');
+              return request(converted);
+          }
+          catch (error) {
+              return Promise.reject(error);
+          }
       }
       updateRenderState(value = {}) {
           var _a;
@@ -26821,6 +26850,7 @@ void main() {
       get gamepad() { var _a, _b; return (_b = (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.value) !== null && _b !== void 0 ? _b : null; }
       get skipRendering() { return false; }
   }
+  Object.defineProperty(XRSession.prototype, 'requestReferenceSpace', { enumerable: true });
   Object.setPrototypeOf(XRSession.prototype, EventTarget.prototype);
   Object.setPrototypeOf(XRInputSource.prototype, Object.prototype);
   installEventHandlers(XRSystem.prototype, ['devicechange'], value => value instanceof XRSystem);
