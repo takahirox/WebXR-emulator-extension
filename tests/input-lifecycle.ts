@@ -161,15 +161,39 @@ export async function runInputLifecycle(page: Page, mode: SessionMode, handheld:
         } finally { await restarted.close(); }
       } finally { keys.forEach((key, index) => Object.defineProperty(raw, key, descriptors[index])); await test.close(); }
       const hands = await setup(mode, true);
+      const handDevice = hands.session._device;
+      const handPoses = handDevice.gamepads.map(gamepad => [...gamepad.pose.position]);
+      const secondHandedness = handDevice.gamepads[1].hand;
       try {
+        // Distinct poses expose accidental use of the compacted active-source index.
+        handDevice.gamepads.forEach((gamepad, index) => { gamepad.pose.position = [index + 1, index + 1, index + 1]; });
         const source = await hands.next(() => hands.session.inputSources[0]);
         const saved = metadata(source, ['generic-hand-select'], 'deterministic hand');
         check(source.hand?.size === 25 && source.gamepad === null && source.gripSpace !== null, 'hand metadata preserves nullability and joints');
         const joint = source.hand!.get('wrist');
         await hands.next(() => check(source.profiles === saved.profiles && source.hand === saved.hand && source.hand!.get('wrist') === joint, 'hand metadata and spaces remain stable across frames'));
-        hands.session._device.gamepadInputSources[0].active = false;
+        const surviving = hands.session.inputSources[1];
+        const wrist = surviving.hand!.get('wrist');
+        const originalWrist = await hands.next(frame => frame.getJointPose(wrist, hands.reference)!.transform.matrix);
+        handDevice.gamepadInputSources[0].active = false;
         await hands.next(frame => check(frame.getPose(joint, hands.reference) === null, 'retired hand joint returns null'));
-      } finally { await hands.close(); }
+        await hands.next(frame => check(hands.session.inputSources.length === 1 && hands.session.inputSources[0] === surviving &&
+          frame.getJointPose(wrist, hands.reference)!.transform.matrix.every((value, index) => Math.abs(value - originalWrist[index]) < 1e-5), 'surviving hand retains controller pose after another disconnects'));
+        handDevice.gamepads[1].hand = secondHandedness === 'left' ? 'right' : 'left';
+        await hands.next(frame => {
+          const replacement = hands.session.inputSources[0];
+          check(replacement !== surviving && replacement.handedness !== surviving.handedness, 'surviving hand metadata change replaces its source');
+          const replacementWrist = replacement.hand!.get('wrist');
+          const wristMatrix = frame.getJointPose(replacementWrist, hands.reference)!.transform.matrix;
+          const gripMatrix = frame.getPose(replacement.gripSpace!, hands.reference)!.transform.matrix;
+          check(wristMatrix.every((value, index) => Math.abs(value - originalWrist[index]) < 1e-5 && Math.abs(value - gripMatrix[index]) < 1e-5), 'recreated hand wrist stays aligned with its controller grip after another disconnects');
+          check(frame.getJointPose(wrist, hands.reference) === null, 'metadata replacement retires the previous hand joints');
+        });
+      } finally {
+        handDevice.gamepads.forEach((gamepad, index) => { gamepad.pose.position = handPoses[index]; });
+        handDevice.gamepads[1].hand = secondHandedness;
+        await hands.close();
+      }
     } else {
       const test = await setup(mode), {session, next, reference} = test;
       const order: string[] = [], events: Runtime.XRInputSource[] = [];

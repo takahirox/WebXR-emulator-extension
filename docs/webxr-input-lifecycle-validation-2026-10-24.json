@@ -422,5 +422,56 @@
       "test-results/webxr-conformance.json"
     ]
   },
-  "publication": "No push, pull request, merge, Issue edit or comment performed by this node."
+  "publication": "No push, pull request, merge, Issue edit or comment performed by this node.",
+  "review_fix_validation": {
+    "issue": 27,
+    "finding": "Recreated XRHands used the compacted active-source index after an earlier controller disconnected, selecting the wrong device Gamepad pose.",
+    "fix": "Resolve the controller slot from raw adapter identity when creating an input source; regenerate the shipped polyfill.",
+    "regression_before_fix": "npm run test:browser exited 1 at the new wrist/grip alignment assertion on the reviewed bundle.",
+    "browser": {
+      "name": "Playwright Chromium",
+      "version": "156.0.8078.4"
+    },
+    "commands": {
+      "npm run build": 0,
+      "npm run test:browser": 0,
+      "git diff --check": 0
+    },
+    "result": "Full existing browser suite passes, including Quest VR/MR, Android AR, empty inline input and panel profile switching. No required checks skipped.",
+    "focused_input_lifecycle": [
+      {
+        "mode": "immersive-vr",
+        "handheld": false,
+        "assertions": 168,
+        "distinct_assertion_labels": 111,
+        "new_regression_assertions": [
+          "surviving hand retains controller pose after another disconnects",
+          "surviving hand metadata change replaces its source",
+          "recreated hand wrist stays aligned with its controller grip after another disconnects",
+          "metadata replacement retires the previous hand joints"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": false,
+        "assertions": 168,
+        "distinct_assertion_labels": 111,
+        "new_regression_assertions": [
+          "surviving hand retains controller pose after another disconnects",
+          "surviving hand metadata change replaces its source",
+          "recreated hand wrist stays aligned with its controller grip after another disconnects",
+          "metadata replacement retires the previous hand joints"
+        ]
+      },
+      {
+        "mode": "immersive-ar",
+        "handheld": true,
+        "assertions": 43,
+        "distinct_assertion_labels": 32,
+        "new_regression_assertions": []
+      }
+    ],
+    "fixture": "Assign distinct poses to controllers 0 and 1; disconnect controller 0; change controller 1 handedness; verify source replacement, preserved wrist pose, wrist/grip alignment and retired old joints. Restore pose and handedness data afterward. Runs in both Quest immersive modes without changing hand negotiation.",
+    "limitations": "The existing not_executed list above still applies; no new Firefox, physical-device or verbatim WPT execution claim."
+  }
 }

@@ -25660,7 +25660,8 @@ void main() {
                           previous._retire();
                           replaced.push(previous);
                       }
-                      this.inputWrappers.set(source, new XRInputSource(this, source, this.rawSources.indexOf(source)));
+                      const controllerIndex = this._device.gamepadInputSources.findIndex(input => input.inputSource === source);
+                      this.inputWrappers.set(source, new XRInputSource(this, source, controllerIndex));
                   }
                   return this.inputWrappers.get(source);
               });

@@ -363,7 +363,9 @@ export class XRSession extends XREventTarget {
       const previous = this.inputWrappers.get(source);
       if (!previous || !previous._matches(source)) {
         if (previous) { previous._retire(); replaced.push(previous); }
-        this.inputWrappers.set(source, new XRInputSource(this, source, this.rawSources.indexOf(source)));
+        // Active sources can omit earlier controllers; hands need the adapter slot.
+        const controllerIndex = this._device.gamepadInputSources.findIndex(input => input.inputSource === source);
+        this.inputWrappers.set(source, new XRInputSource(this, source, controllerIndex));
       }
       return this.inputWrappers.get(source)!;
     });
