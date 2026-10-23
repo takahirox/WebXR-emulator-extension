@@ -13,7 +13,13 @@ import {referenceSpaceCases} from './reference-space';
 const browser = process.argv[2];
 assert(['chromium', 'firefox'].includes(browser), 'Select chromium or firefox');
 const {origin, server} = await serveFirefoxFixtures();
-const report: any = {browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: []};
+const report: any = {issue: 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: [
+  'Inspect session pendingReferenceRequests sizes for release; access _device/_id only for targeted races.',
+  'Temporarily replace adapter transform method with controlled Promises; restore in finally.',
+  'Capture real timer callbacks through calling-task microtasks; restore timers, shut down, then replay cancelled callbacks.',
+  'Proxy transform matrix counts numeric allocation reads; count timer calls from late adapter continuations.',
+  'Call real device endSession; inline additionally emits its presentation-end notification because it has no presentation.',
+]};
 const filename = `test-results/reference-space-${browser}.json`;
 await mkdir('test-results', {recursive: true});
 let close: (() => Promise<void>) | undefined;
@@ -63,7 +69,9 @@ try {
     }).catch(async error => { await rm(profile, {recursive: true, force: true}); throw error; });
     const targets: Awaited<ReturnType<typeof attachTarget>>[] = [];
     close = async () => { for (const target of targets) await target.detach().catch(() => {}); await context.close(); await rm(profile, {recursive: true, force: true}); };
-    report.versions = {browser: context.browser()!.version(), node: process.version, playwright: JSON.parse(await readFile('node_modules/playwright/package.json', 'utf8')).version};
+    const executable = process.env.WEBXR_CHROMIUM_EXECUTABLE ?? chromium.executablePath();
+    report.versions = {browser: context.browser()!.version(), node: process.version, playwright: JSON.parse(await readFile('node_modules/playwright/package.json', 'utf8')).version,
+      executableSHA256: createHash('sha256').update(await readFile(executable)).digest('hex')};
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
     assert(worker.url().endsWith('/dist/extension/background.js'));
     const page = await context.newPage(); await page.goto(origin + '/csp');
@@ -109,7 +117,7 @@ finally {
   await close?.(); server.close();
   report.completedAt = new Date().toISOString();
   report.provenance = {};
-  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'tests/reference-space.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
+  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'tests/reference-space.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
     report.provenance[file] = createHash('sha256').update(await readFile(file)).digest('hex');
   }
   await writeFile(filename, JSON.stringify(report, null, 2));
