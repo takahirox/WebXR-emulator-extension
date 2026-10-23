@@ -3,10 +3,12 @@ import type EmulatedXRDevice from '../EmulatedXRDevice';
 import type {SessionMode} from '../../types/contracts';
 import type {HitTestOptions, TransientHitTestOptions} from '../../types/polyfill';
 import {SourceGamepad, type DeviceInput, type InputSignal} from '../device-adapter';
-import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, invalidState, unsupported} from './geometry';
+import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, spaceObjects, invalidState, unsupported} from './geometry';
 import {HALL_PLAY_AREA} from '../virtual-play-area';
 import {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
-import {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation} from './sensing';
+import {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation, jointObjects} from './sensing';
+import {interfaceValue, interfaceSequence, float32Output} from './bulk-input';
+import {interfaceBrands} from './interface-brand';
 import XRHitTestSource from './XRHitTestSource';
 import XRTransientInputHitTestSource from './XRTransientInputHitTestSource';
 import XRHitTestResult from './XRHitTestResult';
@@ -251,7 +253,7 @@ export class XRSession extends XREventTarget {
   _assertLive() { if (this.ended) invalidState('The session has ended.'); }
   _require(feature: string) { this._assertLive(); if (!this.enabledFeatures.includes(feature)) unsupported(`${feature} was not enabled.`); }
   _owns(space: XRSpace) {
-    if (!(space instanceof XRSpace)) throw new TypeError('Expected XRSpace.');
+    interfaceValue(space, spaceObjects, 'XRSpace');
     if (space._session !== this) invalidState('Space belongs to a different session.');
   }
   _setVisibility(value: typeof this.visibility) {
@@ -412,14 +414,14 @@ export class XRSession extends XREventTarget {
   };
 }
 
-export class XRFrame {
+export class XRFrame extends interfaceBrands.FrameObject {
   _active = false;
   private hitResults = new Map<XRHitTestSource, XRHitTestResult[]>();
   private anchorSnapshot: XRAnchorSet;
   private environmentSnapshot: ReturnType<EnvironmentTracker['snapshot']>;
   private transientResults = new Map<XRTransientInputHitTestSource, XRTransientInputHitTestResult[]>();
   constructor(readonly session: XRSession, readonly predictedDisplayTime: number, readonly _animation: boolean) {
-    frameObjects.add(this);
+    super();
     this.anchorSnapshot = new XRAnchorSet(session._anchors);
     this.environmentSnapshot = session._environment.snapshot();
     if (_animation) {
@@ -471,14 +473,39 @@ export class XRFrame {
     const pose = this.getPose(joint, baseSpace); return pose ? new XRJointPose(pose.transform, joint._radius) : null;
   }
   fillJointRadii(joints: Iterable<XRJointSpace>, radii: Float32Array) {
-    this._assertActive(); const list = [...joints]; if (radii.length < list.length) throw new TypeError('Insufficient radii array.');
-    for (const [index, joint] of list.entries()) { if (!(joint instanceof XRJointSpace)) throw new TypeError('Expected XRJointSpace.'); this.session._owns(joint); radii[index] = joint._radius; }
-    return true;
+    interfaceValue(this, frameObjects, 'XRFrame');
+    if (arguments.length < 2) throw new TypeError('Expected joints and radii.');
+    const list = interfaceSequence<XRJointSpace>(joints, jointObjects, 'XRJointSpace');
+    const capacity = float32Output(radii);
+    this._assertActive();
+    for (const joint of list) this.session._owns(joint);
+    if (capacity < list.length) throw new TypeError('Insufficient radii array.');
+    let valid = true;
+    for (const [index, joint] of list.entries()) {
+      // All joints of an emulated hand share the same tracking availability.
+      // Query native tracking independently of any reference/base space.
+      const tracked = joint._update() !== null;
+      radii[index] = tracked ? joint._radius : NaN;
+      if (!tracked) valid = false;
+    }
+    return valid;
   }
   fillPoses(spaces: Iterable<XRSpace>, baseSpace: XRSpace, transforms: Float32Array) {
-    this._assertActive(); const list = [...spaces]; if (transforms.length < list.length * 16) throw new TypeError('Insufficient transform array.');
+    interfaceValue(this, frameObjects, 'XRFrame');
+    if (arguments.length < 3) throw new TypeError('Expected spaces, baseSpace and transforms.');
+    const list = interfaceSequence<XRSpace>(spaces, spaceObjects, 'XRSpace');
+    interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+    const capacity = float32Output(transforms);
+    this._assertActive();
+    for (const space of list) this.session._owns(space);
+    this.session._owns(baseSpace);
+    if (capacity < list.length * 16) throw new TypeError('Insufficient transform array.');
     let valid = true;
-    for (const [index, space] of list.entries()) { const pose = this.getPose(space, baseSpace); if (pose) transforms.set(pose.transform.matrix, index * 16); else { valid = false; transforms.fill(NaN, index * 16, index * 16 + 16); } }
+    for (const [index, space] of list.entries()) {
+      const pose = this.getPose(space, baseSpace);
+      if (!pose) valid = false;
+      for (let component = 0; component < 16; component++) transforms[index * 16 + component] = pose ? pose.transform.matrix[component] : NaN;
+    }
     return valid;
   }
   getLightEstimate(probe: XRLightProbe) {
@@ -494,6 +521,8 @@ export class XRFrame {
   getHitTestResults(source: XRHitTestSource) { this._assertActive(); if (!this.hitResults.has(source)) invalidState('Hit test source was not active for this frame.'); return this.hitResults.get(source)!.slice(); }
   getHitTestResultsForTransientInput(source: XRTransientInputHitTestSource) { this._assertActive(); if (!this.transientResults.has(source)) invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source)!.slice(); }
 }
+// Share allocation branding while retaining the public prototype's own realm.
+Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
 
 /** Every exposed space and input identity is owned by exactly one session. */
 export class XRInputSource {

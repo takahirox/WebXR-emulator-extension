@@ -892,8 +892,61 @@ function WebXRPolyfillInjection() {
     };
   })();
 
+  function createBrands() {
+      const frames = new WeakSet(), spaces = new WeakSet(), joints = new WeakSet();
+      class FrameObject {
+          constructor() { frames.add(this); }
+      }
+      class SpaceObject extends EventTarget {
+          constructor(joint = false) { super(); spaces.add(this); if (joint)
+              joints.add(this); }
+      }
+      Object.freeze(FrameObject.prototype);
+      Object.freeze(FrameObject);
+      Object.freeze(SpaceObject.prototype);
+      Object.freeze(SpaceObject);
+      return Object.freeze({ FrameObject, SpaceObject,
+          frames: Object.freeze({ has: (value) => frames.has(value) }),
+          spaces: Object.freeze({ has: (value) => spaces.has(value) }),
+          joints: Object.freeze({ has: (value) => joints.has(value) }),
+      });
+  }
+  const key = Symbol.for('WebXR-emulator.interface-brands');
+  let host = globalThis;
+  if (typeof window !== 'undefined') {
+      const pending = [window], visited = new Set();
+      while (pending.length) {
+          const candidate = pending.pop();
+          if (visited.has(candidate))
+              continue;
+          visited.add(candidate);
+          try {
+              void candidate.document;
+              host = candidate;
+              if (Object.prototype.hasOwnProperty.call(candidate, key))
+                  break;
+          }
+          catch ( _a) {  }
+          try {
+              if (candidate.opener)
+                  pending.push(candidate.opener);
+          }
+          catch ( _b) {  }
+          try {
+              pending.push(candidate.parent);
+          }
+          catch ( _c) {  }
+      }
+  }
+  const shared = host;
+  if (!Object.prototype.hasOwnProperty.call(shared, key)) {
+      Object.defineProperty(shared, key, { value: createBrands() });
+  }
+  const interfaceBrands = shared[key];
+
   const sessionObjects = new WeakSet();
-  const frameObjects = new WeakSet();
+  const frameObjects = interfaceBrands.frames;
+  const spaceObjects = interfaceBrands.spaces;
   const compatibleContexts = new WeakSet();
   const invalidState = (message) => { throw new DOMException(message, 'InvalidStateError'); };
   const unsupported = (message) => { throw new DOMException(message, 'NotSupportedError'); };
@@ -927,9 +980,9 @@ function WebXRPolyfillInjection() {
           return this.inverseValue;
       }
   }
-  class XRSpace extends EventTarget {
-      constructor(_session, matrixProvider) {
-          super();
+  class XRSpace extends interfaceBrands.SpaceObject {
+      constructor(_session, matrixProvider, joint = false) {
+          super(joint);
           this._session = _session;
           this.matrixProvider = matrixProvider;
           this._baseMatrix = null;
@@ -938,6 +991,7 @@ function WebXRPolyfillInjection() {
       _update() { this._baseMatrix = this.matrixProvider(); return this._baseMatrix; }
       _adjustForOriginOffset(_matrix) { }
   }
+  Object.setPrototypeOf(XRSpace.prototype, EventTarget.prototype);
   class XRReferenceSpace extends XRSpace {
       constructor(session, _type, nativeMatrix, offset = create$3()) {
           super(session, () => {
@@ -1031,6 +1085,7 @@ function WebXRPolyfillInjection() {
     frameObjects: frameObjects,
     invalidState: invalidState,
     sessionObjects: sessionObjects,
+    spaceObjects: spaceObjects,
     unsupported: unsupported
   });
 
@@ -1539,9 +1594,10 @@ function WebXRPolyfillInjection() {
   }
   const names = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
       ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))];
+  const jointObjects = interfaceBrands.joints;
   class XRJointSpace extends XRSpace {
       constructor(session, jointName, _radius, provider) {
-          super(session, provider);
+          super(session, provider, true);
           this.jointName = jointName;
           this._radius = _radius;
       }
@@ -1660,7 +1716,8 @@ function WebXRPolyfillInjection() {
     XRJointPose: XRJointPose,
     XRJointSpace: XRJointSpace,
     XRLightEstimate: XRLightEstimate,
-    XRLightProbe: XRLightProbe
+    XRLightProbe: XRLightProbe,
+    jointObjects: jointObjects
   });
 
   const REVISION = '186';
@@ -25083,6 +25140,49 @@ void main() {
       Object.freeze([-1, 0, 1]),
   ]);
 
+  var _a;
+  const typedArray = Object.getPrototypeOf(Float32Array.prototype);
+  const arrayName = Object.getOwnPropertyDescriptor(typedArray, Symbol.toStringTag).get;
+  const arrayBuffer = Object.getOwnPropertyDescriptor(typedArray, 'buffer').get;
+  const arrayLength = Object.getOwnPropertyDescriptor(typedArray, 'length').get;
+  const bufferLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
+  const bufferResizable = (_a = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'resizable')) === null || _a === void 0 ? void 0 : _a.get;
+  function isObject$1(value) { return Object(value) === value; }
+  function interfaceValue(value, brand, name) {
+      if (!isObject$1(value) || !brand.has(value))
+          throw new TypeError(`Expected ${name}.`);
+      return value;
+  }
+  function interfaceSequence(value, brand, name) {
+      if (!isObject$1(value))
+          throw new TypeError('Expected iterable sequence.');
+      const method = value[Symbol.iterator];
+      if (typeof method !== 'function')
+          throw new TypeError('Expected iterable sequence.');
+      const iterator = Reflect.apply(method, value, []);
+      if (!isObject$1(iterator))
+          throw new TypeError('Expected iterator object.');
+      const next = iterator.next;
+      const list = [];
+      while (true) {
+          const step = Reflect.apply(next, iterator, []);
+          if (!isObject$1(step))
+              throw new TypeError('Expected iterator result object.');
+          if (step.done)
+              return list;
+          list.push(interfaceValue(step.value, brand, name));
+      }
+  }
+  function float32Output(value) {
+      if (arrayName.call(value) !== 'Float32Array')
+          throw new TypeError('Expected Float32Array.');
+      const buffer = arrayBuffer.call(value);
+      bufferLength.call(buffer);
+      if (bufferResizable === null || bufferResizable === void 0 ? void 0 : bufferResizable.call(buffer))
+          throw new TypeError('Resizable buffers are not supported.');
+      return arrayLength.call(value);
+  }
+
   const PRIVATE$4 = Symbol('@@webxr-polyfill/XRRay');
   class XRRay {
       constructor(origin, direction) {
@@ -25788,8 +25888,7 @@ void main() {
       _require(feature) { this._assertLive(); if (!this.enabledFeatures.includes(feature))
           unsupported(`${feature} was not enabled.`); }
       _owns(space) {
-          if (!(space instanceof XRSpace))
-              throw new TypeError('Expected XRSpace.');
+          interfaceValue(space, spaceObjects, 'XRSpace');
           if (space._session !== this)
               invalidState('Space belongs to a different session.');
       }
@@ -25927,15 +26026,15 @@ void main() {
           }
       }
   }
-  class XRFrame {
+  class XRFrame extends interfaceBrands.FrameObject {
       constructor(session, predictedDisplayTime, _animation) {
+          super();
           this.session = session;
           this.predictedDisplayTime = predictedDisplayTime;
           this._animation = _animation;
           this._active = false;
           this.hitResults = new Map();
           this.transientResults = new Map();
-          frameObjects.add(this);
           this.anchorSnapshot = new XRAnchorSet(session._anchors);
           this.environmentSnapshot = session._environment.snapshot();
           if (_animation) {
@@ -26008,32 +26107,45 @@ void main() {
           return pose ? new XRJointPose(pose.transform, joint._radius) : null;
       }
       fillJointRadii(joints, radii) {
+          interfaceValue(this, frameObjects, 'XRFrame');
+          if (arguments.length < 2)
+              throw new TypeError('Expected joints and radii.');
+          const list = interfaceSequence(joints, jointObjects, 'XRJointSpace');
+          const capacity = float32Output(radii);
           this._assertActive();
-          const list = [...joints];
-          if (radii.length < list.length)
-              throw new TypeError('Insufficient radii array.');
-          for (const [index, joint] of list.entries()) {
-              if (!(joint instanceof XRJointSpace))
-                  throw new TypeError('Expected XRJointSpace.');
+          for (const joint of list)
               this.session._owns(joint);
-              radii[index] = joint._radius;
+          if (capacity < list.length)
+              throw new TypeError('Insufficient radii array.');
+          let valid = true;
+          for (const [index, joint] of list.entries()) {
+              const tracked = joint._update() !== null;
+              radii[index] = tracked ? joint._radius : NaN;
+              if (!tracked)
+                  valid = false;
           }
-          return true;
+          return valid;
       }
       fillPoses(spaces, baseSpace, transforms) {
+          interfaceValue(this, frameObjects, 'XRFrame');
+          if (arguments.length < 3)
+              throw new TypeError('Expected spaces, baseSpace and transforms.');
+          const list = interfaceSequence(spaces, spaceObjects, 'XRSpace');
+          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+          const capacity = float32Output(transforms);
           this._assertActive();
-          const list = [...spaces];
-          if (transforms.length < list.length * 16)
+          for (const space of list)
+              this.session._owns(space);
+          this.session._owns(baseSpace);
+          if (capacity < list.length * 16)
               throw new TypeError('Insufficient transform array.');
           let valid = true;
           for (const [index, space] of list.entries()) {
               const pose = this.getPose(space, baseSpace);
-              if (pose)
-                  transforms.set(pose.transform.matrix, index * 16);
-              else {
+              if (!pose)
                   valid = false;
-                  transforms.fill(NaN, index * 16, index * 16 + 16);
-              }
+              for (let component = 0; component < 16; component++)
+                  transforms[index * 16 + component] = pose ? pose.transform.matrix[component] : NaN;
           }
           return valid;
       }
@@ -26063,6 +26175,7 @@ void main() {
       getHitTestResultsForTransientInput(source) { this._assertActive(); if (!this.transientResults.has(source))
           invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source).slice(); }
   }
+  Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
   class XRInputSource {
       constructor(session, raw, index) {
           this.session = session;
