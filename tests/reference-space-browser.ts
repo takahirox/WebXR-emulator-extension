@@ -10,24 +10,27 @@ import {activate, configure} from './firefox-contract';
 import {attachTarget, getTargets} from './cdp-target';
 import {referenceSpaceCases} from './reference-space';
 import {rigidTransformCases} from './rigid-transform';
+import {poseViewCases} from './pose-view';
 
 const browser = process.argv[2];
 const transforms = process.argv[3] === 'transforms';
-const cases = transforms ? rigidTransformCases : referenceSpaceCases;
+const poses = process.argv[3] === 'poses';
+const selection = poses ? 'pose-view' : transforms ? 'rigid-transform' : 'reference-space';
+const cases = poses ? poseViewCases : transforms ? rigidTransformCases : referenceSpaceCases;
 assert(['chromium', 'firefox'].includes(browser), 'Select chromium or firefox');
 const {origin, server} = await serveFirefoxFixtures();
-const report: any = {issue: transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: transforms ? ['Real injected iframe/popup realms; application-visible matrix transfers, pose queries and WebGL triangle pixels.', 'Inspect _session ownership, callbacks.size and the real layer _presentationCanvas for presented pixels/captures; no adapter, GL or timer replacements.'] : [
+const report: any = {issue: poses ? 49 : transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: poses ? ['Genuine separately injected iframe and popup constructors, getters and borrowed operations; real inline animation frames in all three realms.', 'Inspect _device, _session, callbacks.size and _presentationCanvas for ownership, calibration/presentation, cleanup and controlled input-button events.', 'Construct explicit unavailable/estimated XRSpace providers; mark _emulatedPosition only for the estimated-provider case. Temporarily remove/restore one gamepad slot synchronously for existing joint tracking loss; toggle/restore one existing input slot for source retirement/reacquisition. Await real AR room readiness. Firefox WebDriver activates the actual main/popup windows for realm inline frames, without modifying visibility. No GL, timers or animation callbacks replaced.'] : transforms ? ['Real injected iframe/popup realms; application-visible matrix transfers, pose queries and WebGL triangle pixels.', 'Inspect _session ownership, callbacks.size and the real layer _presentationCanvas for presented pixels/captures; no adapter, GL or timer replacements.'] : [
   'Inspect session pendingReferenceRequests sizes for release; access _device/_id only for targeted races.',
   'Temporarily replace adapter transform method with controlled Promises; restore in finally.',
   'Capture real timer callbacks through calling-task microtasks; restore timers, shut down, then replay cancelled callbacks.',
   'Proxy transform matrix counts numeric allocation reads; count timer calls from late adapter continuations.',
   'Call real device endSession; inline additionally emits its presentation-end notification because it has no presentation.',
 ]};
-const filename = `test-results/${transforms ? "rigid-transform" : "reference-space"}-${browser}.json`;
+const filename = `test-results/${selection}-${browser}.json`;
 await mkdir('test-results', {recursive: true});
 async function saveRendering(result: any, device: string) {
   for (const render of result.rendering ?? []) {
-    const file = `test-results/rigid-transform-${browser}-${device.startsWith('Meta') ? 'quest' : 'android'}-${result.mode}-${render.label}.png`;
+    const file = `test-results/${selection}-${browser}-${device.startsWith('Meta') ? 'quest' : 'android'}-${result.mode}-${render.label}.png`;
     await writeFile(file, Buffer.from(render.png.replace(/^data:image\/png;base64,/, ''), 'base64'));
     delete render.png; render.capture = file;
   }
@@ -52,13 +55,23 @@ try {
       console.log('scenario', browser, device, mode);
       await configure(firefox, device, selected); await firefox.navigate(origin + '/csp');
       const start = firefox.logs.length;
+      const mainHandle = poses ? await firefox.request<string>('GET', '/window') : '';
       await activate(firefox, expression, [mode]);
       const outcome = await eventually(async () => {
+        // Firefox may ignore script window.focus(). Activate the actual top-level
+        // window needed by this realm's inline RAF, preserving visibility policy.
+        if (poses) await firefox.request('POST', '/window', {handle: mainHandle});
         if (await firefox.evaluate(`return !!document.querySelector('#reference-space-session')`)) {
           const element = await firefox.request<Record<string,string>>('POST', '/element', {using:'css selector', value:'#reference-space-session'});
           await firefox.request('POST', `/element/${element['element-6066-11e4-a52e-4f735466cecf']}/click`, {});
         }
-        return firefox.evaluate<any>('return {...window.referenceSpaceOutcome,progress:window.rigidTransformProgress,visibility:document.visibilityState}');
+        const value = await firefox.evaluate<any>('return {...window.referenceSpaceOutcome,progress:window.rigidTransformProgress,visibility:document.visibilityState,realm:window.poseViewRealm}');
+        if (poses && value.state === 'running' && value.realm === 'popup') {
+          const handles = await firefox.request<string[]>('GET', '/window/handles');
+          const popupHandle = handles.find(handle => handle !== mainHandle);
+          if (popupHandle) await firefox.request('POST', '/window', {handle: popupHandle});
+        }
+        return value;
       }, value => value?.state !== 'running', 'focused reference-space outcome', 60000);
       assert.equal(outcome.state, 'passed', outcome.failure + '\n' + outcome.stack);
       const result = outcome.value;
@@ -129,7 +142,7 @@ finally {
   await close?.(); server.close();
   report.completedAt = new Date().toISOString();
   report.provenance = {};
-  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
+  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'package.json', 'src/polyfill/api/layer-allocation.ts', 'tests/environment.ts', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/pose-view.ts', 'src/polyfill/api/sensing.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
     report.provenance[file] = createHash('sha256').update(await readFile(file)).digest('hex');
   }
   await writeFile(filename, JSON.stringify(report, null, 2));

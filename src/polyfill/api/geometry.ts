@@ -75,10 +75,22 @@ for (const name of ['position', 'orientation', 'matrix', 'inverse']) {
   Object.defineProperty(XRRigidTransform.prototype, name, {...Object.getOwnPropertyDescriptor(XRRigidTransform.prototype, name), enumerable: true});
 }
 
+function initializeSpaceRelation(space: XRSpace, origin: object, offset: mat4) {
+  let tracking = interfaceBrands.trackingOrigins.get(origin);
+  if (!tracking) { tracking = {emulatedPosition: false}; interfaceBrands.trackingOrigins.set(origin, tracking); }
+  interfaceBrands.spaceRelations.set(space, {origin, offset, tracking});
+}
 // Every space carries a session and a world-space matrix provider.
 export class XRSpace extends interfaceBrands.SpaceObject {
   _baseMatrix: mat4 | null = null;
-  constructor(readonly _session: XRSession, private matrixProvider: () => mat4 | null, joint = false) { super(joint); }
+  // Virtual providers supply exact 6DoF positions. A provider supplying an
+  // estimated position can mark it explicitly; self-relative poses stay exact.
+  get _emulatedPosition() { return interfaceBrands.spaceRelations.get(this)!.tracking.emulatedPosition; }
+  set _emulatedPosition(value: boolean) { interfaceBrands.spaceRelations.get(this)!.tracking.emulatedPosition = value; }
+  constructor(readonly _session: XRSession, private matrixProvider: () => mat4 | null, joint = false) {
+    super(joint);
+    initializeSpaceRelation(this, matrixProvider, mat4.create());
+  }
   get _inverseBaseMatrix() { return this._baseMatrix && mat4.invert(mat4.create(), this._baseMatrix); }
   _update() { this._baseMatrix = this.matrixProvider(); return this._baseMatrix; }
   _adjustForOriginOffset(_matrix: mat4) {} // Offset is already in _baseMatrix.
@@ -94,6 +106,7 @@ export class XRReferenceSpace extends XRSpace {
       const matrix = nativeMatrix();
       return matrix && mat4.multiply(mat4.create(), matrix, offset);
     });
+    initializeSpaceRelation(this, nativeMatrix, offset);
     const allocate = this.createOffsetSpace.bind(this);
     interfaceBrands.referenceOffsets.set(this, transform => allocate(mat4.multiply(mat4.create(), offset, transform)));
   }
@@ -130,25 +143,122 @@ export class XRBoundedReferenceSpace extends XRReferenceSpace {
   }
 }
 
+// Allocation permission stays inside the bundle; public interfaces have no
+// constructor in WebIDL. Never publish this token on the injected global.
+export const geometryAllocation = Symbol('geometry allocation');
+export function requireGeometryAllocation(token: symbol | undefined) {
+  if (token !== geometryAllocation) throw new TypeError('Illegal constructor.');
+}
+function poseState(value: object) {
+  const state = interfaceBrands.poses.get(value);
+  if (!state) throw new TypeError('Expected XRPose.');
+  return state;
+}
+export function relativePose(space: XRSpace, base: XRSpace) {
+  const source = interfaceBrands.spaceRelations.get(space)!, target = interfaceBrands.spaceRelations.get(base)!;
+  // A shared native origin has a statically known relative relationship even
+  // when its absolute tracking is unavailable or estimated.
+  if (source.origin === target.origin) return {
+    matrix: mat4.multiply(mat4.create(), mat4.invert(mat4.create(), target.offset)!, source.offset), emulated: false,
+  };
+  const world = space._update(), baseWorld = base._update();
+  return world && baseWorld ? {
+    matrix: mat4.multiply(mat4.create(), mat4.invert(mat4.create(), baseWorld)!, world),
+    emulated: source.tracking.emulatedPosition || target.tracking.emulatedPosition,
+  } : null;
+}
 export class XRPose {
-  readonly emulatedPosition = true;
-  readonly linearVelocity = null;
-  readonly angularVelocity = null;
-  constructor(readonly transform: XRRigidTransform) {}
+  constructor(transform: XRRigidTransform, emulatedPosition: boolean, token?: symbol) {
+    requireGeometryAllocation(token);
+    interfaceBrands.poses.set(this, {transform, emulatedPosition});
+  }
+  get transform() { return poseState(this).transform; }
+  get emulatedPosition() { return poseState(this).emulatedPosition; }
+  get linearVelocity() { poseState(this); return null; }
+  get angularVelocity() { poseState(this); return null; }
 }
 export class XRViewerPose extends XRPose {
-  constructor(transform: XRRigidTransform, readonly views: readonly XRView[]) { super(transform); }
+  constructor(transform: XRRigidTransform, views: readonly XRView[], emulatedPosition: boolean, token?: symbol) {
+    super(transform, emulatedPosition, token);
+    interfaceBrands.viewerViews.set(this, Object.freeze([...views]));
+  }
+  get views() {
+    const views = interfaceBrands.viewerViews.get(this);
+    if (!views) throw new TypeError('Expected XRViewerPose.');
+    return views;
+  }
+}
+function viewportState(value: object) {
+  const state = interfaceBrands.viewports.get(value);
+  if (!state) throw new TypeError('Expected XRViewport.');
+  return state;
 }
 export class XRViewport {
-  constructor(readonly x: number, readonly y: number, readonly width: number, readonly height: number) {}
+  constructor(x: number, y: number, width: number, height: number, token?: symbol) {
+    requireGeometryAllocation(token); interfaceBrands.viewports.set(this, {x, y, width, height});
+  }
+  get x() { return viewportState(this).x; }
+  get y() { return viewportState(this).y; }
+  get width() { return viewportState(this).width; }
+  get height() { return viewportState(this).height; }
 }
-export class XRViewGeometry {
-  constructor(readonly transform: XRRigidTransform, readonly projectionMatrix: Float32Array) {}
+export function initializeViewGeometry(value: object, transform: XRRigidTransform, projection: ArrayLike<number>) {
+  const geometry = Array.from(projection) as mat4;
+  let array: Float32Array | undefined;
+  interfaceBrands.viewGeometry.set(value, {transform, projection: geometry, array: () => {
+    if (!array || array.buffer.byteLength === 0) array = new Float32Array(geometry);
+    return array;
+  }});
 }
-export class XRView extends XRViewGeometry {
-  readonly recommendedViewportScale = null;
-  readonly isFirstPersonObserver = false;
-  constructor(readonly _frame: import('./runtime').XRFrame, readonly eye: 'none' | 'left' | 'right', transform: XRRigidTransform,
-    projectionMatrix: Float32Array, readonly _worldMatrix: mat4) { super(transform, projectionMatrix); }
-  requestViewportScale(_scale: number | null) {} // Advisory; fixed emulated resolution.
+// XRViewGeometry is a mixin: its members live directly on each including
+// interface's prototype, with that interface's own receiver check.
+export function installViewGeometry(prototype: object, has: (value: object) => boolean) {
+  for (const name of ['transform', 'projectionMatrix'] as const) {
+    Object.defineProperty(prototype, name, {enumerable: true, configurable: true, get(this: object) {
+      if (!has(this)) throw new TypeError('Expected a view geometry receiver.');
+      const state = interfaceBrands.viewGeometry.get(this)!;
+      return name === 'transform' ? state.transform : state.array();
+    }});
+  }
 }
+export const projectionData = (value: object) => {
+  const state = interfaceBrands.viewGeometry.get(value);
+  if (!state) throw new TypeError('Expected view geometry.');
+  return state.projection;
+};
+export function viewState(value: object) {
+  const state = interfaceBrands.views.get(value);
+  if (!state) throw new TypeError('Expected XRView.');
+  return state;
+}
+export class XRView {
+  declare readonly transform: XRRigidTransform;
+  declare readonly projectionMatrix: Float32Array;
+  constructor(frame: import('./runtime').XRFrame, eye: 'none' | 'left' | 'right', transform: XRRigidTransform,
+    projection: ArrayLike<number>, world: mat4, index: number, token?: symbol) {
+    requireGeometryAllocation(token);
+    interfaceBrands.views.set(this, {frame, eye, index, world});
+    initializeViewGeometry(this, transform, projection);
+  }
+  get eye() { return viewState(this).eye; }
+  get index() { return viewState(this).index; }
+  get recommendedViewportScale() { viewState(this); return null; }
+  get isFirstPersonObserver() { viewState(this); return false; }
+  get _frame() { return viewState(this).frame; }
+  get _worldMatrix() { return viewState(this).world; }
+  requestViewportScale(scale: number | null) {
+    viewState(this);
+    if (arguments.length < 1) throw new TypeError('Expected scale.');
+    // Required nullable double: explicit undefined and null both convert to null.
+    if (scale !== null && scale !== undefined && !Number.isFinite(+scale)) throw new TypeError('Expected a finite double.');
+    // Advisory; fixed emulated resolution, including retained views.
+  }
+}
+installViewGeometry(XRView.prototype, value => interfaceBrands.views.has(value));
+export function enumerableMembers(prototype: object, names: readonly string[]) {
+  for (const name of names) Object.defineProperty(prototype, name, {...Object.getOwnPropertyDescriptor(prototype, name), enumerable: true});
+}
+enumerableMembers(XRPose.prototype, ['transform', 'emulatedPosition', 'linearVelocity', 'angularVelocity']);
+enumerableMembers(XRViewerPose.prototype, ['views']);
+enumerableMembers(XRViewport.prototype, ['x', 'y', 'width', 'height']);
+enumerableMembers(XRView.prototype, ['eye', 'index', 'recommendedViewportScale', 'isFirstPersonObserver', 'requestViewportScale']);

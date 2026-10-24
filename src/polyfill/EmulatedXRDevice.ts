@@ -1,6 +1,6 @@
 import type { DeviceConfig, DeviceSize, SessionMode, EmulatedGamepad } from '../types/contracts';
 import type { PolyfillGlobal, BaseLayer, RenderState, Viewport } from '../types/polyfill';
-import {XRSpace} from './api/geometry';
+import {geometryAllocation, XRSpace} from './api/geometry';
 import type XRHitTestSource from './api/XRHitTestSource';
 import { dispatchCustomEvent } from '../types/contracts';
 import {DeviceAdapter as XRDevice, ControllerInput as GamepadXRInputSource, type DeviceInput as XRInputSource} from './device-adapter';
@@ -463,7 +463,7 @@ export default class EmulatedXRDevice extends XRDevice {
     }
     const inverse = coordinateSystem._inverseBaseMatrix;
     if (!inverse) return null;
-    return new XRPose(XRRigidTransform._fromMatrix(mat4.multiply(mat4.create(), inverse, matrix)));
+    return new XRPose(XRRigidTransform._fromMatrix(mat4.multiply(mat4.create(), inverse, matrix)), false, geometryAllocation);
   }
 
   onWindowResize() {
