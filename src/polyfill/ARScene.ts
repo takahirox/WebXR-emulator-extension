@@ -6,6 +6,7 @@ import {
   Object3D,
   OrthographicCamera,
   Mesh,
+  Matrix3,
   MeshBasicMaterial,
   MeshStandardMaterial,
   WebGLRenderer,
@@ -25,6 +26,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import MyControls from './MyControls';
 import type DOMOverlay from './DOMOverlay';
 import {roomMeshes} from './api/environment';
+import {roomHitTestGeometry, intersectHitTestGeometry, type HitTestGeometry} from './api/hit-test-geometry';
 import type {DeviceSize} from '../types/contracts';
 
 // @TODO: These default values should be imported from somewhere common place
@@ -445,10 +447,15 @@ export default class ARScene {
   }
 
   // Raycasting for AR hit testing API
-  getHitTestResults(origin: ArrayLike<number>, direction: ArrayLike<number>) {
+  getHitTestGeometry() { return roomHitTestGeometry(this.room); }
+
+  getHitTestResults(origin: ArrayLike<number>, direction: ArrayLike<number>, types?: readonly string[], geometry?: HitTestGeometry) {
+    if (types) return intersectHitTestGeometry(origin, direction, geometry ?? this.getHitTestGeometry(), types);
+    // Depth and independent room probes use the source mesh raycaster directly.
     raycaster.set(new Vector3().fromArray(origin), new Vector3().fromArray(direction));
     this.room?.updateWorldMatrix(true, true);
-    return raycaster.intersectObjects(roomMeshes(this.room), false);
+    return raycaster.intersectObjects(roomMeshes(this.room), false).map(hit => ({...hit,
+      normal: hit.face!.normal.clone().applyMatrix3(new Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize(), entityType: 'mesh' as const}));
   }
 
   loadVirtualRoomAsset(buffer: ArrayBuffer) {

@@ -1,0 +1,27 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:environment
+> tsx --test tests/environment.ts tests/play-area.ts
+
+✔ room patches preserve world geometry, identity, updates and removal (3.635583ms)
+✔ small cumulative shape changes eventually publish new polygon metadata (1.699625ms)
+✔ non-indexed, sloped and degenerate geometry; feature independence (0.168042ms)
+✔ depth formats encode a known plane in meters, quantize and never wrap (4.017959ms)
+✔ rectangle polygon and pinned rectangular proxy agree within 1e-4 m (0.513833ms)
+✔ rotated rectangle polygon and pinned rectangular proxy agree within 1e-4 m (0.189ms)
+✔ sloped rectangle polygon and pinned rectangular proxy agree within 1e-4 m (0.150417ms)
+✔ vertical rectangle polygon and pinned rectangular proxy agree within 1e-4 m (0.147333ms)
+✔ disconnected and opening regions have no gap fill or overlapping proxies (0.515875ms)
+✔ connected coplanar hole survives internal-edge cancellation (0.518667ms)
+✔ plane interfaces are nonconstructible, branded readonly setlikes (0.423791ms)
+hall measurements {"fixtures":[{"name":"rectangle","polygonBoundaryErrorMetres":0,"proxyBoundaryErrorMetres":0,"area":12,"proxyArea":12,"displacementMetres":0,"normalError":0,"orientation":"horizontal"},{"name":"rotated rectangle","polygonBoundaryErrorMetres":1.9991373319493151e-7,"proxyBoundaryErrorMetres":1.9991373319493151e-7,"area":12.000000000000004,"proxyArea":12.000000000000007,"displacementMetres":0,"normalError":0,"orientation":"horizontal"},{"name":"sloped rectangle","polygonBoundaryErrorMetres":1.5388186237196645e-7,"proxyBoundaryErrorMetres":1.5388186237196645e-7,"area":12,"proxyArea":12.000000000000004,"displacementMetres":0,"normalError":1.101926057709333e-8,"orientation":null},{"name":"vertical rectangle","polygonBoundaryErrorMetres":0,"proxyBoundaryErrorMetres":0,"area":12,"proxyArea":12,"displacementMetres":0,"normalError":0,"orientation":"vertical"},{"name":"connected hole","triangles":16,"planes":4,"knownArea":32,"polygonArea":32,"proxyArea":32,"holeExcess":0}],"triangles":100,"planes":85,"horizontal":20,"vertical":59,"sourceArea":675.8218116500445,"polygonCovered":675.8217753288324,"proxyCovered":675.8217852053231,"proxyOverlap":0.000006427056717662463,"polygonOverlap":0.000010819450886424626,"polygonArea":675.8218042076909,"proxyArea":732.509846805441,"maxDisplacement":4.440892098500626e-16}
+✔ packaged hall plane coverage and centered XRPlanes proxy measurements (22.539334ms)
+✔ hit testing filters independently classified plane and mesh fixtures (2.24175ms)
+✔ authored hall play area is clockwise, floor-covered and clear of obstacles (7.462834ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 280.617458

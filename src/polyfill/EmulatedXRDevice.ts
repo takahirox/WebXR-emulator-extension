@@ -5,6 +5,8 @@ import type XRHitTestSource from './api/XRHitTestSource';
 import { dispatchCustomEvent } from '../types/contracts';
 import {DeviceAdapter as XRDevice, ControllerInput as GamepadXRInputSource, type DeviceInput as XRInputSource} from './device-adapter';
 import XRTransientInputHitTestSource from './api/XRTransientInputHitTestSource';
+import {interfaceBrands} from './api/interface-brand';
+import {rayState} from './api/XRRay';
 import {XRSpace as OwnedSpace, XRRigidTransform, transformMatrix, XRPose} from './api/geometry';
 import {
   vec3,
@@ -476,6 +478,13 @@ export default class EmulatedXRDevice extends XRDevice {
     this.hitTestSources.push(source);
   }
 
+  removeHitTestSource(source: XRHitTestSource | XRTransientInputHitTestSource) {
+    this.hitTestSources = this.hitTestSources.filter(item => item !== source);
+    this.hitTestSourcesForTransientInput = this.hitTestSourcesForTransientInput.filter(item => item !== source);
+    this.hitTestResults.delete(source as XRHitTestSource);
+    this.hitTestResultsForTransientInput.delete(source as XRTransientInputHitTestSource);
+  }
+
   getHitTestResults(source: XRHitTestSource) {
     return this.hitTestResults.get(source) || [];
   }
@@ -547,6 +556,7 @@ export default class EmulatedXRDevice extends XRDevice {
 
     // Do hit test next
     hitTestResults.clear();
+    const geometry = hitTestSources.length ? this.arScene!.getHitTestGeometry() : null;
     for (const source of hitTestSources as (XRHitTestSource | XRTransientInputHitTestSource)[]) {
       if (sessionId !== source._session._id) {
         continue;
@@ -554,11 +564,12 @@ export default class EmulatedXRDevice extends XRDevice {
 
       // Gets base matrix depending on hit test source type
       let baseMatrix;
-      if (source instanceof XRTransientInputHitTestSource) {
+      if (interfaceBrands.transientHitSources.has(source)) {
+        const transient = source as XRTransientInputHitTestSource;
         if (!this.gamepadInputSources[0].active) {
           continue;
         }
-        if (!this.gamepadInputSources[0].inputSource.profiles.includes(source._profile)) {
+        if (!this.gamepadInputSources[0].inputSource.profiles.includes(transient._profile)) {
           continue;
         }
         const world = new OwnedSpace(source._session, () => mat4.create()); world._update();
@@ -566,24 +577,24 @@ export default class EmulatedXRDevice extends XRDevice {
         baseMatrix = pose ? transformMatrix(pose.transform) : undefined;
         if (!baseMatrix) continue;
       } else {
-        baseMatrix = source._space._update();
+        baseMatrix = (source as XRHitTestSource)._space._update();
         if (!baseMatrix) {
           continue;
         }
       }
 
       // Calculates origin and direction used for hit test in AR scene
-      const offsetRay = source._offsetRay;
+      const offsetRay = rayState(source._offsetRay);
       const origin = vec3.set(vec3.create(), offsetRay.origin.x, offsetRay.origin.y, offsetRay.origin.z);
       const direction = vec3.set(vec3.create(), offsetRay.direction.x, offsetRay.direction.y, offsetRay.direction.z);
       vec3.transformMat4(origin, origin, baseMatrix);
       vec3.transformQuat(direction, direction, mat4.getRotation(quat.create(), baseMatrix));
 
       // Do hit test in AR scene and stores the result matrices
-      const arHitTestResults = this.arScene!.getHitTestResults(origin, direction);
+      const arHitTestResults = this.arScene!.getHitTestResults(origin, direction, source._entityTypes, geometry!);
       const results = [];
       for (const result of arHitTestResults) {
-        const normal = result.face!.normal.clone().transformDirection(result.object.matrixWorld);
+        const normal = result.normal;
         const rotation = quat.rotationTo(quat.create(), [0, 1, 0], [normal.x, normal.y, normal.z]);
         const matrix = mat4.fromQuat(mat4.create(), rotation);
         matrix[12] = result.point.x;

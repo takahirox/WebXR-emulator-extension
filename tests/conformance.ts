@@ -459,7 +459,9 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
         check(session.domOverlayState === null && !session.enabledFeatures.includes('dom-overlay'), 'overlay preview stays disabled without opt-in');
         check(session.depthUsage === 'cpu-optimized' && session.depthDataFormat === 'float32', 'CPU depth format negotiation');
         await rejects(() => session.requestHitTestSource({space: inlineSpace}), 'InvalidStateError', 'foreign hit test space');
-        await rejects(() => session.requestHitTestSource({space: viewer, entityTypes: ['point']}), 'NotSupportedError', 'point-cloud entity unsupported');
+        const pointsOnly = await session.requestHitTestSource({space: viewer, entityTypes: ['point']});
+        await nextFrame(frame => check(frame.getHitTestResults(pointsOnly).length === 0, 'absent point data produces no hits'));
+        pointsOnly.cancel();
         await rejects(() => session.requestHitTestSource({space: viewer, entityTypes: ['wrong']}), 'TypeError', 'invalid hit entity');
         const hit = await session.requestHitTestSource({space: viewer, entityTypes: ['plane', 'mesh']});
         const transient = await session.requestHitTestSourceForTransientInput({profile: 'not-touch'});

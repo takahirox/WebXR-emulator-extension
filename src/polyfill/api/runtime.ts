@@ -1,7 +1,7 @@
 import {mat4} from 'gl-matrix';
 import type EmulatedXRDevice from '../EmulatedXRDevice';
 import type {SessionMode} from '../../types/contracts';
-import type {HitTestOptions, TransientHitTestOptions} from '../../types/polyfill';
+import {convertHitTestOptions, convertTransientHitTestOptions, hitTestAllocation} from './hit-test-options';
 import {SourceGamepad, type DeviceInput, type InputSignal} from '../device-adapter';
 import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, transformMatrix, transformObjects, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, spaceObjects, relativePose, geometryAllocation, requireGeometryAllocation, enumerableMembers, viewState, invalidState, unsupported} from './geometry';
 import {HALL_PLAY_AREA} from '../virtual-play-area';
@@ -9,8 +9,8 @@ import {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
 import {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation, jointObjects} from './sensing';
 import {interfaceValue, interfaceSequence, float32Output} from './bulk-input';
 import {interfaceBrands} from './interface-brand';
-import XRHitTestSource from './XRHitTestSource';
-import XRTransientInputHitTestSource from './XRTransientInputHitTestSource';
+import XRHitTestSource, {hitSourceState} from './XRHitTestSource';
+import XRTransientInputHitTestSource, {transientHitSourceState} from './XRTransientInputHitTestSource';
 import XRHitTestResult from './XRHitTestResult';
 import XRTransientInputHitTestResult from './XRTransientInputHitTestResult';
 import XRInputSourceArray from './XRInputSourceArray';
@@ -376,12 +376,19 @@ export class XRSession extends interfaceBrands.SessionObject {
     setTimeout(() => this._emit(new XRSessionEvent('end', {session: this})), 0);
     this.onShutdown();
   }
-  async requestHitTestSource(options: HitTestOptions) {
-    this._require('hit-test'); this._owns(options.space);
-    const source = new XRHitTestSource(this, options); this._hitSources.add(source); this._device.addHitTestSource(source); return source;
+  async requestHitTestSource(value?: unknown) {
+    interfaceValue(this, sessionObjects, 'XRSession');
+    const options = convertHitTestOptions(value);
+    if (!this.enabledFeatures.includes('hit-test')) unsupported('hit-test was not enabled.');
+    this._assertLive(); this._owns(options.space);
+    const source = new XRHitTestSource(this, options, hitTestAllocation); this._hitSources.add(source); this._device.addHitTestSource(source); return source;
   }
-  async requestHitTestSourceForTransientInput(options: TransientHitTestOptions) {
-    this._require('hit-test'); const source = new XRTransientInputHitTestSource(this, options); this._transientSources.add(source); this._device.addHitTestSourceForTransientInput(source); return source;
+  async requestHitTestSourceForTransientInput(value?: unknown) {
+    interfaceValue(this, sessionObjects, 'XRSession');
+    const options = convertTransientHitTestOptions(value);
+    if (!this.enabledFeatures.includes('hit-test')) unsupported('hit-test was not enabled.');
+    this._assertLive();
+    const source = new XRTransientInputHitTestSource(this, options, hitTestAllocation); this._transientSources.add(source); this._device.addHitTestSourceForTransientInput(source); return source;
   }
   private emitInput(type: string, inputSource: XRInputSource, time: number) {
     const frame = new XRFrame(this, time, false, geometryAllocation); frame._active = true;
@@ -405,7 +412,7 @@ export class XRSession extends interfaceBrands.SessionObject {
     }
     if (!this.presentation || this.presentation.context.isContextLost()) return;
     this._viewer._update();
-    for (const source of this._hitSources) if (source._space instanceof XRSpace) source._space._update();
+    for (const source of this._hitSources) source._space._update();
     this._device.onFrameStart(this._id, {depthNear: this.renderState.depthNear, depthFar: this.renderState.depthFar, inlineVerticalFieldOfView: this.renderState.inlineVerticalFieldOfView ?? Math.PI / 2});
     this.rawSources = this._mode === 'inline' ? [] : this._device.getInputSources();
     const replaced: XRInputSource[] = [];
@@ -483,11 +490,11 @@ export class XRFrame extends interfaceBrands.FrameObject {
     this.anchorSnapshot = new XRAnchorSet(session._anchors);
     this.environmentSnapshot = session._environment.snapshot();
     if (_animation) {
-      for (const source of session._hitSources) this.hitResults.set(source, session._device.getHitTestResults(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix))));
+      for (const source of session._hitSources) this.hitResults.set(source, session._device.getHitTestResults(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix), hitTestAllocation)));
       for (const source of session._transientSources) {
         const input = Array.from(session.inputSources).find(input => input.targetRayMode === 'screen' && input.profiles.includes(source._profile));
-        const hits = session._device.getHitTestResultsForTransientInput(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix)));
-        this.transientResults.set(source, input ? [new XRTransientInputHitTestResult(this, hits, input)] : []);
+        const hits = session._device.getHitTestResultsForTransientInput(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix), hitTestAllocation));
+        this.transientResults.set(source, input ? [new XRTransientInputHitTestResult(this, hits, input, hitTestAllocation)] : []);
       }
     }
   }
@@ -580,8 +587,8 @@ export class XRFrame extends interfaceBrands.FrameObject {
     if (!this.session.depthActive || !this.session._device.arScene?.room) return null;
     return new XRCPUDepthInformation(this, view);
   }
-  getHitTestResults(source: XRHitTestSource) { this._assertActive(); if (!this.hitResults.has(source)) invalidState('Hit test source was not active for this frame.'); return this.hitResults.get(source)!.slice(); }
-  getHitTestResultsForTransientInput(source: XRTransientInputHitTestSource) { this._assertActive(); if (!this.transientResults.has(source)) invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source)!.slice(); }
+  getHitTestResults(source: XRHitTestSource) { frameState(this); hitSourceState(source); this._assertActive(); if (!this.hitResults.has(source)) invalidState('Hit test source was not active for this frame.'); return this.hitResults.get(source)!.slice(); }
+  getHitTestResultsForTransientInput(source: XRTransientInputHitTestSource) { frameState(this); transientHitSourceState(source); this._assertActive(); if (!this.transientResults.has(source)) invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source)!.slice(); }
 }
 function frameState(value: object) {
   const state = interfaceBrands.frameValues.get(value);
@@ -607,7 +614,7 @@ function allocateViewerPose(frame: XRFrame, reference: XRReferenceSpace) {
   });
   return new XRViewerPose(transform, views, relative.emulated, geometryAllocation);
 }
-enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose']);
+enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
 // Share allocation branding while retaining the public prototype's own realm.
 Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
 
@@ -673,3 +680,5 @@ installEventHandlers(XRSystem.prototype, ['devicechange'], value => value instan
 installEventHandlers(XRSession.prototype, [
   'end', 'visibilitychange', 'inputsourceschange', 'selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend',
 ], value => sessionObjects.has(value));
+
+enumerableMembers(XRSession.prototype, ['requestHitTestSource', 'requestHitTestSourceForTransientInput']);

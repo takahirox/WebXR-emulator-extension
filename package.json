@@ -21,7 +21,11 @@
     "test:pose-view:chromium": "tsx tests/reference-space-browser.ts chromium poses",
     "test:pose-view:firefox": "tsx tests/reference-space-browser.ts firefox poses",
     "test:transform:chromium": "tsx tests/reference-space-browser.ts chromium transforms",
-    "test:transform:firefox": "tsx tests/reference-space-browser.ts firefox transforms"
+    "test:transform:firefox": "tsx tests/reference-space-browser.ts firefox transforms",
+    "test:hit-test:chromium": "tsx tests/reference-space-browser.ts chromium hit-test",
+    "test:hit-test:firefox": "tsx tests/reference-space-browser.ts firefox hit-test",
+    "test:hit-test-applications:chromium": "tsx tests/reference-space-browser.ts chromium hit-test-applications",
+    "test:hit-test-applications:firefox": "tsx tests/reference-space-browser.ts firefox hit-test-applications"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",

@@ -368,25 +368,6 @@ function WebXRPolyfillInjection() {
     out[15] = a[15];
     return out;
   }
-  function fromTranslation(out, v) {
-    out[0] = 1;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = 1;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = 1;
-    out[11] = 0;
-    out[12] = v[0];
-    out[13] = v[1];
-    out[14] = v[2];
-    out[15] = 1;
-    return out;
-  }
   function fromRotation(out, rad, axis) {
     var x = axis[0],
       y = axis[1],
@@ -695,7 +676,7 @@ function WebXRPolyfillInjection() {
     out[2] = a[2];
     return out;
   }
-  function set$1(out, x, y, z) {
+  function set(out, x, y, z) {
     out[0] = x;
     out[1] = y;
     out[2] = z;
@@ -741,7 +722,7 @@ function WebXRPolyfillInjection() {
     out[2] = ax * by - ay * bx;
     return out;
   }
-  function transformMat4$1(out, a, m) {
+  function transformMat4(out, a, m) {
     var x = a[0],
       y = a[1],
       z = a[2];
@@ -810,13 +791,6 @@ function WebXRPolyfillInjection() {
     }
     return out;
   }
-  function set(out, x, y, z, w) {
-    out[0] = x;
-    out[1] = y;
-    out[2] = z;
-    out[3] = w;
-    return out;
-  }
   function normalize$2(out, a) {
     var x = a[0];
     var y = a[1];
@@ -830,17 +804,6 @@ function WebXRPolyfillInjection() {
     out[1] = y * len;
     out[2] = z * len;
     out[3] = w * len;
-    return out;
-  }
-  function transformMat4(out, a, m) {
-    var x = a[0],
-      y = a[1],
-      z = a[2],
-      w = a[3];
-    out[0] = m[0] * x + m[4] * y + m[8] * z + m[12] * w;
-    out[1] = m[1] * x + m[5] * y + m[9] * z + m[13] * w;
-    out[2] = m[2] * x + m[6] * y + m[10] * z + m[14] * w;
-    out[3] = m[3] * x + m[7] * y + m[11] * z + m[15] * w;
     return out;
   }
   (function () {
@@ -1082,6 +1045,97 @@ function WebXRPolyfillInjection() {
       });
   }
 
+  function createHitTestAllocations(brands) {
+      const rays = new WeakMap();
+      const hitSources = new WeakMap();
+      const transientHitSources = new WeakMap();
+      const hitResults = new WeakMap();
+      const transientHitResults = new WeakMap();
+      function sourceRecord(session, options, extra, membership, source) {
+          const offsetRay = options.offsetRay;
+          if (!brands.sessions.has(session) || !rays.has(offsetRay))
+              throw new TypeError('Expected session and ray.');
+          const entityTypes = Object.freeze([...options.entityTypes]);
+          if (entityTypes.some(type => !['plane', 'mesh', 'point'].includes(type)))
+              throw new TypeError('Invalid entity type.');
+          return Object.freeze({ ...extra, session, offsetRay, entityTypes,
+              get active() { return membership.has(source); } });
+      }
+      class RayAllocation {
+          constructor(p, d) {
+              p = { x: +p.x, y: +p.y, z: +p.z, w: +p.w };
+              d = { x: +d.x, y: +d.y, z: +d.z, w: +d.w };
+              if (p.w !== 1 || d.w !== 0 || ![d.x, d.y, d.z].every(Number.isFinite) || (d.x === 0 && d.y === 0 && d.z === 0))
+                  throw new TypeError('Invalid ray.');
+              const scale = Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
+              const length = Math.hypot(d.x / scale, d.y / scale, d.z / scale);
+              d.x = d.x / scale / length;
+              d.y = d.y / scale / length;
+              d.z = d.z / scale / length;
+              const origin = Object.freeze(new DOMPointReadOnly(p.x, p.y, p.z, p.w));
+              const direction = Object.freeze(new DOMPointReadOnly(d.x, d.y, d.z, d.w));
+              let matrix;
+              rays.set(this, Object.freeze({ origin, direction, matrix: () => {
+                      if (!matrix || matrix.buffer.byteLength === 0) {
+                          const rotation = create$3();
+                          const sine = Math.hypot(d.x, d.y);
+                          if (sine > 0) {
+                              fromRotation(rotation, Math.atan2(sine, -d.z), [d.y / sine, -d.x / sine, 0]);
+                          }
+                          else if (d.z > 0)
+                              fromRotation(rotation, Math.PI, [1, 0, 0]);
+                          rotation[12] = p.x;
+                          rotation[13] = p.y;
+                          rotation[14] = p.z;
+                          matrix = new Float32Array(rotation);
+                      }
+                      return matrix;
+                  } }));
+          }
+      }
+      class HitSourceAllocation {
+          constructor(session, options) {
+              const space = options.space;
+              if (!brands.spaces.has(space))
+                  throw new TypeError('Expected XRSpace.');
+              hitSources.set(this, sourceRecord(session, options, { space }, session._hitSources, this));
+          }
+      }
+      class TransientHitSourceAllocation {
+          constructor(session, options) {
+              const profile = `${options.profile}`;
+              transientHitSources.set(this, sourceRecord(session, options, { profile }, session._transientSources, this));
+          }
+      }
+      class HitResultAllocation {
+          constructor(frame, transform) {
+              if (!brands.frames.has(frame) || !brands.transforms.has(transform))
+                  throw new TypeError('Expected frame and transform.');
+              hitResults.set(this, Object.freeze({ frame, transform }));
+          }
+      }
+      class TransientHitResultAllocation {
+          constructor(frame, results, inputSource) {
+              if (!brands.frames.has(frame) || !brands.inputSources.has(inputSource))
+                  throw new TypeError('Expected frame and input source.');
+              const snapshot = [...results];
+              if (snapshot.some(result => { var _a; return ((_a = hitResults.get(result)) === null || _a === void 0 ? void 0 : _a.frame) !== frame; }))
+                  throw new TypeError('Expected frame hit results.');
+              transientHitResults.set(this, Object.freeze({ inputSource, results: Object.freeze(snapshot) }));
+          }
+      }
+      function reader(map) {
+          return Object.freeze({ get: (value) => map.get(value), has: (value) => map.has(value) });
+      }
+      for (const C of [RayAllocation, HitSourceAllocation, TransientHitSourceAllocation, HitResultAllocation, TransientHitResultAllocation]) {
+          Object.freeze(C.prototype);
+          Object.freeze(C);
+      }
+      return Object.freeze({ RayAllocation, HitSourceAllocation, TransientHitSourceAllocation, HitResultAllocation, TransientHitResultAllocation,
+          rays: reader(rays), hitSources: reader(hitSources), transientHitSources: reader(transientHitSources),
+          hitResults: reader(hitResults), transientHitResults: reader(transientHitResults) });
+  }
+
   function createBrands() {
       const frames = new WeakSet(), spaces = new WeakSet(), joints = new WeakSet();
       const sessions = new WeakSet(), inputSources = new WeakSet();
@@ -1106,12 +1160,20 @@ function WebXRPolyfillInjection() {
       Object.freeze(SessionObject);
       Object.freeze(InputSourceObject.prototype);
       Object.freeze(InputSourceObject);
+      const transforms = new WeakMap();
+      const hitTestAllocations = createHitTestAllocations({ sessions, spaces, frames, inputSources, transforms });
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
           layerAllocations: createLayerAllocations(sessions),
           planeValues: new WeakMap(),
           planeSets: new WeakMap(),
           roomCaptures: new WeakMap(),
-          transforms: new WeakMap(),
+          hitTestAllocations,
+          rays: hitTestAllocations.rays,
+          hitSources: hitTestAllocations.hitSources,
+          transientHitSources: hitTestAllocations.transientHitSources,
+          hitResults: hitTestAllocations.hitResults,
+          transientHitResults: hitTestAllocations.transientHitResults,
+          transforms,
           referenceOffsets: new WeakMap(),
           referenceSpaceRequests: new WeakMap(),
           frameValues: new WeakMap(),
@@ -1295,7 +1357,7 @@ function WebXRPolyfillInjection() {
           this.nativeBounds = nativeBounds;
           const inverse = invert(create$3(), offset);
           this.boundsValue = Object.freeze(nativeBounds.map(point => {
-              const p = transformMat4$1(create$2(), point, inverse);
+              const p = transformMat4(create$2(), point, inverse);
               return Object.freeze(new DOMPointReadOnly(p[0], p[1], p[2], 1));
           }));
       }
@@ -2382,8 +2444,8 @@ function WebXRPolyfillInjection() {
           const world = create$2();
           for (let y = 0; y < this.height; y++)
               for (let x = 0; x < this.width; x++) {
-                  transformMat4$1(local, [(x + 0.5) / this.width * 2 - 1, 1 - (y + 0.5) / this.height * 2, 0], inverseProjection);
-                  transformMat4$1(world, local, view._worldMatrix);
+                  transformMat4(local, [(x + 0.5) / this.width * 2 - 1, 1 - (y + 0.5) / this.height * 2, 0], inverseProjection);
+                  transformMat4(world, local, view._worldMatrix);
                   subtract(world, world, origin);
                   normalize$3(world, world);
                   const hit = frame.session._device.arScene.getHitTestResults(origin, world)[0];
@@ -14979,7 +15041,7 @@ function WebXRPolyfillInjection() {
   var color_pars_fragment = "#if defined( USE_COLOR ) || defined( USE_COLOR_ALPHA )\n\tvarying vec4 vColor;\n#endif";
   var color_pars_vertex = "#if defined( USE_COLOR ) || defined( USE_COLOR_ALPHA ) || defined( USE_INSTANCING_COLOR ) || defined( USE_BATCHING_COLOR )\n\tvarying vec4 vColor;\n#endif";
   var color_vertex = "#if defined( USE_COLOR ) || defined( USE_COLOR_ALPHA ) || defined( USE_INSTANCING_COLOR ) || defined( USE_BATCHING_COLOR )\n\tvColor = vec4( 1.0 );\n#endif\n#ifdef USE_COLOR_ALPHA\n\tvColor *= color;\n#elif defined( USE_COLOR )\n\tvColor.rgb *= color;\n#endif\n#ifdef USE_INSTANCING_COLOR\n\tvColor.rgb *= instanceColor.rgb;\n#endif\n#ifdef USE_BATCHING_COLOR\n\tvColor *= getBatchingColor( getIndirectIndex( gl_DrawID ) );\n#endif";
-  var common = "#define PI 3.141592653589793\n#define PI2 6.283185307179586\n#define PI_HALF 1.5707963267948966\n#define RECIPROCAL_PI 0.3183098861837907\n#define RECIPROCAL_PI2 0.15915494309189535\n#define EPSILON 1e-6\n#ifndef saturate\n#define saturate( a ) clamp( a, 0.0, 1.0 )\n#endif\n#define whiteComplement( a ) ( 1.0 - saturate( a ) )\nfloat pow2( const in float x ) { return x*x; }\nvec3 pow2( const in vec3 x ) { return x*x; }\nfloat pow3( const in float x ) { return x*x*x; }\nfloat pow4( const in float x ) { float x2 = x*x; return x2*x2; }\nfloat max3( const in vec3 v ) { return max( max( v.x, v.y ), v.z ); }\nfloat average( const in vec3 v ) { return dot( v, vec3( 0.3333333 ) ); }\nhighp float rand( const in vec2 uv ) {\n\tconst highp float a = 12.9898, b = 78.233, c = 43758.5453;\n\thighp float dt = dot( uv.xy, vec2( a,b ) ), sn = mod( dt, PI );\n\treturn fract( sin( sn ) * c );\n}\n#ifdef HIGH_PRECISION\n\tfloat precisionSafeLength( vec3 v ) { return length( v ); }\n#else\n\tfloat precisionSafeLength( vec3 v ) {\n\t\tfloat maxComponent = max3( abs( v ) );\n\t\treturn length( v / maxComponent ) * maxComponent;\n\t}\n#endif\nstruct IncidentLight {\n\tvec3 color;\n\tvec3 direction;\n\tbool visible;\n};\nstruct ReflectedLight {\n\tvec3 directDiffuse;\n\tvec3 directSpecular;\n\tvec3 indirectDiffuse;\n\tvec3 indirectSpecular;\n};\n#ifdef USE_ALPHAHASH\n\tvarying vec3 vPosition;\n#endif\nvec3 transformDirection( in vec3 dir, in mat4 matrix ) {\n\treturn normalize( ( matrix * vec4( dir, 0.0 ) ).xyz );\n}\n#define inverseTransformDirection transformDirectionByInverseViewMatrix\nvec3 transformNormalByInverseViewMatrix( in vec3 normal, in mat4 viewMatrix ) {\n\treturn normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );\n}\nvec3 transformDirectionByInverseViewMatrix( in vec3 dir, in mat4 viewMatrix ) {\n\treturn normalize( ( vec4( dir, 0.0 ) * viewMatrix ).xyz );\n}\nbool isPerspectiveMatrix( mat4 m ) {\n\treturn m[ 2 ][ 3 ] == - 1.0;\n}\nvec2 equirectUv( in vec3 dir ) {\n\tfloat u = atan( dir.z, dir.x ) * RECIPROCAL_PI2 + 0.5;\n\tfloat v = asin( clamp( dir.y, - 1.0, 1.0 ) ) * RECIPROCAL_PI + 0.5;\n\treturn vec2( u, v );\n}\nvec3 BRDF_Lambert( const in vec3 diffuseColor ) {\n\treturn RECIPROCAL_PI * diffuseColor;\n}\nvec3 F_Schlick( const in vec3 f0, const in float f90, const in float dotVH ) {\n\tfloat fresnel = exp2( ( - 5.55473 * dotVH - 6.98316 ) * dotVH );\n\treturn f0 * ( 1.0 - fresnel ) + ( f90 * fresnel );\n}\nfloat F_Schlick( const in float f0, const in float f90, const in float dotVH ) {\n\tfloat fresnel = exp2( ( - 5.55473 * dotVH - 6.98316 ) * dotVH );\n\treturn f0 * ( 1.0 - fresnel ) + ( f90 * fresnel );\n} // validated";
+  var common$1 = "#define PI 3.141592653589793\n#define PI2 6.283185307179586\n#define PI_HALF 1.5707963267948966\n#define RECIPROCAL_PI 0.3183098861837907\n#define RECIPROCAL_PI2 0.15915494309189535\n#define EPSILON 1e-6\n#ifndef saturate\n#define saturate( a ) clamp( a, 0.0, 1.0 )\n#endif\n#define whiteComplement( a ) ( 1.0 - saturate( a ) )\nfloat pow2( const in float x ) { return x*x; }\nvec3 pow2( const in vec3 x ) { return x*x; }\nfloat pow3( const in float x ) { return x*x*x; }\nfloat pow4( const in float x ) { float x2 = x*x; return x2*x2; }\nfloat max3( const in vec3 v ) { return max( max( v.x, v.y ), v.z ); }\nfloat average( const in vec3 v ) { return dot( v, vec3( 0.3333333 ) ); }\nhighp float rand( const in vec2 uv ) {\n\tconst highp float a = 12.9898, b = 78.233, c = 43758.5453;\n\thighp float dt = dot( uv.xy, vec2( a,b ) ), sn = mod( dt, PI );\n\treturn fract( sin( sn ) * c );\n}\n#ifdef HIGH_PRECISION\n\tfloat precisionSafeLength( vec3 v ) { return length( v ); }\n#else\n\tfloat precisionSafeLength( vec3 v ) {\n\t\tfloat maxComponent = max3( abs( v ) );\n\t\treturn length( v / maxComponent ) * maxComponent;\n\t}\n#endif\nstruct IncidentLight {\n\tvec3 color;\n\tvec3 direction;\n\tbool visible;\n};\nstruct ReflectedLight {\n\tvec3 directDiffuse;\n\tvec3 directSpecular;\n\tvec3 indirectDiffuse;\n\tvec3 indirectSpecular;\n};\n#ifdef USE_ALPHAHASH\n\tvarying vec3 vPosition;\n#endif\nvec3 transformDirection( in vec3 dir, in mat4 matrix ) {\n\treturn normalize( ( matrix * vec4( dir, 0.0 ) ).xyz );\n}\n#define inverseTransformDirection transformDirectionByInverseViewMatrix\nvec3 transformNormalByInverseViewMatrix( in vec3 normal, in mat4 viewMatrix ) {\n\treturn normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );\n}\nvec3 transformDirectionByInverseViewMatrix( in vec3 dir, in mat4 viewMatrix ) {\n\treturn normalize( ( vec4( dir, 0.0 ) * viewMatrix ).xyz );\n}\nbool isPerspectiveMatrix( mat4 m ) {\n\treturn m[ 2 ][ 3 ] == - 1.0;\n}\nvec2 equirectUv( in vec3 dir ) {\n\tfloat u = atan( dir.z, dir.x ) * RECIPROCAL_PI2 + 0.5;\n\tfloat v = asin( clamp( dir.y, - 1.0, 1.0 ) ) * RECIPROCAL_PI + 0.5;\n\treturn vec2( u, v );\n}\nvec3 BRDF_Lambert( const in vec3 diffuseColor ) {\n\treturn RECIPROCAL_PI * diffuseColor;\n}\nvec3 F_Schlick( const in vec3 f0, const in float f90, const in float dotVH ) {\n\tfloat fresnel = exp2( ( - 5.55473 * dotVH - 6.98316 ) * dotVH );\n\treturn f0 * ( 1.0 - fresnel ) + ( f90 * fresnel );\n}\nfloat F_Schlick( const in float f0, const in float f90, const in float dotVH ) {\n\tfloat fresnel = exp2( ( - 5.55473 * dotVH - 6.98316 ) * dotVH );\n\treturn f0 * ( 1.0 - fresnel ) + ( f90 * fresnel );\n} // validated";
   var cube_uv_reflection_fragment = "#ifdef ENVMAP_TYPE_CUBE_UV\n\t#define cubeUV_minMipLevel 4.0\n\t#define cubeUV_minTileSize 16.0\n\tfloat getFace( vec3 direction ) {\n\t\tvec3 absDirection = abs( direction );\n\t\tfloat face = - 1.0;\n\t\tif ( absDirection.x > absDirection.z ) {\n\t\t\tif ( absDirection.x > absDirection.y )\n\t\t\t\tface = direction.x > 0.0 ? 0.0 : 3.0;\n\t\t\telse\n\t\t\t\tface = direction.y > 0.0 ? 1.0 : 4.0;\n\t\t} else {\n\t\t\tif ( absDirection.z > absDirection.y )\n\t\t\t\tface = direction.z > 0.0 ? 2.0 : 5.0;\n\t\t\telse\n\t\t\t\tface = direction.y > 0.0 ? 1.0 : 4.0;\n\t\t}\n\t\treturn face;\n\t}\n\tvec2 getUV( vec3 direction, float face ) {\n\t\tvec2 uv;\n\t\tif ( face == 0.0 ) {\n\t\t\tuv = vec2( direction.z, direction.y ) / abs( direction.x );\n\t\t} else if ( face == 1.0 ) {\n\t\t\tuv = vec2( - direction.x, - direction.z ) / abs( direction.y );\n\t\t} else if ( face == 2.0 ) {\n\t\t\tuv = vec2( - direction.x, direction.y ) / abs( direction.z );\n\t\t} else if ( face == 3.0 ) {\n\t\t\tuv = vec2( - direction.z, direction.y ) / abs( direction.x );\n\t\t} else if ( face == 4.0 ) {\n\t\t\tuv = vec2( - direction.x, direction.z ) / abs( direction.y );\n\t\t} else {\n\t\t\tuv = vec2( direction.x, direction.y ) / abs( direction.z );\n\t\t}\n\t\treturn 0.5 * ( uv + 1.0 );\n\t}\n\tvec3 bilinearCubeUV( sampler2D envMap, vec3 direction, float mipInt ) {\n\t\tfloat face = getFace( direction );\n\t\tfloat filterInt = max( cubeUV_minMipLevel - mipInt, 0.0 );\n\t\tmipInt = max( mipInt, cubeUV_minMipLevel );\n\t\tfloat faceSize = exp2( mipInt );\n\t\thighp vec2 uv = getUV( direction, face ) * ( faceSize - 2.0 ) + 1.0;\n\t\tif ( face > 2.0 ) {\n\t\t\tuv.y += faceSize;\n\t\t\tface -= 3.0;\n\t\t}\n\t\tuv.x += face * faceSize;\n\t\tuv.x += filterInt * 3.0 * cubeUV_minTileSize;\n\t\tuv.y += 4.0 * ( exp2( CUBEUV_MAX_MIP ) - faceSize );\n\t\tuv.x *= CUBEUV_TEXEL_WIDTH;\n\t\tuv.y *= CUBEUV_TEXEL_HEIGHT;\n\t\t#ifdef texture2DGradEXT\n\t\t\treturn texture2DGradEXT( envMap, uv, vec2( 0.0 ), vec2( 0.0 ) ).rgb;\n\t\t#else\n\t\t\treturn texture2D( envMap, uv ).rgb;\n\t\t#endif\n\t}\n\t#define cubeUV_r0 1.0\n\t#define cubeUV_m0 - 2.0\n\t#define cubeUV_r1 0.8\n\t#define cubeUV_m1 - 1.0\n\t#define cubeUV_r4 0.4\n\t#define cubeUV_m4 2.0\n\t#define cubeUV_r5 0.305\n\t#define cubeUV_m5 3.0\n\t#define cubeUV_r6 0.21\n\t#define cubeUV_m6 4.0\n\tfloat roughnessToMip( float roughness ) {\n\t\tfloat mip = 0.0;\n\t\tif ( roughness >= cubeUV_r1 ) {\n\t\t\tmip = ( cubeUV_r0 - roughness ) * ( cubeUV_m1 - cubeUV_m0 ) / ( cubeUV_r0 - cubeUV_r1 ) + cubeUV_m0;\n\t\t} else if ( roughness >= cubeUV_r4 ) {\n\t\t\tmip = ( cubeUV_r1 - roughness ) * ( cubeUV_m4 - cubeUV_m1 ) / ( cubeUV_r1 - cubeUV_r4 ) + cubeUV_m1;\n\t\t} else if ( roughness >= cubeUV_r5 ) {\n\t\t\tmip = ( cubeUV_r4 - roughness ) * ( cubeUV_m5 - cubeUV_m4 ) / ( cubeUV_r4 - cubeUV_r5 ) + cubeUV_m4;\n\t\t} else if ( roughness >= cubeUV_r6 ) {\n\t\t\tmip = ( cubeUV_r5 - roughness ) * ( cubeUV_m6 - cubeUV_m5 ) / ( cubeUV_r5 - cubeUV_r6 ) + cubeUV_m5;\n\t\t} else {\n\t\t\tmip = - 2.0 * log2( 1.16 * roughness );\t\t}\n\t\treturn mip;\n\t}\n\tvec4 textureCubeUV( sampler2D envMap, vec3 sampleDir, float roughness ) {\n\t\tfloat mip = clamp( roughnessToMip( roughness ), cubeUV_m0, CUBEUV_MAX_MIP );\n\t\tfloat mipF = fract( mip );\n\t\tfloat mipInt = floor( mip );\n\t\tvec3 color0 = bilinearCubeUV( envMap, sampleDir, mipInt );\n\t\tif ( mipF == 0.0 ) {\n\t\t\treturn vec4( color0, 1.0 );\n\t\t} else {\n\t\t\tvec3 color1 = bilinearCubeUV( envMap, sampleDir, mipInt + 1.0 );\n\t\t\treturn vec4( mix( color0, color1, mipF ), 1.0 );\n\t\t}\n\t}\n#endif";
   var defaultnormal_vertex = "vec3 transformedNormal = objectNormal;\n#ifdef USE_TANGENT\n\tvec3 transformedTangent = objectTangent;\n#endif\n#ifdef USE_BATCHING\n\tmat3 bm = mat3( batchingMatrix );\n\ttransformedNormal /= vec3( dot( bm[ 0 ], bm[ 0 ] ), dot( bm[ 1 ], bm[ 1 ] ), dot( bm[ 2 ], bm[ 2 ] ) );\n\ttransformedNormal = bm * transformedNormal;\n\t#ifdef USE_TANGENT\n\t\ttransformedTangent = bm * transformedTangent;\n\t#endif\n#endif\n#ifdef USE_INSTANCING\n\tmat3 im = mat3( instanceMatrix );\n\ttransformedNormal /= vec3( dot( im[ 0 ], im[ 0 ] ), dot( im[ 1 ], im[ 1 ] ), dot( im[ 2 ], im[ 2 ] ) );\n\ttransformedNormal = im * transformedNormal;\n\t#ifdef USE_TANGENT\n\t\ttransformedTangent = im * transformedTangent;\n\t#endif\n#endif\ntransformedNormal = normalMatrix * transformedNormal;\n#ifdef FLIP_SIDED\n\ttransformedNormal = - transformedNormal;\n#endif\n#ifdef USE_TANGENT\n\ttransformedTangent = ( modelViewMatrix * vec4( transformedTangent, 0.0 ) ).xyz;\n#endif";
   var displacementmap_pars_vertex = "#ifdef USE_DISPLACEMENTMAP\n\tuniform sampler2D displacementMap;\n\tuniform float displacementScale;\n\tuniform float displacementBias;\n#endif";
@@ -15122,7 +15184,7 @@ function WebXRPolyfillInjection() {
   	color_pars_fragment: color_pars_fragment,
   	color_pars_vertex: color_pars_vertex,
   	color_vertex: color_vertex,
-  	common: common,
+  	common: common$1,
   	cube_uv_reflection_fragment: cube_uv_reflection_fragment,
   	defaultnormal_vertex: defaultnormal_vertex,
   	displacementmap_pars_vertex: displacementmap_pars_vertex,
@@ -25919,6 +25981,148 @@ void main() {
     roomSurfaces: roomSurfaces
   });
 
+  function point(value, direction = false) {
+      if (value !== null && value !== undefined && Object(value) !== value)
+          throw new TypeError('Expected point dictionary.');
+      const input = value;
+      const out = { w: direction ? 0 : 1, x: 0, y: 0, z: direction ? -1 : 0 };
+      for (const key of ['w', 'x', 'y', 'z']) {
+          const member = input === null || input === void 0 ? void 0 : input[key];
+          if (member !== undefined)
+              out[key] = +member;
+          if (direction && !Number.isFinite(out[key]))
+              throw new TypeError('Direction members must be finite doubles.');
+      }
+      return out;
+  }
+  function rayState(value) {
+      const state = interfaceBrands.rays.get(value);
+      if (!state)
+          throw new TypeError('Expected XRRay.');
+      return state;
+  }
+  class XRRay extends interfaceBrands.hitTestAllocations.RayAllocation {
+      constructor(origin = {}, direction = {}) {
+          let p, d;
+          if (arguments.length === 1 && transformObjects.has(origin)) {
+              const m = transformMatrix(origin);
+              p = { x: m[12], y: m[13], z: m[14], w: 1 };
+              d = { x: -m[8], y: -m[9], z: -m[10], w: 0 };
+          }
+          else {
+              p = point(origin);
+              d = point(direction, true);
+          }
+          if (p.w !== 1 || d.w !== 0 || (d.x === 0 && d.y === 0 && d.z === 0))
+              throw new TypeError('Invalid ray origin or direction.');
+          super(p, d);
+      }
+      get origin() { return rayState(this).origin; }
+      get direction() { return rayState(this).direction; }
+      get matrix() { return rayState(this).matrix(); }
+  }
+  enumerableMembers(XRRay.prototype, ['origin', 'direction', 'matrix']);
+  Object.defineProperty(XRRay.prototype, Symbol.toStringTag, { value: 'XRRay', configurable: true });
+
+  var _a;
+  const typedArray = Object.getPrototypeOf(Float32Array.prototype);
+  const arrayName = Object.getOwnPropertyDescriptor(typedArray, Symbol.toStringTag).get;
+  const arrayBuffer = Object.getOwnPropertyDescriptor(typedArray, 'buffer').get;
+  const arrayLength = Object.getOwnPropertyDescriptor(typedArray, 'length').get;
+  const bufferLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
+  const bufferResizable = (_a = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'resizable')) === null || _a === void 0 ? void 0 : _a.get;
+  function isObject$1(value) { return Object(value) === value; }
+  function interfaceValue(value, brand, name) {
+      if (!isObject$1(value) || !brand.has(value))
+          throw new TypeError(`Expected ${name}.`);
+      return value;
+  }
+  function interfaceSequence(value, brand, name) {
+      if (!isObject$1(value))
+          throw new TypeError('Expected iterable sequence.');
+      const method = value[Symbol.iterator];
+      if (typeof method !== 'function')
+          throw new TypeError('Expected iterable sequence.');
+      const iterator = Reflect.apply(method, value, []);
+      if (!isObject$1(iterator))
+          throw new TypeError('Expected iterator object.');
+      const next = iterator.next;
+      const list = [];
+      while (true) {
+          const step = Reflect.apply(next, iterator, []);
+          if (!isObject$1(step))
+              throw new TypeError('Expected iterator result object.');
+          if (step.done)
+              return list;
+          list.push(interfaceValue(step.value, brand, name));
+      }
+  }
+  function float32Output(value) {
+      if (arrayName.call(value) !== 'Float32Array')
+          throw new TypeError('Expected Float32Array.');
+      const buffer = arrayBuffer.call(value);
+      bufferLength.call(buffer);
+      if (bufferResizable === null || bufferResizable === void 0 ? void 0 : bufferResizable.call(buffer))
+          throw new TypeError('Resizable buffers are not supported.');
+      return arrayLength.call(value);
+  }
+
+  const hitTestAllocation = Symbol('hit test allocation');
+  function requireHitTestAllocation(token) {
+      if (token !== hitTestAllocation)
+          throw new TypeError('Illegal constructor.');
+  }
+  function dictionary$1(value) {
+      if (value === undefined || value === null)
+          return {};
+      if (Object(value) !== value)
+          throw new TypeError('Expected hit-test options dictionary.');
+      return value;
+  }
+  function common(value) {
+      const member = value.entityTypes;
+      let entityTypes = ['plane'];
+      if (member !== undefined) {
+          if (member === null || Object(member) !== member)
+              throw new TypeError('Expected entity type sequence.');
+          const method = member[Symbol.iterator];
+          if (typeof method !== 'function')
+              throw new TypeError('Expected entity type sequence.');
+          const iterator = Reflect.apply(method, member, []);
+          if (Object(iterator) !== iterator)
+              throw new TypeError('Expected iterator object.');
+          const next = iterator.next;
+          entityTypes = [];
+          while (true) {
+              const step = Reflect.apply(next, iterator, []);
+              if (Object(step) !== step)
+                  throw new TypeError('Expected iterator result.');
+              if (step.done)
+                  break;
+              const type = `${step.value}`;
+              if (!['plane', 'point', 'mesh'].includes(type))
+                  throw new TypeError('Invalid hit-test entity type.');
+              entityTypes.push(type);
+          }
+      }
+      const offset = value.offsetRay;
+      if (offset !== undefined)
+          rayState(offset);
+      return { entityTypes, offsetRay: offset === undefined ? new XRRay() : offset };
+  }
+  function convertHitTestOptions(value) {
+      const input = dictionary$1(value), converted = common(input);
+      const space = input.space;
+      return { ...converted, space: interfaceValue(space, spaceObjects, 'XRSpace') };
+  }
+  function convertTransientHitTestOptions(value) {
+      const input = dictionary$1(value), converted = common(input);
+      const profile = input.profile;
+      if (profile === undefined)
+          throw new TypeError('profile is required.');
+      return { ...converted, profile: `${profile}` };
+  }
+
   class DeviceAdapter {
       constructor(global) {
           this.global = global;
@@ -26005,257 +26209,118 @@ void main() {
       Object.freeze([-1, 0, 1]),
   ]);
 
-  var _a;
-  const typedArray = Object.getPrototypeOf(Float32Array.prototype);
-  const arrayName = Object.getOwnPropertyDescriptor(typedArray, Symbol.toStringTag).get;
-  const arrayBuffer = Object.getOwnPropertyDescriptor(typedArray, 'buffer').get;
-  const arrayLength = Object.getOwnPropertyDescriptor(typedArray, 'length').get;
-  const bufferLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
-  const bufferResizable = (_a = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'resizable')) === null || _a === void 0 ? void 0 : _a.get;
-  function isObject$1(value) { return Object(value) === value; }
-  function interfaceValue(value, brand, name) {
-      if (!isObject$1(value) || !brand.has(value))
-          throw new TypeError(`Expected ${name}.`);
-      return value;
+  function hitSourceState(value) {
+      const state = interfaceBrands.hitSources.get(value);
+      if (!state)
+          throw new TypeError('Expected XRHitTestSource.');
+      return state;
   }
-  function interfaceSequence(value, brand, name) {
-      if (!isObject$1(value))
-          throw new TypeError('Expected iterable sequence.');
-      const method = value[Symbol.iterator];
-      if (typeof method !== 'function')
-          throw new TypeError('Expected iterable sequence.');
-      const iterator = Reflect.apply(method, value, []);
-      if (!isObject$1(iterator))
-          throw new TypeError('Expected iterator object.');
-      const next = iterator.next;
-      const list = [];
-      while (true) {
-          const step = Reflect.apply(next, iterator, []);
-          if (!isObject$1(step))
-              throw new TypeError('Expected iterator result object.');
-          if (step.done)
-              return list;
-          list.push(interfaceValue(step.value, brand, name));
-      }
-  }
-  function float32Output(value) {
-      if (arrayName.call(value) !== 'Float32Array')
-          throw new TypeError('Expected Float32Array.');
-      const buffer = arrayBuffer.call(value);
-      bufferLength.call(buffer);
-      if (bufferResizable === null || bufferResizable === void 0 ? void 0 : bufferResizable.call(buffer))
-          throw new TypeError('Resizable buffers are not supported.');
-      return arrayLength.call(value);
-  }
-
-  const PRIVATE$4 = Symbol('@@webxr-polyfill/XRRay');
-  class XRRay {
-      constructor(origin, direction) {
-          var _a, _b, _c, _d, _e, _f, _g, _h;
-          const _origin = { x: 0, y: 0, z: 0, w: 1 };
-          const _direction = { x: 0, y: 0, z: -1, w: 0 };
-          if (origin && transformObjects.has(origin)) {
-              const transform = origin;
-              const matrix = transformMatrix(transform);
-              const originVec4 = set(create$1(), _origin.x, _origin.y, _origin.z, _origin.w);
-              const directionVec4 = set(create$1(), _direction.x, _direction.y, _direction.z, _direction.w);
-              transformMat4(originVec4, originVec4, matrix);
-              transformMat4(directionVec4, directionVec4, matrix);
-              _origin.x = originVec4[0];
-              _origin.y = originVec4[1];
-              _origin.z = originVec4[2];
-              _origin.w = originVec4[3];
-              _direction.x = directionVec4[0];
-              _direction.y = directionVec4[1];
-              _direction.z = directionVec4[2];
-              _direction.w = directionVec4[3];
-          }
-          else {
-              if (origin) {
-                  origin = origin;
-                  _origin.x = (_a = origin.x) !== null && _a !== void 0 ? _a : _origin.x;
-                  _origin.y = (_b = origin.y) !== null && _b !== void 0 ? _b : _origin.y;
-                  _origin.z = (_c = origin.z) !== null && _c !== void 0 ? _c : _origin.z;
-                  _origin.w = (_d = origin.w) !== null && _d !== void 0 ? _d : _origin.w;
-              }
-              if (direction) {
-                  _direction.x = (_e = direction.x) !== null && _e !== void 0 ? _e : _direction.x;
-                  _direction.y = (_f = direction.y) !== null && _f !== void 0 ? _f : _direction.y;
-                  _direction.z = (_g = direction.z) !== null && _g !== void 0 ? _g : _direction.z;
-                  _direction.w = (_h = direction.w) !== null && _h !== void 0 ? _h : _direction.w;
-              }
-          }
-          if (![...Object.values(_origin), ...Object.values(_direction)].every(Number.isFinite))
-              throw new TypeError('Ray components must be finite.');
-          if (_origin.w !== 1 || _direction.w !== 0 || !Math.hypot(_direction.x, _direction.y, _direction.z))
-              throw new TypeError('Invalid ray origin or direction.');
-          const length = Math.sqrt(_direction.x * _direction.x +
-              _direction.y * _direction.y + _direction.z * _direction.z) || 1;
-          _direction.x = _direction.x / length;
-          _direction.y = _direction.y / length;
-          _direction.z = _direction.z / length;
-          this[PRIVATE$4] = {
-              origin: new DOMPointReadOnly(_origin.x, _origin.y, _origin.z, _origin.w),
-              direction: new DOMPointReadOnly(_direction.x, _direction.y, _direction.z, _direction.w),
-              matrix: null
-          };
-      }
-      get origin() {
-          return this[PRIVATE$4].origin;
-      }
-      get direction() {
-          return this[PRIVATE$4].direction;
-      }
-      get matrix() {
-          if (this[PRIVATE$4].matrix) {
-              return this[PRIVATE$4].matrix;
-          }
-          const z = set$1(create$2(), 0, 0, -1);
-          const origin = set$1(create$2(), this[PRIVATE$4].origin.x, this[PRIVATE$4].origin.y, this[PRIVATE$4].origin.z);
-          const direction = set$1(create$2(), this[PRIVATE$4].direction.x, this[PRIVATE$4].direction.y, this[PRIVATE$4].direction.z);
-          const axis = cross(create$2(), z, direction);
-          const cosAngle = dot(direction, z);
-          const rotation = create$3();
-          if (cosAngle > -1 && cosAngle < 1) {
-              fromRotation(rotation, Math.acos(cosAngle), axis);
-          }
-          else if (cosAngle === -1) {
-              fromRotation(rotation, Math.acos(cosAngle), set$1(create$2(), 1, 0, 0));
-          }
-          const translation = fromTranslation(create$3(), origin);
-          const matrix = multiply(create$3(), translation, rotation);
-          this[PRIVATE$4].matrix = matrix;
-          return matrix;
-      }
-  }
-
-  const PRIVATE$3 = Symbol('@@webxr-polyfill/XRHitTestSource');
-  class XRHitTestSource {
-      constructor(session, options) {
-          var _a;
-          const types = (_a = options.entityTypes) !== null && _a !== void 0 ? _a : ['plane'];
-          for (const type of types) {
-              if (!['plane', 'point', 'mesh'].includes(type))
-                  throw new TypeError('Invalid hit-test entity type.');
-              if (type === 'point')
-                  throw new DOMException('The virtual room has no point cloud.', 'NotSupportedError');
-          }
-          if (types.length === 0)
-              throw new DOMException('At least one entity type is required.', 'NotSupportedError');
-          if (options.offsetRay !== undefined && !(options.offsetRay instanceof XRRay))
-              throw new TypeError('Expected XRRay.');
-          this[PRIVATE$3] = {
-              session,
-              space: options.space,
-              offsetRay: options.offsetRay || new XRRay(),
-              active: true
-          };
+  class XRHitTestSource extends interfaceBrands.hitTestAllocations.HitSourceAllocation {
+      constructor(...args) {
+          const [session, options, token] = args;
+          requireHitTestAllocation(token);
+          super(session, options);
       }
       cancel() {
-          if (!this._active)
-              throw new DOMException('Source is inactive.', 'InvalidStateError');
+          const state = hitSourceState(this);
+          if (!state.active)
+              invalidState('Source is inactive.');
           this._deactivate();
       }
-      get _space() {
-          return this[PRIVATE$3].space;
-      }
       _deactivate() {
-          this[PRIVATE$3].active = false;
-          this._session._hitSources.delete(this);
+          const state = hitSourceState(this);
+          state.session._hitSources.delete(this);
+          state.session._device.removeHitTestSource(this);
       }
-      get _session() {
-          return this[PRIVATE$3].session;
-      }
-      get _offsetRay() {
-          return this[PRIVATE$3].offsetRay;
-      }
-      get _active() {
-          return this[PRIVATE$3].active;
-      }
+      get _space() { return hitSourceState(this).space; }
+      get _session() { return hitSourceState(this).session; }
+      get _offsetRay() { return hitSourceState(this).offsetRay; }
+      get _entityTypes() { return hitSourceState(this).entityTypes; }
+      get _active() { return hitSourceState(this).active; }
   }
+  enumerableMembers(XRHitTestSource.prototype, ['cancel']);
+  Object.defineProperty(XRHitTestSource.prototype, Symbol.toStringTag, { value: 'XRHitTestSource', configurable: true });
 
-  const PRIVATE$2 = Symbol('@@webxr-polyfill/XRTransientInputHitTestSource');
-  class XRTransientInputHitTestSource {
-      constructor(session, options) {
-          var _a;
-          if (options.profile === undefined)
-              throw new TypeError('profile is required.');
-          const types = (_a = options.entityTypes) !== null && _a !== void 0 ? _a : ['plane'];
-          for (const type of types) {
-              if (!['plane', 'point', 'mesh'].includes(type))
-                  throw new TypeError('Invalid hit-test entity type.');
-              if (type === 'point')
-                  throw new DOMException('The virtual room has no point cloud.', 'NotSupportedError');
-          }
-          if (types.length === 0)
-              throw new DOMException('At least one entity type is required.', 'NotSupportedError');
-          if (options.offsetRay !== undefined && !(options.offsetRay instanceof XRRay))
-              throw new TypeError('Expected XRRay.');
-          this[PRIVATE$2] = {
-              session,
-              profile: options.profile,
-              offsetRay: options.offsetRay || new XRRay(),
-              active: true
-          };
+  function transientHitSourceState(value) {
+      const state = interfaceBrands.transientHitSources.get(value);
+      if (!state)
+          throw new TypeError('Expected XRTransientInputHitTestSource.');
+      return state;
+  }
+  class XRTransientInputHitTestSource extends interfaceBrands.hitTestAllocations.TransientHitSourceAllocation {
+      constructor(...args) {
+          const [session, options, token] = args;
+          requireHitTestAllocation(token);
+          super(session, options);
       }
       cancel() {
-          if (!this._active)
-              throw new DOMException('Source is inactive.', 'InvalidStateError');
+          const state = transientHitSourceState(this);
+          if (!state.active)
+              invalidState('Source is inactive.');
           this._deactivate();
       }
-      get _profile() {
-          return this[PRIVATE$2].profile;
-      }
       _deactivate() {
-          this[PRIVATE$2].active = false;
-          this._session._transientSources.delete(this);
+          const state = transientHitSourceState(this);
+          state.session._transientSources.delete(this);
+          state.session._device.removeHitTestSource(this);
       }
-      get _session() {
-          return this[PRIVATE$2].session;
-      }
-      get _offsetRay() {
-          return this[PRIVATE$2].offsetRay;
-      }
-      get _active() {
-          return this[PRIVATE$2].active;
-      }
+      get _profile() { return transientHitSourceState(this).profile; }
+      get _session() { return transientHitSourceState(this).session; }
+      get _offsetRay() { return transientHitSourceState(this).offsetRay; }
+      get _entityTypes() { return transientHitSourceState(this).entityTypes; }
+      get _active() { return transientHitSourceState(this).active; }
   }
+  enumerableMembers(XRTransientInputHitTestSource.prototype, ['cancel']);
+  Object.defineProperty(XRTransientInputHitTestSource.prototype, Symbol.toStringTag, { value: 'XRTransientInputHitTestSource', configurable: true });
 
-  const PRIVATE$1 = Symbol('@@webxr-polyfill/XRHitTestResult');
-  class XRHitTestResult {
-      constructor(frame, transform) {
-          this[PRIVATE$1] = {
-              frame,
-              transform
-          };
+  function resultState$1(value) {
+      const state = interfaceBrands.hitResults.get(value);
+      if (!state)
+          throw new TypeError('Expected XRHitTestResult.');
+      return state;
+  }
+  class XRHitTestResult extends interfaceBrands.hitTestAllocations.HitResultAllocation {
+      constructor(...args) {
+          const [frame, transform, token] = args;
+          requireHitTestAllocation(token);
+          super(frame, transform);
       }
       async createAnchor() {
-          const { frame, transform } = this[PRIVATE$1];
+          const { frame, transform } = resultState$1(this);
+          frame._assertActive();
           const space = new XRSpace(frame.session, () => clone$1(transformMatrix(transform)));
           return frame.createAnchor(new XRRigidTransform(), space);
       }
       getPose(baseSpace) {
-          const space = new XRSpace(this[PRIVATE$1].frame.session, () => clone$1(transformMatrix(this[PRIVATE$1].transform)));
-          return this[PRIVATE$1].frame.getPose(space, baseSpace);
+          const { frame, transform } = resultState$1(this);
+          if (arguments.length < 1)
+              throw new TypeError('Expected baseSpace.');
+          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+          frame._assertActive();
+          const space = new XRSpace(frame.session, () => clone$1(transformMatrix(transform)));
+          return frame.getPose(space, baseSpace);
       }
   }
+  enumerableMembers(XRHitTestResult.prototype, ['getPose', 'createAnchor']);
+  Object.defineProperty(XRHitTestResult.prototype, Symbol.toStringTag, { value: 'XRHitTestResult', configurable: true });
 
-  const PRIVATE = Symbol('@@webxr-polyfill/XRTransientInputHitTestResult');
-  class XRTransientInputHitTestResult {
-      constructor(frame, results, inputSource) {
-          this[PRIVATE] = {
-              frame,
-              inputSource,
-              results
-          };
-      }
-      get inputSource() {
-          return this[PRIVATE].inputSource;
-      }
-      get results() {
-          return this[PRIVATE].results;
-      }
+  function resultState(value) {
+      const state = interfaceBrands.transientHitResults.get(value);
+      if (!state)
+          throw new TypeError('Expected XRTransientInputHitTestResult.');
+      return state;
   }
+  class XRTransientInputHitTestResult extends interfaceBrands.hitTestAllocations.TransientHitResultAllocation {
+      constructor(...args) {
+          const [frame, results, inputSource, token] = args;
+          requireHitTestAllocation(token);
+          super(frame, results, inputSource);
+      }
+      get inputSource() { return resultState(this).inputSource; }
+      get results() { return resultState(this).results; }
+  }
+  enumerableMembers(XRTransientInputHitTestResult.prototype, ['inputSource', 'results']);
+  Object.defineProperty(XRTransientInputHitTestResult.prototype, Symbol.toStringTag, { value: 'XRTransientInputHitTestResult', configurable: true });
 
   const providers = new WeakMap();
   const isIndex = (key) => typeof key === 'string' && /^(0|[1-9]\d*)$/.test(key) && Number(key) < 0xffffffff;
@@ -26694,8 +26759,7 @@ void main() {
                   return;
               this._viewer._update();
               for (const source of this._hitSources)
-                  if (source._space instanceof XRSpace)
-                      source._space._update();
+                  source._space._update();
               this._device.onFrameStart(this._id, { depthNear: this.renderState.depthNear, depthFar: this.renderState.depthFar, inlineVerticalFieldOfView: (_e = this.renderState.inlineVerticalFieldOfView) !== null && _e !== void 0 ? _e : Math.PI / 2 });
               this.rawSources = this._mode === 'inline' ? [] : this._device.getInputSources();
               const replaced = [];
@@ -27028,17 +27092,25 @@ void main() {
           setTimeout(() => this._emit(new XRSessionEvent('end', { session: this })), 0);
           this.onShutdown();
       }
-      async requestHitTestSource(options) {
-          this._require('hit-test');
+      async requestHitTestSource(value) {
+          interfaceValue(this, sessionObjects, 'XRSession');
+          const options = convertHitTestOptions(value);
+          if (!this.enabledFeatures.includes('hit-test'))
+              unsupported('hit-test was not enabled.');
+          this._assertLive();
           this._owns(options.space);
-          const source = new XRHitTestSource(this, options);
+          const source = new XRHitTestSource(this, options, hitTestAllocation);
           this._hitSources.add(source);
           this._device.addHitTestSource(source);
           return source;
       }
-      async requestHitTestSourceForTransientInput(options) {
-          this._require('hit-test');
-          const source = new XRTransientInputHitTestSource(this, options);
+      async requestHitTestSourceForTransientInput(value) {
+          interfaceValue(this, sessionObjects, 'XRSession');
+          const options = convertTransientHitTestOptions(value);
+          if (!this.enabledFeatures.includes('hit-test'))
+              unsupported('hit-test was not enabled.');
+          this._assertLive();
+          const source = new XRTransientInputHitTestSource(this, options, hitTestAllocation);
           this._transientSources.add(source);
           this._device.addHitTestSourceForTransientInput(source);
           return source;
@@ -27068,11 +27140,11 @@ void main() {
           this.environmentSnapshot = session._environment.snapshot();
           if (_animation) {
               for (const source of session._hitSources)
-                  this.hitResults.set(source, session._device.getHitTestResults(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix))));
+                  this.hitResults.set(source, session._device.getHitTestResults(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix), hitTestAllocation)));
               for (const source of session._transientSources) {
                   const input = Array.from(session.inputSources).find(input => input.targetRayMode === 'screen' && input.profiles.includes(source._profile));
-                  const hits = session._device.getHitTestResultsForTransientInput(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix)));
-                  this.transientResults.set(source, input ? [new XRTransientInputHitTestResult(this, hits, input)] : []);
+                  const hits = session._device.getHitTestResultsForTransientInput(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix), hitTestAllocation));
+                  this.transientResults.set(source, input ? [new XRTransientInputHitTestResult(this, hits, input, hitTestAllocation)] : []);
               }
           }
       }
@@ -27197,9 +27269,9 @@ void main() {
               return null;
           return new XRCPUDepthInformation(this, view);
       }
-      getHitTestResults(source) { this._assertActive(); if (!this.hitResults.has(source))
+      getHitTestResults(source) { frameState(this); hitSourceState(source); this._assertActive(); if (!this.hitResults.has(source))
           invalidState('Hit test source was not active for this frame.'); return this.hitResults.get(source).slice(); }
-      getHitTestResultsForTransientInput(source) { this._assertActive(); if (!this.transientResults.has(source))
+      getHitTestResultsForTransientInput(source) { frameState(this); transientHitSourceState(source); this._assertActive(); if (!this.transientResults.has(source))
           invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source).slice(); }
   }
   function frameState(value) {
@@ -27226,7 +27298,7 @@ void main() {
       });
       return new XRViewerPose(transform, views, relative.emulated, geometryAllocation);
   }
-  enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose']);
+  enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
   Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
   class XRInputSource extends interfaceBrands.InputSourceObject {
       constructor(session, raw, index) {
@@ -27280,6 +27352,7 @@ void main() {
   installEventHandlers(XRSession.prototype, [
       'end', 'visibilitychange', 'inputsourceschange', 'selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend',
   ], value => sessionObjects.has(value));
+  enumerableMembers(XRSession.prototype, ['requestHitTestSource', 'requestHitTestSourceForTransientInput']);
 
   var runtime = /*#__PURE__*/Object.freeze({
     __proto__: null,
@@ -30973,6 +31046,34 @@ void main() {
       }
   }
 
+  function roomHitTestGeometry(room) {
+      room === null || room === void 0 ? void 0 : room.updateWorldMatrix(true, true);
+      return { planes: roomMeshes(room).flatMap(planeRegions), meshes: roomSurfaces(room) };
+  }
+  function intersectHitTestGeometry(origin, direction, geometry, types) {
+      const ray = new Ray(new Vector3().fromArray(origin), new Vector3().fromArray(direction).normalize());
+      const hits = [];
+      if (![...ray.origin.toArray(), ...ray.direction.toArray()].every(Number.isFinite) || !ray.direction.lengthSq())
+          return hits;
+      for (const [entityType, surfaces] of [['plane', geometry.planes], ['mesh', geometry.meshes]]) {
+          if (!types.includes(entityType))
+              continue;
+          for (const surface of surfaces) {
+              const matrix = new Matrix4().fromArray(surface.matrix);
+              const points = Array.from({ length: surface.vertices.length / 3 }, (_, i) => new Vector3().fromArray(surface.vertices, i * 3).applyMatrix4(matrix));
+              for (let i = 1; i + 1 < points.length; i++) {
+                  const point = ray.intersectTriangle(points[0], points[i], points[i + 1], false, new Vector3());
+                  if (!point)
+                      continue;
+                  const normal = new Vector3(0, 1, 0).transformDirection(matrix);
+                  hits.push({ point, normal, distance: point.distanceTo(ray.origin), entityType });
+                  break;
+              }
+          }
+      }
+      return hits.sort((a, b) => a.distance - b.distance);
+  }
+
   const DEFAULT_CAMERA_POSITION = [0, 1.6, 0];
   const DEFAULT_TABLET_POSITION = [0, 1.6, -0.2];
   const DEFAULT_POINTER_POSITION = [0, 1.6, -0.15];
@@ -31309,11 +31410,15 @@ void main() {
               this.appTexture.value.dispose();
           this.appTexture.value = dummyCanvasTexture;
       }
-      getHitTestResults(origin, direction) {
+      getHitTestGeometry() { return roomHitTestGeometry(this.room); }
+      getHitTestResults(origin, direction, types, geometry) {
           var _a;
+          if (types)
+              return intersectHitTestGeometry(origin, direction, geometry !== null && geometry !== void 0 ? geometry : this.getHitTestGeometry(), types);
           raycaster.set(new Vector3().fromArray(origin), new Vector3().fromArray(direction));
           (_a = this.room) === null || _a === void 0 ? void 0 : _a.updateWorldMatrix(true, true);
-          return raycaster.intersectObjects(roomMeshes(this.room), false);
+          return raycaster.intersectObjects(roomMeshes(this.room), false).map(hit => ({ ...hit,
+              normal: hit.face.normal.clone().applyMatrix3(new Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize(), entityType: 'mesh' }));
       }
       loadVirtualRoomAsset(buffer) {
           const loader = new GLTFLoader();
@@ -31874,6 +31979,12 @@ void main() {
       addHitTestSource(source) {
           this.hitTestSources.push(source);
       }
+      removeHitTestSource(source) {
+          this.hitTestSources = this.hitTestSources.filter(item => item !== source);
+          this.hitTestSourcesForTransientInput = this.hitTestSourcesForTransientInput.filter(item => item !== source);
+          this.hitTestResults.delete(source);
+          this.hitTestResultsForTransientInput.delete(source);
+      }
       getHitTestResults(source) {
           return this.hitTestResults.get(source) || [];
       }
@@ -31928,16 +32039,18 @@ void main() {
           }
           hitTestSources.length = activeHitTestSourceNum;
           hitTestResults.clear();
+          const geometry = hitTestSources.length ? this.arScene.getHitTestGeometry() : null;
           for (const source of hitTestSources) {
               if (sessionId !== source._session._id) {
                   continue;
               }
               let baseMatrix;
-              if (source instanceof XRTransientInputHitTestSource) {
+              if (interfaceBrands.transientHitSources.has(source)) {
+                  const transient = source;
                   if (!this.gamepadInputSources[0].active) {
                       continue;
                   }
-                  if (!this.gamepadInputSources[0].inputSource.profiles.includes(source._profile)) {
+                  if (!this.gamepadInputSources[0].inputSource.profiles.includes(transient._profile)) {
                       continue;
                   }
                   const world = new XRSpace(source._session, () => create$3());
@@ -31953,15 +32066,15 @@ void main() {
                       continue;
                   }
               }
-              const offsetRay = source._offsetRay;
-              const origin = set$1(create$2(), offsetRay.origin.x, offsetRay.origin.y, offsetRay.origin.z);
-              const direction = set$1(create$2(), offsetRay.direction.x, offsetRay.direction.y, offsetRay.direction.z);
-              transformMat4$1(origin, origin, baseMatrix);
+              const offsetRay = rayState(source._offsetRay);
+              const origin = set(create$2(), offsetRay.origin.x, offsetRay.origin.y, offsetRay.origin.z);
+              const direction = set(create$2(), offsetRay.direction.x, offsetRay.direction.y, offsetRay.direction.z);
+              transformMat4(origin, origin, baseMatrix);
               transformQuat(direction, direction, getRotation(create(), baseMatrix));
-              const arHitTestResults = this.arScene.getHitTestResults(origin, direction);
+              const arHitTestResults = this.arScene.getHitTestResults(origin, direction, source._entityTypes, geometry);
               const results = [];
               for (const result of arHitTestResults) {
-                  const normal = result.face.normal.clone().transformDirection(result.object.matrixWorld);
+                  const normal = result.normal;
                   const rotation = rotationTo(create(), [0, 1, 0], [normal.x, normal.y, normal.z]);
                   const matrix = fromQuat(create$3(), rotation);
                   matrix[12] = result.point.x;
@@ -32180,7 +32293,7 @@ void main() {
   };
   const tmpVec3 = create$2();
   const translateOnX = (matrix, distance) => {
-      set$1(tmpVec3, distance, 0, 0);
+      set(tmpVec3, distance, 0, 0);
       return translate(matrix, matrix, tmpVec3);
   };
 

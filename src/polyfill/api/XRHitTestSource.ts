@@ -1,51 +1,35 @@
-export const PRIVATE = Symbol('@@webxr-polyfill/XRHitTestSource');
-
-import XRRay from './XRRay';
 import type {XRSession} from './runtime';
-import type { HitTestOptions, HitTestState } from '../../types/polyfill';
+import type {HitTestOptions} from '../../types/polyfill';
+import {interfaceBrands} from './interface-brand';
+import {enumerableMembers, invalidState} from './geometry';
+import {requireHitTestAllocation} from './hit-test-options';
 
-export default class XRHitTestSource {
-  [PRIVATE]: HitTestState;
-
-  constructor(session: XRSession, options: HitTestOptions) {
-    const types = options.entityTypes ?? ['plane'];
-    for (const type of types) {
-      if (!['plane', 'point', 'mesh'].includes(type)) throw new TypeError('Invalid hit-test entity type.');
-      if (type === 'point') throw new DOMException('The virtual room has no point cloud.', 'NotSupportedError');
-    }
-    if (types.length === 0) throw new DOMException('At least one entity type is required.', 'NotSupportedError');
-    if (options.offsetRay !== undefined && !(options.offsetRay instanceof XRRay)) throw new TypeError('Expected XRRay.');
-    this[PRIVATE] = {
-      session,
-      space: options.space,
-      offsetRay: options.offsetRay || new XRRay(),
-      active: true
-    };
+export function hitSourceState(value: object) {
+  const state = interfaceBrands.hitSources.get(value);
+  if (!state) throw new TypeError('Expected XRHitTestSource.');
+  return state;
+}
+export default class XRHitTestSource extends interfaceBrands.hitTestAllocations.HitSourceAllocation {
+  constructor(...args: [session: XRSession, options: HitTestOptions, token?: symbol]) {
+    const [session, options, token] = args;
+    requireHitTestAllocation(token);
+    super(session, options);
   }
-
   cancel() {
-    if (!this._active) throw new DOMException('Source is inactive.', 'InvalidStateError');
+    const state = hitSourceState(this);
+    if (!state.active) invalidState('Source is inactive.');
     this._deactivate();
   }
-
-  get _space() {
-    return this[PRIVATE].space;
-  }
-
   _deactivate() {
-    this[PRIVATE].active = false;
-    this._session._hitSources.delete(this);
+    const state = hitSourceState(this);
+    state.session._hitSources.delete(this);
+    state.session._device.removeHitTestSource(this);
   }
-
-  get _session() {
-    return this[PRIVATE].session;
-  }
-
-  get _offsetRay() {
-    return this[PRIVATE].offsetRay;
-  }
-
-  get _active() {
-    return this[PRIVATE].active;
-  }
+  get _space() { return hitSourceState(this).space; }
+  get _session() { return hitSourceState(this).session; }
+  get _offsetRay() { return hitSourceState(this).offsetRay; }
+  get _entityTypes() { return hitSourceState(this).entityTypes; }
+  get _active() { return hitSourceState(this).active; }
 }
+enumerableMembers(XRHitTestSource.prototype, ['cancel']);
+Object.defineProperty(XRHitTestSource.prototype, Symbol.toStringTag, {value: 'XRHitTestSource', configurable: true});

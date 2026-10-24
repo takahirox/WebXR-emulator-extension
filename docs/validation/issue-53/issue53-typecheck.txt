@@ -1,0 +1,3 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 typecheck
+> tsc --noEmit
