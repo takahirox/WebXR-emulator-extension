@@ -524,7 +524,7 @@ export class XRFrame extends interfaceBrands.FrameObject {
     return interfaceBrands.viewerPoses.get(state.session)!(this, referenceSpace);
   }
   get detectedPlanes() { frameState(this); this._assertActive(); return this.environmentSnapshot.planes; }
-  get detectedMeshes() { this._assertActive(); return this.environmentSnapshot.meshes; }
+  get detectedMeshes() { frameState(this); this._assertActive(); return this.environmentSnapshot.meshes; }
   get trackedAnchors() { this._assertActive(); this.session._require('anchors'); return this.anchorSnapshot; }
   async createAnchor(pose: XRRigidTransform, space: XRSpace) {
     this._assertActive(); this.session._require('anchors');

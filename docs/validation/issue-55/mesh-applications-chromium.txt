@@ -1,0 +1,15 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:mesh-applications:chromium
+> tsx tests/reference-space-browser.ts chromium mesh-applications
+
+mesh application chromium quest
+mesh initial alignment {"count":100,"matched":100,"maxApiError":0,"maxRoomError":4.527959519169083e-7}
+mesh phase viewer moved
+mesh phase pose only
+mesh phase shape rebuilt
+mesh application chromium android
+mesh initial alignment {"count":100,"matched":100,"maxApiError":0,"maxRoomError":4.527959519169083e-7}
+mesh phase viewer moved
+mesh phase pose only
+mesh phase shape rebuilt
+{"status":"passed","browser":"chromium","scenarios":2,"assertions":0,"failures":[]}

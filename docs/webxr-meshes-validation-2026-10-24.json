@@ -1,0 +1,1431 @@
+{
+  "issue": 55,
+  "repository": "takahirox/WebXR-emulator-extension",
+  "date": "2026-10-24",
+  "status": "passed",
+  "evaluationBaseline": "af83fe8ef046ef6b7d772bc8c4e4dc32394f0bf5",
+  "startingCheckpoint": "1294bf9a8b417ad55f6c0e68588434d81a9c52f7",
+  "testedRevision": "Final runtime identified by source and bundle hashes. GitWeave node Result supplies the checkpoint commit. No push, PR, merge or comment performed.",
+  "recordedAt": "2026-10-24T04:09:51.466825+00:00",
+  "checks": [
+    {
+      "command": "npm ci",
+      "exitCode": 0,
+      "outcome": "54 packages installed; 0 audit vulnerabilities."
+    },
+    {
+      "command": "npm run build:firefox",
+      "exitCode": 0,
+      "outcome": "Typecheck, emission, extension/polyfill build and Firefox packaging passed.",
+      "stdout": "docs/validation/issue-55/meshes-build.txt"
+    },
+    {
+      "command": "npm run test:environment",
+      "exitCode": 0,
+      "outcome": "18 tests passed; no failures or skips. Plane coverage, mesh bindings/publication/reconstruction, hit intersections, CPU depth and play area.",
+      "stdout": "docs/validation/issue-55/meshes-environment.txt"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "outcome": "Final observer and fixture additions typecheck.",
+      "stdout": "docs/validation/issue-55/meshes-typecheck.txt"
+    },
+    {
+      "command": "npm run test:meshes:chromium",
+      "exitCode": 0,
+      "status": "passed",
+      "startedAt": "2026-10-24T04:04:56.905Z",
+      "completedAt": "2026-10-24T04:05:03.025Z",
+      "scenarios": 5,
+      "assertions": 15533,
+      "report": "docs/validation/issue-55/meshes-contract-chromium.json",
+      "stdout": "docs/validation/issue-55/meshes-contract-chromium.txt",
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "cleanup": {
+        "contextClosed": true,
+        "profileRemoved": true
+      },
+      "failures": [],
+      "skips": []
+    },
+    {
+      "command": "WEBXR_FIREFOX_EXECUTABLE=\"$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox\" WEBXR_GECKODRIVER=\"$PWD/test-results/browser-tools/geckodriver\" npm run test:meshes:firefox",
+      "exitCode": 0,
+      "status": "passed",
+      "startedAt": "2026-10-24T04:05:32.835Z",
+      "completedAt": "2026-10-24T04:05:46.913Z",
+      "scenarios": 5,
+      "assertions": 15533,
+      "report": "docs/validation/issue-55/meshes-contract-firefox.json",
+      "stdout": "docs/validation/issue-55/meshes-contract-firefox.txt",
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      },
+      "failures": [],
+      "skips": []
+    },
+    {
+      "command": "npm run test:mesh-applications:chromium",
+      "exitCode": 0,
+      "status": "passed",
+      "startedAt": "2026-10-24T04:08:01.925Z",
+      "completedAt": "2026-10-24T04:08:16.472Z",
+      "scenarios": 2,
+      "assertions": 0,
+      "report": "docs/validation/issue-55/mesh-applications-chromium.json",
+      "stdout": "docs/validation/issue-55/mesh-applications-chromium.txt",
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "cleanup": {
+        "contextClosed": true,
+        "profileRemoved": true
+      },
+      "failures": [],
+      "skips": []
+    },
+    {
+      "command": "WEBXR_FIREFOX_EXECUTABLE=\"$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox\" WEBXR_GECKODRIVER=\"$PWD/test-results/browser-tools/geckodriver\" npm run test:mesh-applications:firefox",
+      "exitCode": 0,
+      "status": "passed",
+      "startedAt": "2026-10-24T04:06:16.045Z",
+      "completedAt": "2026-10-24T04:06:45.158Z",
+      "scenarios": 2,
+      "assertions": 0,
+      "report": "docs/validation/issue-55/mesh-applications-firefox.json",
+      "stdout": "docs/validation/issue-55/mesh-applications-firefox.txt",
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      },
+      "failures": [],
+      "skips": []
+    }
+  ],
+  "dependencies": {
+    "three": "0.186.1",
+    "playwright": "1.64.0",
+    "typescript": "5.9.3",
+    "gl-matrix": "3.4.4"
+  },
+  "geometry": {
+    "triangles": 100,
+    "degenerate": 0,
+    "sourceArea": 675.8218116500444,
+    "publishedArea": 675.8218040290562,
+    "coverage": 0.9999999887233764,
+    "maxErrorMetres": 4.368218393774939e-07,
+    "maxNormalError": 2.5840784579215407e-08
+  },
+  "applications": [
+    {
+      "browser": "chromium",
+      "profile": "quest",
+      "device": "Meta Quest 3",
+      "app": "sample",
+      "dependencies": [
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/XRControllerModelFactory.min.js",
+          "status": 200,
+          "bytes": 3737,
+          "sha256": "9938bf5fefe35a612fdd809544b44dc854e4125bae09d45ec8e409c9b69e2041",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+          "status": 200,
+          "bytes": 1208839,
+          "sha256": "4d01ed1c468372b16732fcecfeb2f463ac1b29b0fc296b2d64ec084e32876b39",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/FontLoader.js",
+          "status": 200,
+          "bytes": 3204,
+          "sha256": "1f0da5a44cf7051a4a3b348dc483315e48fb90fb9b85898d0dd3cb077afe30d8",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/geometries/TextGeometry.js",
+          "status": 200,
+          "bytes": 1308,
+          "sha256": "9ba3fece635cc8c0eb2fd806f8b3085f54b8ab8b9884502c6d3112cf89065607",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js",
+          "status": 200,
+          "bytes": 102783,
+          "sha256": "ea134ba6d4995338e00d3cf07b9391d959fd5dddfc352c16da20b15cc6e798c2",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/libs/motion-controllers.module.js",
+          "status": 200,
+          "bytes": 13492,
+          "sha256": "c2d631f67ff39ef82abccb21f680e1f64337b63ebe744d2b39d779e27c28c7bb",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/utils/BufferGeometryUtils.js",
+          "status": 200,
+          "bytes": 31105,
+          "sha256": "889ea11dacd78b15ed26ba7cb0371ceaeda0072f1ae556b44471e4aa259a86c3",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/fonts/gentilis_regular.typeface.json",
+          "status": 200,
+          "bytes": 627529,
+          "sha256": "7ed95f2faa30f59dbe7cfb145b97c42a6ba1188cd2eec01ca61485e8c83ee9de",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        }
+      ],
+      "rendering": [
+        {
+          "label": "before",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 412288
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 412554
+            }
+          ],
+          "textureSHA256": "ad80f9ba37036352ac5f0271ef5854fa89930eb744c90f609f74694456b20f76"
+        },
+        {
+          "label": "viewer-moved",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 436446
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 436492
+            }
+          ],
+          "textureSHA256": "0171f4ed9d8f2352fe47e3b35a6a7f416d296d9a97bb9bf53d246cbfdca97d8f"
+        },
+        {
+          "label": "pose-only",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 436189
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 436224
+            }
+          ],
+          "textureSHA256": "6be685654465a16ef0a7c98fec3be77a760082527fb8bee09f59efbb1681b777"
+        },
+        {
+          "label": "shape",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 437645
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 437626
+            }
+          ],
+          "textureSHA256": "4182b15ed15ba4b280e48a8822d5de9a7b1d34bc8f0c81ad0a78e69d012c7205"
+        },
+        {
+          "label": "removed",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 0
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 0
+            }
+          ],
+          "textureSHA256": "2f33a3631d92234735560f9cac5aca4c40825bdb80f78652aafdece0ae33a60d"
+        },
+        {
+          "label": "reacquired",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 429633
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 429764
+            }
+          ],
+          "textureSHA256": "909263cd73c097f2798e3586fcc7e1f507bb790a17a15d5cfeb0de112ee8c0e0"
+        },
+        {
+          "label": "restart",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 184631
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 182050
+            }
+          ],
+          "textureSHA256": "8262aa54ef51bbe0bc4a5273a0de6ffca3300fcfa7cf97c38b448a963a5f6a59"
+        }
+      ],
+      "pixels": {
+        "width": 1280,
+        "height": 720,
+        "regions": [
+          {
+            "width": 640,
+            "height": 720,
+            "colored": 460800,
+            "transparent": 0,
+            "colors": 603
+          },
+          {
+            "width": 640,
+            "height": 720,
+            "colored": 460800,
+            "transparent": 0,
+            "colors": 608
+          }
+        ],
+        "layer": "projection"
+      },
+      "shutdown": {
+        "frames": 159,
+        "ends": 1,
+        "meshes": 0,
+        "oldNull": true,
+        "callbacks": 0,
+        "layers": 0,
+        "canvasConnected": false
+      },
+      "finalShutdown": {
+        "ends": 2,
+        "meshes": 0,
+        "callbacks": 0,
+        "layers": 0
+      },
+      "meshes": 100,
+      "maxBeforeRoomErrorMetres": 4.527959519169083e-07,
+      "maxShapeRoomErrorMetres": 5.431889913461559e-07,
+      "consumerRebuilds": 100,
+      "consumerDisposed": 100,
+      "captures": [
+        "docs/validation/issue-55/meshes-chromium-quest-before.png",
+        "docs/validation/issue-55/meshes-chromium-quest-before-application.png",
+        "docs/validation/issue-55/meshes-chromium-quest-viewer-moved.png",
+        "docs/validation/issue-55/meshes-chromium-quest-viewer-moved-application.png",
+        "docs/validation/issue-55/meshes-chromium-quest-pose-only.png",
+        "docs/validation/issue-55/meshes-chromium-quest-pose-only-application.png",
+        "docs/validation/issue-55/meshes-chromium-quest-shape.png",
+        "docs/validation/issue-55/meshes-chromium-quest-shape-application.png",
+        "docs/validation/issue-55/meshes-chromium-quest-removed.png",
+        "docs/validation/issue-55/meshes-chromium-quest-removed-application.png",
+        "docs/validation/issue-55/meshes-chromium-quest-reacquired.png",
+        "docs/validation/issue-55/meshes-chromium-quest-reacquired-application.png",
+        "docs/validation/issue-55/meshes-chromium-quest-restart.png",
+        "docs/validation/issue-55/meshes-chromium-quest-restart-application.png"
+      ]
+    },
+    {
+      "browser": "chromium",
+      "profile": "android",
+      "device": "Generic Android Phone (ARCore)",
+      "app": "sample",
+      "dependencies": [
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/FontLoader.js",
+          "status": 200,
+          "bytes": 3204,
+          "sha256": "1f0da5a44cf7051a4a3b348dc483315e48fb90fb9b85898d0dd3cb077afe30d8",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/XRControllerModelFactory.min.js",
+          "status": 200,
+          "bytes": 3737,
+          "sha256": "9938bf5fefe35a612fdd809544b44dc854e4125bae09d45ec8e409c9b69e2041",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/geometries/TextGeometry.js",
+          "status": 200,
+          "bytes": 1308,
+          "sha256": "9ba3fece635cc8c0eb2fd806f8b3085f54b8ab8b9884502c6d3112cf89065607",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+          "status": 200,
+          "bytes": 1208839,
+          "sha256": "4d01ed1c468372b16732fcecfeb2f463ac1b29b0fc296b2d64ec084e32876b39",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js",
+          "status": 200,
+          "bytes": 102783,
+          "sha256": "ea134ba6d4995338e00d3cf07b9391d959fd5dddfc352c16da20b15cc6e798c2",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/libs/motion-controllers.module.js",
+          "status": 200,
+          "bytes": 13492,
+          "sha256": "c2d631f67ff39ef82abccb21f680e1f64337b63ebe744d2b39d779e27c28c7bb",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/utils/BufferGeometryUtils.js",
+          "status": 200,
+          "bytes": 31105,
+          "sha256": "889ea11dacd78b15ed26ba7cb0371ceaeda0072f1ae556b44471e4aa259a86c3",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        },
+        {
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/fonts/gentilis_regular.typeface.json",
+          "status": 200,
+          "bytes": 627529,
+          "sha256": "7ed95f2faa30f59dbe7cfb145b97c42a6ba1188cd2eec01ca61485e8c83ee9de",
+          "evidence": "browser force-cache reread of immutable pinned dependency"
+        }
+      ],
+      "rendering": [
+        {
+          "label": "before",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 1888744
+            }
+          ],
+          "textureSHA256": "0d30526300d89a12eb7ebfd2d6677b8db8d60e6625a67b11d45c0a4c6e58aca4"
+        },
+        {
+          "label": "viewer-moved",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 1974685
+            }
+          ],
+          "textureSHA256": "fa75f61fb1f8adb5071e3e2b693aefb921eb1cf4b1a938f062c165cccba11b81"
+        },
+        {
+          "label": "pose-only",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 1970427
+            }
+          ],
+          "textureSHA256": "c71ec4a40a8c06a4504576b9c1f08b60486f26d02098c8dbe60d49f59048d030"
+        },
+        {
+          "label": "shape",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 1978414
+            }
+          ],
+          "textureSHA256": "f56d52476f7493d180a5c20bd0c7e8720a74f4760dfae56a844a3fc66f37e437"
+        },
+        {
+          "label": "removed",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 0
+            }
+          ],
+          "textureSHA256": "30ebc9497faa64f41120cbd82ae4714e048e41c1753cc2dfebbeeab85768491e"
+        },
+        {
+          "label": "reacquired",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 2048616
+            }
+          ],
+          "textureSHA256": "8c6f026ce4bf982b2f3dcb5a92614f43e721015868175a5c50a758e812b34cea"
+        },
+        {
+          "label": "restart",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 614345
+            }
+          ],
+          "textureSHA256": "a59ac3b2f3428c4a609eb38f02634d1750dbdb7461cc9347f26bc6d39437e389"
+        }
+      ],
+      "pixels": {
+        "width": 1080,
+        "height": 1920,
+        "regions": [
+          {
+            "width": 1080,
+            "height": 1920,
+            "colored": 2073600,
+            "transparent": 0,
+            "colors": 92
+          }
+        ],
+        "layer": "projection"
+      },
+      "shutdown": {
+        "frames": 146,
+        "ends": 1,
+        "meshes": 0,
+        "oldNull": true,
+        "callbacks": 0,
+        "layers": 0,
+        "canvasConnected": false
+      },
+      "finalShutdown": {
+        "ends": 2,
+        "meshes": 0,
+        "callbacks": 0,
+        "layers": 0
+      },
+      "meshes": 100,
+      "maxBeforeRoomErrorMetres": 4.527959519169083e-07,
+      "maxShapeRoomErrorMetres": 5.431889913461559e-07,
+      "consumerRebuilds": 100,
+      "consumerDisposed": 100,
+      "captures": [
+        "docs/validation/issue-55/meshes-chromium-android-before.png",
+        "docs/validation/issue-55/meshes-chromium-android-before-application.png",
+        "docs/validation/issue-55/meshes-chromium-android-viewer-moved.png",
+        "docs/validation/issue-55/meshes-chromium-android-viewer-moved-application.png",
+        "docs/validation/issue-55/meshes-chromium-android-pose-only.png",
+        "docs/validation/issue-55/meshes-chromium-android-pose-only-application.png",
+        "docs/validation/issue-55/meshes-chromium-android-shape.png",
+        "docs/validation/issue-55/meshes-chromium-android-shape-application.png",
+        "docs/validation/issue-55/meshes-chromium-android-removed.png",
+        "docs/validation/issue-55/meshes-chromium-android-removed-application.png",
+        "docs/validation/issue-55/meshes-chromium-android-reacquired.png",
+        "docs/validation/issue-55/meshes-chromium-android-reacquired-application.png",
+        "docs/validation/issue-55/meshes-chromium-android-restart.png",
+        "docs/validation/issue-55/meshes-chromium-android-restart-application.png"
+      ]
+    },
+    {
+      "browser": "firefox",
+      "profile": "quest",
+      "device": "Meta Quest 3",
+      "app": "sample",
+      "dependencies": [
+        {
+          "bytes": 3737,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "9938bf5fefe35a612fdd809544b44dc854e4125bae09d45ec8e409c9b69e2041",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/XRControllerModelFactory.min.js"
+        },
+        {
+          "bytes": 3204,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "1f0da5a44cf7051a4a3b348dc483315e48fb90fb9b85898d0dd3cb077afe30d8",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/FontLoader.js"
+        },
+        {
+          "bytes": 1308,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "9ba3fece635cc8c0eb2fd806f8b3085f54b8ab8b9884502c6d3112cf89065607",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/geometries/TextGeometry.js"
+        },
+        {
+          "bytes": 1208839,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "4d01ed1c468372b16732fcecfeb2f463ac1b29b0fc296b2d64ec084e32876b39",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js"
+        },
+        {
+          "bytes": 102783,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "ea134ba6d4995338e00d3cf07b9391d959fd5dddfc352c16da20b15cc6e798c2",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js"
+        },
+        {
+          "bytes": 13492,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "c2d631f67ff39ef82abccb21f680e1f64337b63ebe744d2b39d779e27c28c7bb",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/libs/motion-controllers.module.js"
+        },
+        {
+          "bytes": 31105,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "889ea11dacd78b15ed26ba7cb0371ceaeda0072f1ae556b44471e4aa259a86c3",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/utils/BufferGeometryUtils.js"
+        },
+        {
+          "bytes": 627529,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "7ed95f2faa30f59dbe7cfb145b97c42a6ba1188cd2eec01ca61485e8c83ee9de",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/fonts/gentilis_regular.typeface.json"
+        }
+      ],
+      "rendering": [
+        {
+          "label": "before",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 1869037
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 1871552
+            }
+          ],
+          "textureSHA256": "973de8a6a7ab2403c721efd6ca47663ec3cc46b701778f4070d6b16680f3341a"
+        },
+        {
+          "label": "viewer-moved",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 1972602
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 1972800
+            }
+          ],
+          "textureSHA256": "386ce8aabb6fe68e2f8724d1c8e29855097ad59325b64398a548ecf28a531125"
+        },
+        {
+          "label": "pose-only",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 1968032
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 1968296
+            }
+          ],
+          "textureSHA256": "437c334431d466f4c2743ff38240a7904fe5d779695dd4aae3bbc95eaf96de80"
+        },
+        {
+          "label": "shape",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 1976614
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 1976638
+            }
+          ],
+          "textureSHA256": "95f0dd45fb99f34088cc7d3a94296cbaf054ea716fd44fd089396d10662ef3f7"
+        },
+        {
+          "label": "removed",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 0
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 0
+            }
+          ],
+          "textureSHA256": "5e11a94e7230249ba8008b9fa5e4a00387d9241b1ede8369af214ff3bf924f65"
+        },
+        {
+          "label": "reacquired",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 1957097
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 1959279
+            }
+          ],
+          "textureSHA256": "a0ce240210e42716b40510b9a4cceca65bba919d603b413fd41e89ebd7c54765"
+        },
+        {
+          "label": "restart",
+          "meshPixels": [
+            {
+              "eye": "left",
+              "meshInteriorPixels": 781990
+            },
+            {
+              "eye": "right",
+              "meshInteriorPixels": 769390
+            }
+          ],
+          "textureSHA256": "e53b3d593f624b8e4c56641bc36c3576df88de30da03a7c4d227ac013df687a9"
+        }
+      ],
+      "pixels": {
+        "height": 1618,
+        "layer": "projection",
+        "regions": [
+          {
+            "colored": 2071040,
+            "colors": 808,
+            "height": 1618,
+            "transparent": 0,
+            "width": 1280
+          },
+          {
+            "colored": 2071040,
+            "colors": 826,
+            "height": 1618,
+            "transparent": 0,
+            "width": 1280
+          }
+        ],
+        "width": 2560
+      },
+      "shutdown": {
+        "callbacks": 0,
+        "canvasConnected": false,
+        "ends": 1,
+        "frames": 140,
+        "layers": 0,
+        "meshes": 0,
+        "oldNull": true
+      },
+      "finalShutdown": {
+        "callbacks": 0,
+        "ends": 2,
+        "layers": 0,
+        "meshes": 0
+      },
+      "meshes": 100,
+      "maxBeforeRoomErrorMetres": 4.527959519169083e-07,
+      "maxShapeRoomErrorMetres": 5.431889913461559e-07,
+      "consumerRebuilds": 100,
+      "consumerDisposed": 100,
+      "captures": [
+        "docs/validation/issue-55/meshes-firefox-quest-before.png",
+        "docs/validation/issue-55/meshes-firefox-quest-before-application.png",
+        "docs/validation/issue-55/meshes-firefox-quest-viewer-moved.png",
+        "docs/validation/issue-55/meshes-firefox-quest-viewer-moved-application.png",
+        "docs/validation/issue-55/meshes-firefox-quest-pose-only.png",
+        "docs/validation/issue-55/meshes-firefox-quest-pose-only-application.png",
+        "docs/validation/issue-55/meshes-firefox-quest-shape.png",
+        "docs/validation/issue-55/meshes-firefox-quest-shape-application.png",
+        "docs/validation/issue-55/meshes-firefox-quest-removed.png",
+        "docs/validation/issue-55/meshes-firefox-quest-removed-application.png",
+        "docs/validation/issue-55/meshes-firefox-quest-reacquired.png",
+        "docs/validation/issue-55/meshes-firefox-quest-reacquired-application.png",
+        "docs/validation/issue-55/meshes-firefox-quest-restart.png",
+        "docs/validation/issue-55/meshes-firefox-quest-restart-application.png"
+      ]
+    },
+    {
+      "browser": "firefox",
+      "profile": "android",
+      "device": "Generic Android Phone (ARCore)",
+      "app": "sample",
+      "dependencies": [
+        {
+          "bytes": 1208839,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "4d01ed1c468372b16732fcecfeb2f463ac1b29b0fc296b2d64ec084e32876b39",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js"
+        },
+        {
+          "bytes": 3737,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "9938bf5fefe35a612fdd809544b44dc854e4125bae09d45ec8e409c9b69e2041",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/XRControllerModelFactory.min.js"
+        },
+        {
+          "bytes": 3204,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "1f0da5a44cf7051a4a3b348dc483315e48fb90fb9b85898d0dd3cb077afe30d8",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/FontLoader.js"
+        },
+        {
+          "bytes": 1308,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "9ba3fece635cc8c0eb2fd806f8b3085f54b8ab8b9884502c6d3112cf89065607",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/geometries/TextGeometry.js"
+        },
+        {
+          "bytes": 102783,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "ea134ba6d4995338e00d3cf07b9391d959fd5dddfc352c16da20b15cc6e798c2",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js"
+        },
+        {
+          "bytes": 13492,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "c2d631f67ff39ef82abccb21f680e1f64337b63ebe744d2b39d779e27c28c7bb",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/libs/motion-controllers.module.js"
+        },
+        {
+          "bytes": 31105,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "889ea11dacd78b15ed26ba7cb0371ceaeda0072f1ae556b44471e4aa259a86c3",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/utils/BufferGeometryUtils.js"
+        },
+        {
+          "bytes": 627529,
+          "evidence": "browser force-cache reread of immutable pinned dependency",
+          "sha256": "7ed95f2faa30f59dbe7cfb145b97c42a6ba1188cd2eec01ca61485e8c83ee9de",
+          "status": 200,
+          "url": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/fonts/gentilis_regular.typeface.json"
+        }
+      ],
+      "rendering": [
+        {
+          "label": "before",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 1888744
+            }
+          ],
+          "textureSHA256": "6f3f4cee6c781356941d3403aaaee823f62bcf13b1241957d8a0bbaf562979bf"
+        },
+        {
+          "label": "viewer-moved",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 1974685
+            }
+          ],
+          "textureSHA256": "d3eb03a9ebd8ea591acb3f31c7abaf58207783f527449665b44585c841aeedeb"
+        },
+        {
+          "label": "pose-only",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 1970427
+            }
+          ],
+          "textureSHA256": "cae4d2aa616d6a9fac2156bc4b7d96cdab3fbaa48395e05fda51d40533755113"
+        },
+        {
+          "label": "shape",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 1978414
+            }
+          ],
+          "textureSHA256": "4ec563a999895ee0229b8b0183969602492adbadd5ea6dee39b31273edccb729"
+        },
+        {
+          "label": "removed",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 0
+            }
+          ],
+          "textureSHA256": "ad05ed8ee5eea86bcccdfeb453f55626ffaa2b61ecd7b43aad84a93b3d58cf2f"
+        },
+        {
+          "label": "reacquired",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 2048616
+            }
+          ],
+          "textureSHA256": "a6969b299036feae542f0bc3ab1cc23fad3ef3a35cf91d57b134da3ccfc3bdd7"
+        },
+        {
+          "label": "restart",
+          "meshPixels": [
+            {
+              "eye": "none",
+              "meshInteriorPixels": 614345
+            }
+          ],
+          "textureSHA256": "4f939bede8739b98985f47279366c199e43f11fbc9e9e46710afb6292c7c2453"
+        }
+      ],
+      "pixels": {
+        "height": 1920,
+        "layer": "projection",
+        "regions": [
+          {
+            "colored": 2073600,
+            "colors": 91,
+            "height": 1920,
+            "transparent": 0,
+            "width": 1080
+          }
+        ],
+        "width": 1080
+      },
+      "shutdown": {
+        "callbacks": 0,
+        "canvasConnected": false,
+        "ends": 1,
+        "frames": 151,
+        "layers": 0,
+        "meshes": 0,
+        "oldNull": true
+      },
+      "finalShutdown": {
+        "callbacks": 0,
+        "ends": 2,
+        "layers": 0,
+        "meshes": 0
+      },
+      "meshes": 100,
+      "maxBeforeRoomErrorMetres": 4.527959519169083e-07,
+      "maxShapeRoomErrorMetres": 5.431889913461559e-07,
+      "consumerRebuilds": 100,
+      "consumerDisposed": 100,
+      "captures": [
+        "docs/validation/issue-55/meshes-firefox-android-before.png",
+        "docs/validation/issue-55/meshes-firefox-android-before-application.png",
+        "docs/validation/issue-55/meshes-firefox-android-viewer-moved.png",
+        "docs/validation/issue-55/meshes-firefox-android-viewer-moved-application.png",
+        "docs/validation/issue-55/meshes-firefox-android-pose-only.png",
+        "docs/validation/issue-55/meshes-firefox-android-pose-only-application.png",
+        "docs/validation/issue-55/meshes-firefox-android-shape.png",
+        "docs/validation/issue-55/meshes-firefox-android-shape-application.png",
+        "docs/validation/issue-55/meshes-firefox-android-removed.png",
+        "docs/validation/issue-55/meshes-firefox-android-removed-application.png",
+        "docs/validation/issue-55/meshes-firefox-android-reacquired.png",
+        "docs/validation/issue-55/meshes-firefox-android-reacquired-application.png",
+        "docs/validation/issue-55/meshes-firefox-android-restart.png",
+        "docs/validation/issue-55/meshes-firefox-android-restart-application.png"
+      ]
+    }
+  ],
+  "sourceSHA256": {
+    "src/polyfill/api/environment.ts": "94c66f723362533288be8eb8f47906741dbe14bfe2b6a236201db7b3807afe9d",
+    "src/polyfill/api/mesh-allocation.ts": "909ccf1a277095e5858d322acacc4bf766715bda41c345ccd4937573b30956c2",
+    "src/polyfill/api/interface-brand.ts": "d4c6d203f8bfd589e6a1457c8c90d62907eaff09ff95927cb218e9adb3c4d955",
+    "src/polyfill/api/runtime.ts": "9192e1c227a8e51886bdbc9780c6300d2250e19ac9bd7763609ed754f82706f1",
+    "src/polyfill/api/geometry.ts": "3c4ab7a879249113f45c030d52e14726f0ee87223f8ff939ee0c9ec53db22d81",
+    "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+    "src/polyfill/api/hit-test-geometry.ts": "5eef8b40dfca856bef3af55b8f3e9e834ab8541dfb4d068a76524b35c5ca4465",
+    "tests/environment.ts": "efbe15d884d39b441513901cee4c8762c829148fd2d0eb323a416ce2d42bd103",
+    "tests/meshes.ts": "aa386008b6c5b207922e49f98a9276b1c2a9ea96a21cc3dc39a4f90150e70cf9",
+    "tests/mesh-applications.ts": "a626b2f607c33fcd1d0698a1e1015e032285efe462fd8fbc6e97bdf1851cab1d",
+    "tests/reference-space-browser.ts": "74fcefa5d2c3d4773feb06e4d1b2ad259c46918d18c4f345a8aa89b433070198",
+    "tests/firefox-upstream.ts": "c013fbb129d7549d5d15cf0f18d6d5edda9e8b048449c9e534f35f2555e1de8d",
+    "tests/firefox-driver.ts": "343cb76bd8014d368f89518413e6e0560bf426327ef1b4a658db7c39eb9dc363",
+    "tests/firefox-scenes.js": "375b5b68b93860fba25b79868ae19d315b7788bd60402c7d42855d8e85b595b4",
+    "tests/firefox-observation.ts": "ff8b1dfd9a640393b5df97f0131d07f047c3c05f42bfc18518b919cbcd7e6844",
+    "tests/firefox-contract.ts": "d352c35bda224d8353b6dadde89c6de946b22e7877de0fb03443f5e7b7328a1e",
+    "polyfill/webxr-polyfill.js": "9f9880de52064efa1904cfe58251c4376ebd2e4b620be56f737f57066383f3de",
+    "build/firefox/polyfill/webxr-polyfill.js": "9f9880de52064efa1904cfe58251c4376ebd2e4b620be56f737f57066383f3de",
+    "assets/hall_empty.glb": "6015b860cbe8fc2cf777bc3a20bc1ce69a2f639b84aa9b3de2c0039dc6a29e40",
+    "package.json": "8c69bfe6d474b1e3a9f13bfe5ec7dbc018d3577b431b2c44e01f42b8a0bffa5f",
+    "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307"
+  },
+  "provenanceNotes": [
+    "Per-run reports preserve source and bundle hashes at execution, immutable upstream URLs/served byte hashes and browser force-cache dependency rereads. Final runtime and contract cases match their tested hashes. Later test-only changes added pixel evidence/reporting and an environment topology assertion; those selections were rerun as recorded.",
+    "Raw report capture paths refer to ignored test-results. The applications and artifacts arrays identify the preserved copies under docs/validation/issue-55.",
+    "The Firefox official release DMG and geckodriver tar archive were downloaded for this worktree; no application, extension feature request, geometry or result was substituted."
+  ],
+  "failuresAndCorrections": [
+    {
+      "status": "resolved",
+      "check": "initial Chromium mesh contracts",
+      "failure": "Cumulative deformation assertion did not advance for selected face under X-only scaling.",
+      "correction": "Apply uniform scaling with step sized to 2e-6 m per maximum local coordinate; 30 individually subthreshold steps exceed the retained published baseline.",
+      "evidence": "docs/validation/issue-55/meshes-contract-chromium-attempt1.json"
+    },
+    {
+      "status": "resolved",
+      "check": "initial Chromium mesh Sample observer",
+      "failure": "4846 real callbacks and 100 detected meshes, but no observed scene: selector looked for plane Sample RingGeometry.",
+      "correction": "Use the unchanged mesh Sample SphereGeometry to find its scene.",
+      "evidence": "docs/validation/issue-55/mesh-applications-chromium-attempt1.json"
+    },
+    {
+      "status": "resolved before final focused runs",
+      "check": "binding implementation inspection against pinned WebIDL",
+      "failure": "Initial readonly membership wrapper returned Array iterators.",
+      "correction": "Private Set storage with frozen readers now supplies genuine Set iterators; focused tests assert the prototype."
+    }
+  ],
+  "interpretation": {
+    "originalAssumption": "Comparing shape to the preceding frame suffices while republishing geometry every frame.",
+    "correction": "Compare with published geometry and publish changed shape and notification coherently, including cumulative subthreshold changes.",
+    "primaryEvidence": [
+      "https://github.com/immersive-web/real-world-meshing/blob/539768590eb39cdff665d8e7a63f37b85eb6440b/index.bs",
+      "https://github.com/immersive-web/webxr-samples/blob/fb41c3416496974672e2c766a41c6febcba2d07e/proposals/mesh-detection.html",
+      "https://github.com/whatwg/webidl/blob/622910c67c724e362f71e8255a0380bade261acb/index.bs"
+    ],
+    "rationale": "The mesh attribute-change prose excludes pose-only timestamps despite its unconditional algorithm. The unchanged Sample rebuilds retained geometry only when lastChangedTime advances. Plane timestamp WPT corroborates only planes, not mesh behavior.",
+    "acceptanceChanged": false,
+    "externalIssueOrPRUpdates": "Not performed: node explicitly prohibits comments, PRs and pushes. Reconciliation retained in committed documentation for downstream use."
+  },
+  "historicalEvidence": "Issue #19 callback-only Chromium runs and other prior execution records are separate, not counted here.",
+  "unperformed": [
+    "Generic test:browser suite rerun",
+    "Independent AI re-review",
+    "Physical headsets/sensors",
+    "Another pinned mesh consumer",
+    "Full native WPT suite; no official mesh WPT pass claimed"
+  ],
+  "requiredPostMergeChecks": [],
+  "artifacts": [
+    {
+      "path": "docs/validation/issue-55/meshes-build.txt",
+      "bytes": 299,
+      "sha256": "daf09271ae66def524acd39867070ec5a852bbd911ee95df1a7bf0ce52220b62",
+      "stdoutNormalization": "Removed trailing empty lines only."
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-environment.txt",
+      "bytes": 3385,
+      "sha256": "99f238e93b1d2c3003688cd428d53fbb8e1c4b7c6a1ef8597bf60eafbfe8d9c4"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-typecheck.txt",
+      "bytes": 74,
+      "sha256": "0b3ab328730c93a7e43f73d6372a6b962a827107b17fe04393dc842481552e86",
+      "stdoutNormalization": "Removed trailing empty lines only."
+    },
+    {
+      "path": "docs/validation/issue-55/mesh-room.json",
+      "bytes": 233,
+      "sha256": "80111318903a3c9da7a52732f32868a77babed9915f8469f07719ee8d2258cb4"
+    },
+    {
+      "path": "docs/validation/issue-55/plane-room.json",
+      "bytes": 122420,
+      "sha256": "1f4fbf54eb14942280bd9770207f0c36b0a5da8bebf54f283eb8e47d09e88a30"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-contract-chromium-attempt1.json",
+      "bytes": 5806,
+      "sha256": "9360fa60de172403d4107bd5ced48371db0c1a340ec34dce8f7c1451cdf57065"
+    },
+    {
+      "path": "docs/validation/issue-55/mesh-applications-chromium-attempt1.json",
+      "bytes": 6298,
+      "sha256": "6b236c4175d59590963f396aae29a6d6332f6588e0072f99a79dc2470357a0c2"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-contract-chromium.json",
+      "bytes": 652371,
+      "sha256": "c5775776bdd733034e50761a19f5ebd9ef478c5814ce403f3ce5cb6d2b5ff4ab"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-contract-chromium.txt",
+      "bytes": 458,
+      "sha256": "2360befa95a65484281b7d3e195ec10c30f09df694fb5dd4659c51f49eab6ff8"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-contract-firefox.json",
+      "bytes": 656545,
+      "sha256": "820703370eb2ef1b5d416c1896e0f105cd6935e59fae3a590129987755f26c0b"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-contract-firefox.txt",
+      "bytes": 450,
+      "sha256": "f9961f14046c2d3b09d0d883cf6f850939e4185f8ccf8335a50b33d180fb41bd"
+    },
+    {
+      "path": "docs/validation/issue-55/mesh-applications-chromium.json",
+      "bytes": 76893,
+      "sha256": "abae097bbf15c87e2a5d41c6dad237a3514644f656515b393a1fb91bdfd9c771"
+    },
+    {
+      "path": "docs/validation/issue-55/mesh-applications-chromium.txt",
+      "bytes": 644,
+      "sha256": "15a56c30e1f0e8f5acd4a3fc106794e86659ea4d63354dee02a9788bb252c5ea"
+    },
+    {
+      "path": "docs/validation/issue-55/mesh-applications-firefox.json",
+      "bytes": 97482,
+      "sha256": "b48f6f6ed07e1b9d3fc878c9886f61aa1827f101711c1476b7d88b424e35f3a9"
+    },
+    {
+      "path": "docs/validation/issue-55/mesh-applications-firefox.txt",
+      "bytes": 639,
+      "sha256": "f350da35298327dd54ebb804c47044b63780f602e2e9832c26530d9d69c3df97"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-before.png",
+      "bytes": 218214,
+      "sha256": "839b567b277470c12a693b7d9f67861aa40ac147ec664ff654d7d53700c58c80"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-before-application.png",
+      "bytes": 55909,
+      "sha256": "ad80f9ba37036352ac5f0271ef5854fa89930eb744c90f609f74694456b20f76"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-viewer-moved.png",
+      "bytes": 228408,
+      "sha256": "b85fcd09b11b5fd4b24fee121fd20bcd4434a0ad728fca34c62c4959ba3e26d9"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-viewer-moved-application.png",
+      "bytes": 53055,
+      "sha256": "0171f4ed9d8f2352fe47e3b35a6a7f416d296d9a97bb9bf53d246cbfdca97d8f"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-pose-only.png",
+      "bytes": 225512,
+      "sha256": "43023dfca30d459b80250d30a1e49a52c31e79d06c6c9cfaa0200a680d05245a"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-pose-only-application.png",
+      "bytes": 54561,
+      "sha256": "6be685654465a16ef0a7c98fec3be77a760082527fb8bee09f59efbb1681b777"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-shape.png",
+      "bytes": 210604,
+      "sha256": "c08700fdfd572e63aa06991a955518e09985636d964855bb3fbd6db070ea51cb"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-shape-application.png",
+      "bytes": 53908,
+      "sha256": "4182b15ed15ba4b280e48a8822d5de9a7b1d34bc8f0c81ad0a78e69d012c7205"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-removed.png",
+      "bytes": 212850,
+      "sha256": "03b78b99a37cacf5f391da8efadfabf30390fa756debf2f4b6f54c778c98ad44"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-removed-application.png",
+      "bytes": 29566,
+      "sha256": "2f33a3631d92234735560f9cac5aca4c40825bdb80f78652aafdece0ae33a60d"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-reacquired.png",
+      "bytes": 218055,
+      "sha256": "e113d2624f7b0e887986c9bf0eff0a9bdf9e4ecb76b8582320e1617efc77e498"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-reacquired-application.png",
+      "bytes": 54965,
+      "sha256": "909263cd73c097f2798e3586fcc7e1f507bb790a17a15d5cfeb0de112ee8c0e0"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-restart.png",
+      "bytes": 217138,
+      "sha256": "cec1763ccbc0767abba44165fab6790cfbc1176f8a55a4ed6178d0a5c6304c26"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-quest-restart-application.png",
+      "bytes": 53878,
+      "sha256": "8262aa54ef51bbe0bc4a5273a0de6ffca3300fcfa7cf97c38b448a963a5f6a59"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-before.png",
+      "bytes": 236054,
+      "sha256": "cdfc891a7114ca8480ecfc605a22c44183f5d5b1c2e38c5c92698944c81eb32f"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-before-application.png",
+      "bytes": 69831,
+      "sha256": "0d30526300d89a12eb7ebfd2d6677b8db8d60e6625a67b11d45c0a4c6e58aca4"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-viewer-moved.png",
+      "bytes": 211581,
+      "sha256": "7eb77c10fb4524d582aae8321d972793ff65e8e399cb12415209a16954621f02"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-viewer-moved-application.png",
+      "bytes": 63627,
+      "sha256": "fa75f61fb1f8adb5071e3e2b693aefb921eb1cf4b1a938f062c165cccba11b81"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-pose-only.png",
+      "bytes": 202438,
+      "sha256": "fd332d1eb6dea923181d2cfda7c72770b7b03067be193e65cbbc20d3a3c0af3b"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-pose-only-application.png",
+      "bytes": 65611,
+      "sha256": "c71ec4a40a8c06a4504576b9c1f08b60486f26d02098c8dbe60d49f59048d030"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-shape.png",
+      "bytes": 194287,
+      "sha256": "daf3462a70b8c9ff4888f5a7f25ad74280c6ee971f14d5158fe5f1d11762338e"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-shape-application.png",
+      "bytes": 66134,
+      "sha256": "f56d52476f7493d180a5c20bd0c7e8720a74f4760dfae56a844a3fc66f37e437"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-removed.png",
+      "bytes": 186189,
+      "sha256": "91625d97be6ba96747a23e6771e5bf33eba8b7fc5b89b06b8e027a4a9bf8ed03"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-removed-application.png",
+      "bytes": 48138,
+      "sha256": "30ebc9497faa64f41120cbd82ae4714e048e41c1753cc2dfebbeeab85768491e"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-reacquired.png",
+      "bytes": 195370,
+      "sha256": "0809ee00ba3e56ec31f609254cf97d1bfea3d8eddf11093519a5c24f5d49e1cf"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-reacquired-application.png",
+      "bytes": 66577,
+      "sha256": "8c6f026ce4bf982b2f3dcb5a92614f43e721015868175a5c50a758e812b34cea"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-restart.png",
+      "bytes": 195825,
+      "sha256": "457316500d5b73fa7ed2ff92c57dc063328538a97a5c3a84b6a2b94cbf212fa9"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-chromium-android-restart-application.png",
+      "bytes": 66219,
+      "sha256": "a59ac3b2f3428c4a609eb38f02634d1750dbdb7461cc9347f26bc6d39437e389"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-before.png",
+      "bytes": 943000,
+      "sha256": "d89fb5b44dea19a049b45bab1517194666c6d6f5baf73d59911c30dbe6db186d"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-before-application.png",
+      "bytes": 80610,
+      "sha256": "973de8a6a7ab2403c721efd6ca47663ec3cc46b701778f4070d6b16680f3341a"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-viewer-moved.png",
+      "bytes": 864430,
+      "sha256": "d4fea44432eb69490c6db8e062fad4d61522fca6677c56f2a716527c4579cbc9"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-viewer-moved-application.png",
+      "bytes": 78529,
+      "sha256": "386ce8aabb6fe68e2f8724d1c8e29855097ad59325b64398a548ecf28a531125"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-pose-only.png",
+      "bytes": 860860,
+      "sha256": "87a0c5bf906c5b70a5355dda09aa8fecaf0c626fd53aa5530a646a18b0a15d06"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-pose-only-application.png",
+      "bytes": 83017,
+      "sha256": "437c334431d466f4c2743ff38240a7904fe5d779695dd4aae3bbc95eaf96de80"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-shape.png",
+      "bytes": 819484,
+      "sha256": "e7a77d62d8ade001451dda6f6b71d25799f64d2fe892266d60ef1baada841362"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-shape-application.png",
+      "bytes": 82204,
+      "sha256": "95f0dd45fb99f34088cc7d3a94296cbaf054ea716fd44fd089396d10662ef3f7"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-removed.png",
+      "bytes": 827345,
+      "sha256": "fed0c4834e70849f182f7012c8d24d5c18f3afcabee913a99f821d8b54539c9d"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-removed-application.png",
+      "bytes": 35636,
+      "sha256": "5e11a94e7230249ba8008b9fa5e4a00387d9241b1ede8369af214ff3bf924f65"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-reacquired.png",
+      "bytes": 840069,
+      "sha256": "801a9c2ae10c5bce8f41fb5fb5cee40fac1b9f6bfdb6d504c5493511f0c6b7c7"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-reacquired-application.png",
+      "bytes": 84132,
+      "sha256": "a0ce240210e42716b40510b9a4cceca65bba919d603b413fd41e89ebd7c54765"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-restart.png",
+      "bytes": 843787,
+      "sha256": "d83d6db17adf1b6cae3b5ffc1c33f048c1bb26dbe13bf218084ea2279b68623e"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-quest-restart-application.png",
+      "bytes": 84085,
+      "sha256": "e53b3d593f624b8e4c56641bc36c3576df88de30da03a7c4d227ac013df687a9"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-before.png",
+      "bytes": 876502,
+      "sha256": "34ad62fa417d5a53b19a64eb7e3b767d386e87caa07f165c4012d618ad9f0a97"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-before-application.png",
+      "bytes": 24718,
+      "sha256": "6f3f4cee6c781356941d3403aaaee823f62bcf13b1241957d8a0bbaf562979bf"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-viewer-moved.png",
+      "bytes": 755398,
+      "sha256": "8276f4320ce0b848e89c573e4071f0adbf619c6e97e91f43afa4102bf46e8321"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-viewer-moved-application.png",
+      "bytes": 21424,
+      "sha256": "d3eb03a9ebd8ea591acb3f31c7abaf58207783f527449665b44585c841aeedeb"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-pose-only.png",
+      "bytes": 722252,
+      "sha256": "73353d7831416d9f33228b008434304e828cb6269f1b2b5f997ab6b224f33b4b"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-pose-only-application.png",
+      "bytes": 23758,
+      "sha256": "cae4d2aa616d6a9fac2156bc4b7d96cdab3fbaa48395e05fda51d40533755113"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-shape.png",
+      "bytes": 691944,
+      "sha256": "4c51df42793d092dd3dd90445fb5758da750995007a23e3b1fd47fb7fe448850"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-shape-application.png",
+      "bytes": 23673,
+      "sha256": "4ec563a999895ee0229b8b0183969602492adbadd5ea6dee39b31273edccb729"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-removed.png",
+      "bytes": 664036,
+      "sha256": "72af949694406f583a4036163c68f90e6373950daf71318952897eb230ea8520"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-removed-application.png",
+      "bytes": 12498,
+      "sha256": "ad05ed8ee5eea86bcccdfeb453f55626ffaa2b61ecd7b43aad84a93b3d58cf2f"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-reacquired.png",
+      "bytes": 698893,
+      "sha256": "8e60c1f58a1f7ecde5b4f87a8caa21c988862e1957d4ef17caefbe494cbf9d7c"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-reacquired-application.png",
+      "bytes": 23950,
+      "sha256": "a6969b299036feae542f0bc3ab1cc23fad3ef3a35cf91d57b134da3ccfc3bdd7"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-restart.png",
+      "bytes": 700971,
+      "sha256": "18be188932dac176b02106f03a43510f1171c8d171901d892e9be462ed108d83"
+    },
+    {
+      "path": "docs/validation/issue-55/meshes-firefox-android-restart-application.png",
+      "bytes": 24115,
+      "sha256": "4f939bede8739b98985f47279366c199e43f11fbc9e9e46710afb6292c7c2453"
+    }
+  ],
+  "primarySourceBytes": {
+    "meshSpec": {
+      "url": "https://raw.githubusercontent.com/immersive-web/real-world-meshing/539768590eb39cdff665d8e7a63f37b85eb6440b/index.bs",
+      "bytes": 14691,
+      "sha256": "38a3f3fda74676f68369f015beea27c1e0f6370b1f64a1e66bf5b267db69dd32"
+    },
+    "sample": {
+      "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/proposals/mesh-detection.html",
+      "bytes": 16407,
+      "sha256": "e596ecc71a488e7114796814f034141c1caa91601f4decbbfc428334601e7e8c"
+    },
+    "webIDL": {
+      "url": "https://raw.githubusercontent.com/whatwg/webidl/622910c67c724e362f71e8255a0380bade261acb/index.bs",
+      "bytes": 694518,
+      "sha256": "8db18145ddf051a30d6cad35fde25537fad8c9b0ee2f993e341091cd51c31013"
+    }
+  },
+  "toolDownloads": [
+    {
+      "url": "https://archive.mozilla.org/pub/firefox/releases/157.0/mac/en-US/Firefox%20157.0.dmg",
+      "bytes": 161304638,
+      "sha256": "df6d8c79b6126bcf24cb70ebab9371916a662028e2d706e462d432e78fdf396c"
+    },
+    {
+      "url": "https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-macos-aarch64.tar.gz",
+      "bytes": 4234637,
+      "sha256": "d02b3f7003f999caf90974a2ef5da0286c05d01cee19112c86846d759fdba4f5"
+    }
+  ]
+}

@@ -25,7 +25,11 @@
     "test:hit-test:chromium": "tsx tests/reference-space-browser.ts chromium hit-test",
     "test:hit-test:firefox": "tsx tests/reference-space-browser.ts firefox hit-test",
     "test:hit-test-applications:chromium": "tsx tests/reference-space-browser.ts chromium hit-test-applications",
-    "test:hit-test-applications:firefox": "tsx tests/reference-space-browser.ts firefox hit-test-applications"
+    "test:hit-test-applications:firefox": "tsx tests/reference-space-browser.ts firefox hit-test-applications",
+    "test:meshes:chromium": "tsx tests/reference-space-browser.ts chromium meshes",
+    "test:mesh-applications:chromium": "tsx tests/reference-space-browser.ts chromium mesh-applications",
+    "test:meshes:firefox": "tsx tests/reference-space-browser.ts firefox meshes",
+    "test:mesh-applications:firefox": "tsx tests/reference-space-browser.ts firefox mesh-applications"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",
