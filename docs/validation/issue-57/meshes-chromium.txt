@@ -1,0 +1,10 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:meshes:chromium
+> tsx tests/reference-space-browser.ts chromium meshes
+
+scenario chromium Meta Quest 3 immersive-vr
+scenario chromium Meta Quest 3 immersive-ar
+scenario chromium Generic Android Phone (ARCore) immersive-ar
+scenario chromium Meta Quest 3 inline
+scenario chromium Generic Android Phone (ARCore) inline
+{"status":"passed","browser":"chromium","scenarios":5,"assertions":22360,"failures":[]}

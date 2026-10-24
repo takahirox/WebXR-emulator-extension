@@ -1,12 +1,9 @@
-import {mat4} from 'gl-matrix';
-import {XRSpace} from './geometry';
+// Initialize geometry before the shared allocators that defer XRSpace creation.
+import './geometry';
 import type {XRSession} from './runtime';
 import {interfaceBrands} from './interface-brand';
-import {planeRegions} from './plane-regions';
-import {roomMeshes, type Surface} from './room-surfaces';
 export {roomMeshes, roomSurfaces, type Surface} from './room-surfaces';
 
-const planeAllocation = Symbol('plane allocation');
 function planeState(value: XRPlane) {
   const state = interfaceBrands.planeValues.get(value);
   if (!state) throw new TypeError('Expected XRPlane.');
@@ -18,10 +15,7 @@ function planeSetState(value: XRPlaneSet) {
   return state;
 }
 export class XRPlaneSet implements Iterable<XRPlane> {
-  constructor(values: Iterable<XRPlane>, token?: symbol) {
-    if (token !== planeAllocation) throw new TypeError('Illegal constructor.');
-    interfaceBrands.planeSets.set(this, new Set(values));
-  }
+  constructor(_values?: Iterable<XRPlane>) { throw new TypeError('Illegal constructor.'); }
   get size() { return planeSetState(this).size; }
   has(value: XRPlane) {
     const set = planeSetState(this);
@@ -35,7 +29,7 @@ export class XRPlaneSet implements Iterable<XRPlane> {
   forEach(callback: (value: XRPlane, key: XRPlane, set: XRPlaneSet) => void, thisArg: unknown = undefined) {
     const set = planeSetState(this);
     if (typeof callback !== 'function') throw new TypeError('Expected callable callback.');
-    for (const value of set) Reflect.apply(callback, thisArg, [value,value,this]);
+    for (const value of set.values()) Reflect.apply(callback, thisArg, [value,value,this]);
   }
   [Symbol.iterator]() { return this.values(); }
 }
@@ -81,13 +75,7 @@ Object.defineProperties(XRMeshSet.prototype, {
 });
 
 export class XRPlane {
-  constructor(session: XRSession, token?: symbol) {
-    if (token !== planeAllocation) throw new TypeError('Illegal constructor.');
-    const state = {space: null as unknown as XRSpace, polygon: Object.freeze([]) as readonly DOMPointReadOnly[],
-      orientation: null as Surface['orientation'], changed: 0, matrix: null as mat4 | null, signature: [] as number[]};
-    state.space = new XRSpace(session, () => session.ended ? null : state.matrix);
-    interfaceBrands.planeValues.set(this, state);
-  }
+  constructor(_session?: XRSession) { throw new TypeError('Illegal constructor.'); }
   get planeSpace() { return planeState(this).space; }
   get polygon() { return planeState(this).polygon; }
   get orientation() { return planeState(this).orientation; }
@@ -102,19 +90,6 @@ for (const prototype of [XRPlane.prototype, XRPlaneSet.prototype]) {
     if (name !== 'constructor') Object.defineProperty(prototype, name, {enumerable: true});
   }
 }
-function updatePlane(plane: XRPlane, surface: Surface, time: number) {
-  const state = planeState(plane);
-  // Planes 394f13e attribute-change prose and WPT no_change take precedence
-  // over the update algorithm's unconditional timestamp assignment.
-  if (state.signature.length !== surface.vertices.length || surface.vertices.some((v,i)=>Math.abs(v-state.signature[i])>1e-5) || state.orientation !== surface.orientation) {
-    state.changed = time;
-    // Compare future updates with published geometry so tiny changes accumulate.
-    state.signature = surface.vertices.slice();
-    state.polygon = Object.freeze(Array.from({length: surface.vertices.length/3}, (_,i) => Object.freeze(new DOMPointReadOnly(surface.vertices[i*3],0,surface.vertices[i*3+2],1))));
-  }
-  state.orientation = surface.orientation; state.matrix = surface.matrix;
-}
-
 export class XRMesh {
   constructor(_session?: XRSession) { throw new TypeError('Illegal constructor.'); }
   get meshSpace() { return meshState(this).space; }
@@ -133,22 +108,13 @@ for (const C of [XRMesh, XRMeshSet]) {
 
 /** Session-owned identities; frame sets copy membership, never the mutable map. */
 export class EnvironmentTracker {
-  private planes = new Map<string, XRPlane>();
+  private planes: InstanceType<typeof interfaceBrands.planeAllocations.PlaneTracker>;
   private meshes: InstanceType<typeof interfaceBrands.meshAllocations.MeshTracker>;
-  constructor(private session: XRSession) {
+  constructor(session: XRSession) {
+    this.planes = new interfaceBrands.planeAllocations.PlaneTracker(session, XRPlane.prototype, XRPlaneSet.prototype);
     this.meshes = new interfaceBrands.meshAllocations.MeshTracker(session, XRMesh.prototype, XRMeshSet.prototype);
   }
-  update(time: number) {
-    this.meshes.update(time);
-    const planeSurfaces = roomMeshes(this.session._device.arScene?.room ?? null).flatMap(planeRegions);
-    const planeKeys = new Set(planeSurfaces.map(surface=>surface.key));
-    for (const [key, plane] of this.planes) if (!planeKeys.has(key)) { planeState(plane).matrix=null; this.planes.delete(key); }
-    if (this.session.enabledFeatures.includes('plane-detection')) for (const surface of planeSurfaces) {
-      let plane = this.planes.get(surface.key);
-      if (!plane) this.planes.set(surface.key, plane = new XRPlane(this.session, planeAllocation));
-      updatePlane(plane, surface, time);
-    }
-  }
-  snapshot() { return {planes: new XRPlaneSet(this.planes.values(), planeAllocation), meshes: this.meshes.snapshot()}; }
-  clear() { for (const plane of this.planes.values()) planeState(plane).matrix=null; this.planes.clear(); this.meshes.clear(); }
+  update(time: number) { this.meshes.update(time); this.planes.update(time); }
+  snapshot() { return {planes: this.planes.snapshot(), meshes: this.meshes.snapshot()}; }
+  clear() { this.planes.clear(); this.meshes.clear(); }
 }

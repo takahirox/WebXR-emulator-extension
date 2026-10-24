@@ -24345,6 +24345,178 @@ void main() {
       return Object.freeze({ MeshTracker, ...meshBindings });
   }
 
+  const epsilon = 1e-5;
+  const canonical = (e) => { var _a; const first = (_a = e.toArray().find(v => Math.abs(v) > epsilon)) !== null && _a !== void 0 ? _a : 1; return first < 0 ? e.negate() : e; };
+  const edgeKey = (a, b) => [a, b].map(p => p.toArray().map(v => Math.round(v / epsilon)).join(',')).sort().join(':');
+  function planeRegions(mesh) {
+      var _a;
+      const attribute = mesh.geometry.getAttribute('position');
+      if (!attribute)
+          return [];
+      const indices = mesh.geometry.index, triangles = [];
+      for (let i = 0; i + 2 < ((_a = indices === null || indices === void 0 ? void 0 : indices.count) !== null && _a !== void 0 ? _a : attribute.count); i += 3) {
+          const points = [0, 1, 2].map(j => new Vector3().fromBufferAttribute(attribute, indices ? indices.getX(i + j) : i + j));
+          if (!points.every(p => p.toArray().every(Number.isFinite)))
+              continue;
+          const normal = points[1].clone().sub(points[0]).cross(points[2].clone().sub(points[0]));
+          const area = normal.length() / 2;
+          if (area < 1e-10)
+              continue;
+          triangles.push({ ids: [i], points, normal: normal.normalize(), area });
+      }
+      const groups = [];
+      const pending = new Set(triangles);
+      for (const seed of triangles) {
+          if (!pending.delete(seed))
+              continue;
+          const group = [seed], edges = new Set();
+          const addEdges = (r) => r.points.forEach((p, i) => edges.add(edgeKey(p, r.points[(i + 1) % 3])));
+          addEdges(seed);
+          for (let changed = true; changed;) {
+              changed = false;
+              for (const candidate of pending) {
+                  if (seed.normal.dot(candidate.normal) < 1 - 1e-8 || candidate.points.some(p => Math.abs(p.clone().sub(seed.points[0]).dot(seed.normal)) > epsilon))
+                      continue;
+                  if (!candidate.points.some((p, i) => edges.has(edgeKey(p, candidate.points[(i + 1) % 3]))))
+                      continue;
+                  pending.delete(candidate);
+                  group.push(candidate);
+                  addEdges(candidate);
+                  changed = true;
+              }
+          }
+          groups.push(group);
+      }
+      const regions = [];
+      for (const group of groups) {
+          const edges = new Map();
+          for (const triangle of group)
+              triangle.points.forEach((p, i) => {
+                  const q = triangle.points[(i + 1) % 3], key = edgeKey(p, q), edge = edges.get(key);
+                  if (edge)
+                      edge.count++;
+                  else
+                      edges.set(key, { a: p, b: q, count: 1 });
+              });
+          const boundary = [...edges.values()].filter(e => e.count === 1);
+          const directions = boundary.map(e => canonical(e.b.clone().sub(e.a)));
+          directions.sort((a, b) => Math.abs(b.lengthSq() - a.lengthSq()) > epsilon ? b.lengthSq() - a.lengthSq() : b.x - a.x || b.y - a.y || b.z - a.z);
+          if (!directions.length)
+              continue;
+          const x = directions[0].normalize(), normal = group[0].normal, z = x.clone().cross(normal);
+          const projected = boundary.map(e => ({ a: [e.a.dot(x), e.a.dot(z)], b: [e.b.dot(x), e.b.dot(z)] }));
+          const coordinates = projected.flatMap(e => [e.a[0], e.b[0]]).sort((a, b) => a - b);
+          const cuts = coordinates.filter((v, i) => !i || v - coordinates[i - 1] > epsilon);
+          const distance = group[0].points[0].dot(normal);
+          const point = (u, v) => x.clone().multiplyScalar(u).addScaledVector(z, v).addScaledVector(normal, distance);
+          const at = (e, u) => e.a[1] + (e.b[1] - e.a[1]) * (u - e.a[0]) / (e.b[0] - e.a[0]);
+          let part = 0;
+          for (let i = 0; i + 1 < cuts.length; i++) {
+              const left = cuts[i], right = cuts[i + 1], mid = (left + right) / 2;
+              const hits = projected.filter(e => mid > Math.min(e.a[0], e.b[0]) && mid < Math.max(e.a[0], e.b[0])).sort((a, b) => at(a, mid) - at(b, mid));
+              for (let j = 0; j + 1 < hits.length; j += 2) {
+                  const a = hits[j], b = hits[j + 1];
+                  const points = [point(left, at(a, left)), point(right, at(a, right)), point(right, at(b, right)), point(left, at(b, left))];
+                  const unique = points.filter((p, k) => p.distanceTo(points[(k + 1) % 4]) > epsilon);
+                  if (unique.length < 3)
+                      continue;
+                  regions.push({ ids: [group[0].ids[0], part++], points: unique, normal, area: 0, axis: x });
+              }
+          }
+      }
+      return regions.map(region => {
+          const axis = region.axis;
+          const origin = region.points[0].clone().applyMatrix4(mesh.matrixWorld);
+          const x = region.points[0].clone().add(axis).applyMatrix4(mesh.matrixWorld).sub(origin).normalize();
+          const normalMatrix = new Matrix4().copy(mesh.matrixWorld).invert().transpose();
+          const y = region.normal.clone().transformDirection(normalMatrix);
+          const z = x.clone().cross(y).normalize();
+          const points = region.points.map(p => p.clone().applyMatrix4(mesh.matrixWorld).sub(origin));
+          const xs = points.map(p => p.dot(x)), zs = points.map(p => p.dot(z));
+          const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+          const center = origin.addScaledVector(x, cx).addScaledVector(z, cz);
+          return { key: `${mesh.uuid}:${region.ids.join(',')}`, matrix: new Float32Array(new Matrix4().makeBasis(x, y, z).setPosition(center).elements),
+              vertices: points.flatMap((p, i) => [xs[i] - cx, 0, zs[i] - cz]),
+              orientation: Math.abs(y.y) > 0.999 ? 'horizontal' : Math.abs(y.y) < 0.001 ? 'vertical' : null };
+      });
+  }
+
+  function createPlaneAllocations(sessions) {
+      const tracking = new WeakMap();
+      const planes = new WeakMap();
+      const sets = new WeakMap();
+      function allocatePlane(session, prototype) {
+          const state = { space: null, polygon: Object.freeze([]),
+              orientation: null, changed: 0, matrix: null, signature: [] };
+          state.space = new XRSpace(session, () => session.ended || !state.matrix ? null : clone$1(state.matrix));
+          const plane = Object.create(prototype);
+          tracking.set(plane, state);
+          planes.set(plane, Object.freeze({ space: state.space,
+              get polygon() { return state.polygon; }, get orientation() { return state.orientation; },
+              get changed() { return state.changed; } }));
+          return plane;
+      }
+      function allocateSet(values, prototype) {
+          const set = new Set(values), collection = Object.create(prototype);
+          sets.set(collection, Object.freeze({ size: set.size, has: (value) => set.has(value),
+              values: () => set.values(), entries: () => set.entries() }));
+          return collection;
+      }
+      function updatePlane(plane, surface, time) {
+          const state = tracking.get(plane);
+          if (state.signature.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - state.signature[i]) > 1e-5) || state.orientation !== surface.orientation) {
+              state.changed = time;
+              state.signature = surface.vertices.slice();
+              state.polygon = Object.freeze(Array.from({ length: surface.vertices.length / 3 }, (_, i) => Object.freeze(new DOMPointReadOnly(surface.vertices[i * 3], 0, surface.vertices[i * 3 + 2], 1))));
+          }
+          state.orientation = surface.orientation;
+          state.matrix = surface.matrix;
+      }
+      const trackers = new WeakMap();
+      class PlaneTracker {
+          constructor(session, planePrototype, setPrototype) {
+              if (!sessions.has(session))
+                  throw new TypeError('Expected XRSession.');
+              trackers.set(this, { session, planes: new Map(), planePrototype, setPrototype });
+          }
+          update(time) {
+              var _a, _b;
+              if (!Number.isFinite(time))
+                  throw new TypeError('Expected finite frame time.');
+              const { session, planes, planePrototype } = trackers.get(this);
+              const surfaces = roomMeshes((_b = (_a = session._device.arScene) === null || _a === void 0 ? void 0 : _a.room) !== null && _b !== void 0 ? _b : null).flatMap(planeRegions);
+              const keys = new Set(surfaces.map(surface => surface.key));
+              for (const [key, plane] of planes)
+                  if (!keys.has(key)) {
+                      tracking.get(plane).matrix = null;
+                      planes.delete(key);
+                  }
+              if (!session.ended && session.enabledFeatures.includes('plane-detection'))
+                  for (const surface of surfaces) {
+                      let plane = planes.get(surface.key);
+                      if (!plane)
+                          planes.set(surface.key, plane = allocatePlane(session, planePrototype));
+                      updatePlane(plane, surface, time);
+                  }
+          }
+          snapshot() {
+              const { planes, setPrototype } = trackers.get(this);
+              return allocateSet(planes.values(), setPrototype);
+          }
+          clear() {
+              const { planes } = trackers.get(this);
+              for (const plane of planes.values())
+                  tracking.get(plane).matrix = null;
+              planes.clear();
+          }
+      }
+      Object.freeze(PlaneTracker.prototype);
+      Object.freeze(PlaneTracker);
+      return Object.freeze({ PlaneTracker,
+          planes: Object.freeze({ get: (value) => planes.get(value) }),
+          sets: Object.freeze({ get: (value) => sets.get(value) }) });
+  }
+
   function createHitTestAllocations(brands) {
       const rays = new WeakMap();
       const hitSources = new WeakMap();
@@ -24462,11 +24634,13 @@ void main() {
       Object.freeze(InputSourceObject);
       const transforms = new WeakMap();
       const hitTestAllocations = createHitTestAllocations({ sessions, spaces, frames, inputSources, transforms });
+      const planeAllocations = createPlaneAllocations(sessions);
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
           layerAllocations: createLayerAllocations(sessions),
           meshAllocations: createMeshAllocations(sessions),
-          planeValues: new WeakMap(),
-          planeSets: new WeakMap(),
+          planeAllocations,
+          planeValues: planeAllocations.planes,
+          planeSets: planeAllocations.sets,
           roomCaptures: new WeakMap(),
           hitTestAllocations,
           rays: hitTestAllocations.rays,
@@ -25782,103 +25956,6 @@ void main() {
     jointObjects: jointObjects
   });
 
-  const epsilon = 1e-5;
-  const canonical = (e) => { var _a; const first = (_a = e.toArray().find(v => Math.abs(v) > epsilon)) !== null && _a !== void 0 ? _a : 1; return first < 0 ? e.negate() : e; };
-  const edgeKey = (a, b) => [a, b].map(p => p.toArray().map(v => Math.round(v / epsilon)).join(',')).sort().join(':');
-  function planeRegions(mesh) {
-      var _a;
-      const attribute = mesh.geometry.getAttribute('position');
-      if (!attribute)
-          return [];
-      const indices = mesh.geometry.index, triangles = [];
-      for (let i = 0; i + 2 < ((_a = indices === null || indices === void 0 ? void 0 : indices.count) !== null && _a !== void 0 ? _a : attribute.count); i += 3) {
-          const points = [0, 1, 2].map(j => new Vector3().fromBufferAttribute(attribute, indices ? indices.getX(i + j) : i + j));
-          if (!points.every(p => p.toArray().every(Number.isFinite)))
-              continue;
-          const normal = points[1].clone().sub(points[0]).cross(points[2].clone().sub(points[0]));
-          const area = normal.length() / 2;
-          if (area < 1e-10)
-              continue;
-          triangles.push({ ids: [i], points, normal: normal.normalize(), area });
-      }
-      const groups = [];
-      const pending = new Set(triangles);
-      for (const seed of triangles) {
-          if (!pending.delete(seed))
-              continue;
-          const group = [seed], edges = new Set();
-          const addEdges = (r) => r.points.forEach((p, i) => edges.add(edgeKey(p, r.points[(i + 1) % 3])));
-          addEdges(seed);
-          for (let changed = true; changed;) {
-              changed = false;
-              for (const candidate of pending) {
-                  if (seed.normal.dot(candidate.normal) < 1 - 1e-8 || candidate.points.some(p => Math.abs(p.clone().sub(seed.points[0]).dot(seed.normal)) > epsilon))
-                      continue;
-                  if (!candidate.points.some((p, i) => edges.has(edgeKey(p, candidate.points[(i + 1) % 3]))))
-                      continue;
-                  pending.delete(candidate);
-                  group.push(candidate);
-                  addEdges(candidate);
-                  changed = true;
-              }
-          }
-          groups.push(group);
-      }
-      const regions = [];
-      for (const group of groups) {
-          const edges = new Map();
-          for (const triangle of group)
-              triangle.points.forEach((p, i) => {
-                  const q = triangle.points[(i + 1) % 3], key = edgeKey(p, q), edge = edges.get(key);
-                  if (edge)
-                      edge.count++;
-                  else
-                      edges.set(key, { a: p, b: q, count: 1 });
-              });
-          const boundary = [...edges.values()].filter(e => e.count === 1);
-          const directions = boundary.map(e => canonical(e.b.clone().sub(e.a)));
-          directions.sort((a, b) => Math.abs(b.lengthSq() - a.lengthSq()) > epsilon ? b.lengthSq() - a.lengthSq() : b.x - a.x || b.y - a.y || b.z - a.z);
-          if (!directions.length)
-              continue;
-          const x = directions[0].normalize(), normal = group[0].normal, z = x.clone().cross(normal);
-          const projected = boundary.map(e => ({ a: [e.a.dot(x), e.a.dot(z)], b: [e.b.dot(x), e.b.dot(z)] }));
-          const coordinates = projected.flatMap(e => [e.a[0], e.b[0]]).sort((a, b) => a - b);
-          const cuts = coordinates.filter((v, i) => !i || v - coordinates[i - 1] > epsilon);
-          const distance = group[0].points[0].dot(normal);
-          const point = (u, v) => x.clone().multiplyScalar(u).addScaledVector(z, v).addScaledVector(normal, distance);
-          const at = (e, u) => e.a[1] + (e.b[1] - e.a[1]) * (u - e.a[0]) / (e.b[0] - e.a[0]);
-          let part = 0;
-          for (let i = 0; i + 1 < cuts.length; i++) {
-              const left = cuts[i], right = cuts[i + 1], mid = (left + right) / 2;
-              const hits = projected.filter(e => mid > Math.min(e.a[0], e.b[0]) && mid < Math.max(e.a[0], e.b[0])).sort((a, b) => at(a, mid) - at(b, mid));
-              for (let j = 0; j + 1 < hits.length; j += 2) {
-                  const a = hits[j], b = hits[j + 1];
-                  const points = [point(left, at(a, left)), point(right, at(a, right)), point(right, at(b, right)), point(left, at(b, left))];
-                  const unique = points.filter((p, k) => p.distanceTo(points[(k + 1) % 4]) > epsilon);
-                  if (unique.length < 3)
-                      continue;
-                  regions.push({ ids: [group[0].ids[0], part++], points: unique, normal, area: 0, axis: x });
-              }
-          }
-      }
-      return regions.map(region => {
-          const axis = region.axis;
-          const origin = region.points[0].clone().applyMatrix4(mesh.matrixWorld);
-          const x = region.points[0].clone().add(axis).applyMatrix4(mesh.matrixWorld).sub(origin).normalize();
-          const normalMatrix = new Matrix4().copy(mesh.matrixWorld).invert().transpose();
-          const y = region.normal.clone().transformDirection(normalMatrix);
-          const z = x.clone().cross(y).normalize();
-          const points = region.points.map(p => p.clone().applyMatrix4(mesh.matrixWorld).sub(origin));
-          const xs = points.map(p => p.dot(x)), zs = points.map(p => p.dot(z));
-          const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
-          const center = origin.addScaledVector(x, cx).addScaledVector(z, cz);
-          return { key: `${mesh.uuid}:${region.ids.join(',')}`, matrix: new Float32Array(new Matrix4().makeBasis(x, y, z).setPosition(center).elements),
-              vertices: points.flatMap((p, i) => [xs[i] - cx, 0, zs[i] - cz]),
-              orientation: Math.abs(y.y) > 0.999 ? 'horizontal' : Math.abs(y.y) < 0.001 ? 'vertical' : null };
-      });
-  }
-
-  const planeAllocation = Symbol('plane allocation');
   function planeState(value) {
       const state = interfaceBrands.planeValues.get(value);
       if (!state)
@@ -25892,11 +25969,7 @@ void main() {
       return state;
   }
   class XRPlaneSet {
-      constructor(values, token) {
-          if (token !== planeAllocation)
-              throw new TypeError('Illegal constructor.');
-          interfaceBrands.planeSets.set(this, new Set(values));
-      }
+      constructor(_values) { throw new TypeError('Illegal constructor.'); }
       get size() { return planeSetState(this).size; }
       has(value) {
           const set = planeSetState(this);
@@ -25912,7 +25985,7 @@ void main() {
           const set = planeSetState(this);
           if (typeof callback !== 'function')
               throw new TypeError('Expected callable callback.');
-          for (const value of set)
+          for (const value of set.values())
               Reflect.apply(callback, thisArg, [value, value, this]);
       }
       [Symbol.iterator]() { return this.values(); }
@@ -25963,14 +26036,7 @@ void main() {
       [Symbol.toStringTag]: { value: 'XRMeshSet', configurable: true },
   });
   class XRPlane {
-      constructor(session, token) {
-          if (token !== planeAllocation)
-              throw new TypeError('Illegal constructor.');
-          const state = { space: null, polygon: Object.freeze([]),
-              orientation: null, changed: 0, matrix: null, signature: [] };
-          state.space = new XRSpace(session, () => session.ended ? null : state.matrix);
-          interfaceBrands.planeValues.set(this, state);
-      }
+      constructor(_session) { throw new TypeError('Illegal constructor.'); }
       get planeSpace() { return planeState(this).space; }
       get polygon() { return planeState(this).polygon; }
       get orientation() { return planeState(this).orientation; }
@@ -25985,16 +26051,6 @@ void main() {
           if (name !== 'constructor')
               Object.defineProperty(prototype, name, { enumerable: true });
       }
-  }
-  function updatePlane(plane, surface, time) {
-      const state = planeState(plane);
-      if (state.signature.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - state.signature[i]) > 1e-5) || state.orientation !== surface.orientation) {
-          state.changed = time;
-          state.signature = surface.vertices.slice();
-          state.polygon = Object.freeze(Array.from({ length: surface.vertices.length / 3 }, (_, i) => Object.freeze(new DOMPointReadOnly(surface.vertices[i * 3], 0, surface.vertices[i * 3 + 2], 1))));
-      }
-      state.orientation = surface.orientation;
-      state.matrix = surface.matrix;
   }
   class XRMesh {
       constructor(_session) { throw new TypeError('Illegal constructor.'); }
@@ -26014,31 +26070,12 @@ void main() {
   }
   class EnvironmentTracker {
       constructor(session) {
-          this.session = session;
-          this.planes = new Map();
+          this.planes = new interfaceBrands.planeAllocations.PlaneTracker(session, XRPlane.prototype, XRPlaneSet.prototype);
           this.meshes = new interfaceBrands.meshAllocations.MeshTracker(session, XRMesh.prototype, XRMeshSet.prototype);
       }
-      update(time) {
-          var _a, _b;
-          this.meshes.update(time);
-          const planeSurfaces = roomMeshes((_b = (_a = this.session._device.arScene) === null || _a === void 0 ? void 0 : _a.room) !== null && _b !== void 0 ? _b : null).flatMap(planeRegions);
-          const planeKeys = new Set(planeSurfaces.map(surface => surface.key));
-          for (const [key, plane] of this.planes)
-              if (!planeKeys.has(key)) {
-                  planeState(plane).matrix = null;
-                  this.planes.delete(key);
-              }
-          if (this.session.enabledFeatures.includes('plane-detection'))
-              for (const surface of planeSurfaces) {
-                  let plane = this.planes.get(surface.key);
-                  if (!plane)
-                      this.planes.set(surface.key, plane = new XRPlane(this.session, planeAllocation));
-                  updatePlane(plane, surface, time);
-              }
-      }
-      snapshot() { return { planes: new XRPlaneSet(this.planes.values(), planeAllocation), meshes: this.meshes.snapshot() }; }
-      clear() { for (const plane of this.planes.values())
-          planeState(plane).matrix = null; this.planes.clear(); this.meshes.clear(); }
+      update(time) { this.meshes.update(time); this.planes.update(time); }
+      snapshot() { return { planes: this.planes.snapshot(), meshes: this.meshes.snapshot() }; }
+      clear() { this.planes.clear(); this.meshes.clear(); }
   }
 
   var environment = /*#__PURE__*/Object.freeze({

@@ -1,0 +1,46 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:environment
+> tsx --test tests/environment.ts tests/play-area.ts
+
+/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/src/polyfill/api/geometry.ts:5
+export const sessionObjects = interfaceBrands.sessions;
+                              ^
+
+ReferenceError: Cannot access 'interfaceBrands' before initialization
+    at <anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/src/polyfill/api/geometry.ts:5:31)
+    at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:660:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.12.0
+✖ tests/environment.ts (414.91525ms)
+/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/src/polyfill/api/geometry.ts:5
+export const sessionObjects = interfaceBrands.sessions;
+                              ^
+
+ReferenceError: Cannot access 'interfaceBrands' before initialization
+    at <anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/src/polyfill/api/geometry.ts:5:31)
+    at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:660:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.12.0
+✖ tests/play-area.ts (419.958ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 459.402916
+
+✖ failing tests:
+
+test at tests/environment.ts:1:1
+✖ tests/environment.ts (414.91525ms)
+  'test failed'
+
+test at tests/play-area.ts:1:1
+✖ tests/play-area.ts (419.958ms)
+  'test failed'

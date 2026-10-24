@@ -232,6 +232,56 @@ test('plane interfaces are nonconstructible, branded readonly setlikes',()=>{
   tracker.update(2); assert.equal(tracker.snapshot().planes.has(plane),false);
 });
 
+test('plane allocation ignores mutable public superclass chains and caller state',()=>{
+  const room=new Group();room.add(rectangle(-1,-1,1,1));
+  const session=fixtureSession({_device:{arScene:{room}},enabledFeatures:['plane-detection'],ended:false});
+  const tracker=new EnvironmentTracker(session),planeBase=Object.getPrototypeOf(XRPlane),setBase=Object.getPrototypeOf(XRPlaneSet);
+  let intercepted=0;
+  try {
+    Object.setPrototypeOf(XRPlane,function(){intercepted++;});Object.setPrototypeOf(XRPlaneSet,function(){intercepted++;});
+    tracker.update(1);const set=tracker.snapshot().planes,plane=[...set][0];
+    assert.equal(set.size,1);assert.equal(plane.lastChangedTime,1);assert(plane.planeSpace._update());
+    assert.equal(intercepted,0,'internal allocation never invokes mutable public superclass chains');
+  } finally {Object.setPrototypeOf(XRPlane,planeBase);Object.setPrototypeOf(XRPlaneSet,setBase);tracker.clear();}
+});
+
+// Separate subtests demonstrate each original registry path independently.
+// All attempts use fresh tracking so an earlier mutation cannot hide a failure.
+test('plane registry does not expose brand, record or membership writers',async t=>{
+  for(const attack of ['registration','replacement','deletion','record','pose','signature','populated set','empty set'])await t.test(attack,()=>{
+    const room=new Group();room.add(rectangle(-1,-1,1,1));
+    const session=fixtureSession({_device:{arScene:{room}},enabledFeatures:['plane-detection'],ended:false});
+    const tracker=new EnvironmentTracker(session);tracker.update(1);
+    const set=tracker.snapshot().planes,plane=[...set][0],values=interfaceBrands.planeValues as any,sets=interfaceBrands.planeSets as any;
+    const attempt=(fn:()=>void)=>{try{fn();}catch{ /* blocked mutations are expected */ }};
+    const polygon=plane.polygon,pose=Array.from(plane.planeSpace._update()!);
+    const record={space:plane.planeSpace,polygon:[],orientation:null,changed:999,matrix:null,signature:[]};
+    if(attack==='registration') {
+      const fake=Object.create(XRPlane.prototype);attempt(()=>values.set(fake,record));
+      assert.throws(()=>Object.getOwnPropertyDescriptor(XRPlane.prototype,'polygon')!.get!.call(fake),TypeError);
+      const fakeSet=Object.create(XRPlaneSet.prototype);attempt(()=>sets.set(fakeSet,new Set([fake])));
+      assert.throws(()=>Object.getOwnPropertyDescriptor(XRPlaneSet.prototype,'size')!.get!.call(fakeSet),TypeError);
+    }
+    if(attack==='replacement') {attempt(()=>values.set(plane,record));attempt(()=>sets.set(set,new Set()));}
+    if(attack==='deletion') {attempt(()=>values.delete(plane));attempt(()=>sets.delete(set));}
+    if(attack==='record')attempt(()=>Object.assign(values.get(plane),record));
+    if(attack==='pose')attempt(()=>values.get(plane).matrix.fill(999));
+    if(attack==='signature')attempt(()=>values.get(plane).signature.fill(999));
+    if(attack==='populated set')attempt(()=>sets.get(set).clear());
+    if(attack==='empty set') {
+      tracker.clear();const empty=tracker.snapshot().planes;
+      attempt(()=>sets.get(empty).add(plane));assert.equal(empty.size,0);
+      tracker.update(1);assert.equal(tracker.snapshot().planes.has(plane),false);
+      return;
+    }
+    assert.equal(set.size,1);assert(set.has(plane));assert.equal(plane.polygon,polygon);
+    assert.equal(plane.lastChangedTime,1);assert.deepEqual(Array.from(plane.planeSpace._update()!),pose);
+    tracker.update(2);assert.equal(plane.lastChangedTime,1,'comparison baseline cannot be changed');
+    assert(tracker.snapshot().planes.has(plane));
+    tracker.clear();assert.equal(plane.planeSpace._update(),null);
+  });
+});
+
 // Independent convex clipping in the measured plane's coordinates. Compare
 // polygons and exact pinned box footprints against the original GLB triangles.
 function intersectArea(subject:number[][], clip:number[][]) {

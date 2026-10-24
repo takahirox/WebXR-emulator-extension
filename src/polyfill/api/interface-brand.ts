@@ -4,6 +4,7 @@ import type {mat4} from 'gl-matrix';
 import type {EventHandler} from './event-handlers';
 import {createLayerAllocations} from './layer-allocation';
 import {createMeshAllocations} from './mesh-allocation';
+import {createPlaneAllocations} from './plane-allocation';
 import {createHitTestAllocations} from './hit-test-allocation';
 
 // Same-origin injections share allocation brands, not writable WeakSets. Only
@@ -33,15 +34,13 @@ function createBrands() {
     matrix: () => Float32Array; inverse: () => XRRigidTransform;
   }>();
   const hitTestAllocations = createHitTestAllocations({sessions, spaces, frames, inputSources, transforms});
+  const planeAllocations = createPlaneAllocations(sessions);
   return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
     layerAllocations: createLayerAllocations(sessions),
     meshAllocations: createMeshAllocations(sessions),
-    planeValues: new WeakMap<object, {
-      space: import('./geometry').XRSpace; polygon: readonly DOMPointReadOnly[];
-      orientation: 'horizontal' | 'vertical' | null; changed: number;
-      matrix: mat4 | null; signature: number[];
-    }>(),
-    planeSets: new WeakMap<object, Set<import('./environment').XRPlane>>(),
+    planeAllocations,
+    planeValues: planeAllocations.planes,
+    planeSets: planeAllocations.sets,
     roomCaptures: new WeakMap<object, () => Promise<void>>(),
     hitTestAllocations,
     rays: hitTestAllocations.rays,
