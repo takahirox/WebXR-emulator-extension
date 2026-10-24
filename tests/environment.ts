@@ -282,3 +282,23 @@ test('packaged hall plane coverage and centered XRPlanes proxy measurements',asy
   await mkdir('test-results',{recursive:true});await writeFile('test-results/plane-room.json',JSON.stringify(report,null,2));
   console.log('hall measurements',JSON.stringify({...report,regions:undefined}));
 });
+
+test('hit testing filters independently classified plane and mesh fixtures', async () => {
+  const {intersectHitTestGeometry} = await import('../src/polyfill/api/hit-test-geometry');
+  // Independently authored, spatially separate native representations. They
+  // deliberately do not derive one type by relabeling hits of the other.
+  const surface = (z: number) => ({key: String(z), orientation: 'vertical' as const,
+    matrix: new Float32Array([1,0,0,0, 0,0,1,0, 0,-1,0,0, 0,0,z,1]),
+    vertices: [-1,0,-1, 1,0,-1, 1,0,1, -1,0,1]});
+  const geometry = {planes: [surface(-2)], meshes: [surface(-1), surface(-3)]};
+  const cast = (types: string[], origin = [0,0,0]) => intersectHitTestGeometry(origin, [0,0,-1], geometry, types);
+  assert.deepEqual(cast(['plane']).map(h => [h.entityType, h.distance]), [['plane',2]]);
+  assert.deepEqual(cast(['mesh']).map(h => [h.entityType, h.distance]), [['mesh',1],['mesh',3]]);
+  assert.deepEqual(cast(['point','mesh','plane']).map(h => [h.entityType,h.distance]), [['mesh',1],['plane',2],['mesh',3]]);
+  assert.deepEqual(cast([]), []); assert.deepEqual(cast(['point']), []);
+  assert.deepEqual(cast(['plane','mesh'], [4,0,0]), []);
+  assert.deepEqual(cast(['plane','mesh'], [Infinity,0,0]), []);
+  for (const hit of cast(['plane','mesh'])) assert.deepEqual(hit.normal.toArray(), [0,0,1]);
+  geometry.meshes.push(surface(-2));
+  assert.equal(cast(['plane','mesh']).filter(h => h.distance === 2).length, 2, 'coincident representations retain genuine classification');
+});

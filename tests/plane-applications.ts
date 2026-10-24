@@ -4,12 +4,12 @@ import {eventually} from './firefox-driver';
 import {observeXR,applicationPixels} from './firefox-observation';
 import {panelPose} from './firefox-contract';
 
-interface Driver {
+export interface Driver {
   browser:string; origin:string;
   navigate(url:string):Promise<void>; configure(device:string):Promise<void>;
   evaluate<T=any>(script:string,args?:unknown[]):Promise<T>;
   panel<T=any>(script:string,args?:unknown[]):Promise<T>;
-  clickEntry():Promise<void>; screenshot():Promise<Buffer>; phoneSelect(point:{x:number;y:number}):Promise<void>;
+  clickEntry():Promise<void>; screenshot():Promise<Buffer>; phoneSelect(point:{x:number;y:number},moveTo?:{x:number;y:number},button?:'left'|'right'):Promise<void>;
 }
 
 /** Observation only: retain original results/arguments; measure application

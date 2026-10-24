@@ -1,29 +1,35 @@
 import type {XRFrame} from './runtime';
-export const PRIVATE = Symbol('@@webxr-polyfill/XRHitTestResult');
-import {XRSpace, XRRigidTransform, transformMatrix} from './geometry';
+import {XRSpace, XRRigidTransform, transformMatrix, spaceObjects, enumerableMembers} from './geometry';
+import {interfaceBrands} from './interface-brand';
+import {interfaceValue} from './bulk-input';
+import {requireHitTestAllocation} from './hit-test-options';
+import {mat4} from 'gl-matrix';
 
-import {
-  mat4
-} from 'gl-matrix';
-
+function resultState(value: object) {
+  const state = interfaceBrands.hitResults.get(value);
+  if (!state) throw new TypeError('Expected XRHitTestResult.');
+  return state;
+}
 export default class XRHitTestResult {
-  [PRIVATE]: {frame: XRFrame; transform: XRRigidTransform};
-
-  constructor(frame: XRFrame, transform: XRRigidTransform) {
-    this[PRIVATE] = {
-      frame,
-      transform
-    };
+  constructor(...args: [frame: XRFrame, transform: XRRigidTransform, token?: symbol]) {
+    const [frame, transform, token] = args;
+    requireHitTestAllocation(token);
+    interfaceBrands.hitResults.set(this, {frame, transform});
   }
-
   async createAnchor() {
-    const {frame, transform} = this[PRIVATE];
+    const {frame, transform} = resultState(this);
+    frame._assertActive();
     const space = new XRSpace(frame.session, () => mat4.clone(transformMatrix(transform)));
     return frame.createAnchor(new XRRigidTransform(), space);
   }
-
   getPose(baseSpace: XRSpace) {
-    const space = new XRSpace(this[PRIVATE].frame.session, () => mat4.clone(transformMatrix(this[PRIVATE].transform)));
-    return this[PRIVATE].frame.getPose(space, baseSpace);
+    const {frame, transform} = resultState(this);
+    if (arguments.length < 1) throw new TypeError('Expected baseSpace.');
+    interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+    frame._assertActive();
+    const space = new XRSpace(frame.session, () => mat4.clone(transformMatrix(transform)));
+    return frame.getPose(space, baseSpace);
   }
 }
+enumerableMembers(XRHitTestResult.prototype, ['getPose', 'createAnchor']);
+Object.defineProperty(XRHitTestResult.prototype, Symbol.toStringTag, {value: 'XRHitTestResult', configurable: true});

@@ -1,25 +1,22 @@
-import type {XRFrame} from './runtime';
-import type {XRInputSource} from './runtime';
+import type {XRFrame, XRInputSource} from './runtime';
 import type XRHitTestResult from './XRHitTestResult';
+import {interfaceBrands} from './interface-brand';
+import {enumerableMembers} from './geometry';
+import {requireHitTestAllocation} from './hit-test-options';
 
-export const PRIVATE = Symbol('@@webxr-polyfill/XRTransientInputHitTestResult');
-
-export default class XRTransientInputHitTestResult {
-  [PRIVATE]: {frame: XRFrame; results: XRHitTestResult[]; inputSource: XRInputSource};
-
-  constructor(frame: XRFrame, results: XRHitTestResult[], inputSource: XRInputSource) {
-    this[PRIVATE] = {
-      frame,
-      inputSource,
-      results
-    };
-  }
-
-  get inputSource() {
-    return this[PRIVATE].inputSource;
-  }
-
-  get results() {
-    return this[PRIVATE].results;
-  }
+function resultState(value: object) {
+  const state = interfaceBrands.transientHitResults.get(value);
+  if (!state) throw new TypeError('Expected XRTransientInputHitTestResult.');
+  return state;
 }
+export default class XRTransientInputHitTestResult {
+  constructor(...args: [frame: XRFrame, results: XRHitTestResult[], inputSource: XRInputSource, token?: symbol]) {
+    const [, results, inputSource, token] = args;
+    requireHitTestAllocation(token);
+    interfaceBrands.transientHitResults.set(this, {inputSource, results: Object.freeze([...results])});
+  }
+  get inputSource() { return resultState(this).inputSource; }
+  get results() { return resultState(this).results; }
+}
+enumerableMembers(XRTransientInputHitTestResult.prototype, ['inputSource', 'results']);
+Object.defineProperty(XRTransientInputHitTestResult.prototype, Symbol.toStringTag, {value: 'XRTransientInputHitTestResult', configurable: true});

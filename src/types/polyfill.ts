@@ -10,5 +10,5 @@ export interface TransientHitTestOptions { profile: string; offsetRay?: XRRay; e
 export interface BaseLayer { context: (WebGLRenderingContext | WebGL2RenderingContext); readonly framebufferWidth: number; readonly framebufferHeight: number; readonly _presentationCanvas: HTMLCanvasElement | OffscreenCanvas }
 export interface RenderState { depthNear: number; depthFar: number; inlineVerticalFieldOfView: number }
 export interface Viewport { x: number; y: number; width: number; height: number }
-export interface HitTestState { session: XRSession; space: XRSpace; offsetRay: XRRay; active: boolean }
-export interface TransientHitTestState { session: XRSession; profile: string; offsetRay: XRRay; active: boolean }
+export interface HitTestState { session: XRSession; space: XRSpace; offsetRay: XRRay; entityTypes: readonly string[]; active: boolean }
+export interface TransientHitTestState { session: XRSession; profile: string; offsetRay: XRRay; entityTypes: readonly string[]; active: boolean }

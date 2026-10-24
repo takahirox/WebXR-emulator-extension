@@ -38,5 +38,37 @@
   "webxr/plane-detection/xrFrame_detectedPlanes_incomplete_update.https.html": {
     "sha256": "d9bf23219496ecea9623efe4ca9db62c1583f40e97dfc1e604503ab749b922d5",
     "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/plane-detection/xrFrame_detectedPlanes_incomplete_update.https.html"
+  },
+  "webxr/hit-test/xrRay_constructor.https.html": {
+    "sha256": "e68cd415e8034ff44097403c54d420489258369d4eaca02ef761a5dd019d8325",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/xrRay_constructor.https.html"
+  },
+  "webxr/hit-test/xrRay_matrix.https.html": {
+    "sha256": "4199b453da9c9fd40c0c8dbb1ed44b9cfd1907727a4a3da7c47c6367c0882ce3",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/xrRay_matrix.https.html"
+  },
+  "webxr/hit-test/ar_hittest_source_cancel.https.html": {
+    "sha256": "292e86cf6afc1d44cb07a730afb6fa7b65dbb87d5f591d24401d0c56c6057f02",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/ar_hittest_source_cancel.https.html"
+  },
+  "webxr/hit-test/ar_hittest_subscription_states_regular.https.html": {
+    "sha256": "f5e792acdb9113ad436082e9b85bfe8ad1f6a762d7c1d03831ecd32af9b5109e",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/ar_hittest_subscription_states_regular.https.html"
+  },
+  "webxr/hit-test/ar_hittest_subscription_states_transient.https.html": {
+    "sha256": "a100f48121e9184477ccd1ec5ce528b69466ae186b54b020fe17d109cfcc59ce",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/ar_hittest_subscription_states_transient.https.html"
+  },
+  "webxr/hit-test/ar_hittest_subscription_refSpaces.https.html": {
+    "sha256": "d97a1450650e27b1750a6f65974537dc16e47346fc1d702d6a35392b6bfa915e",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/ar_hittest_subscription_refSpaces.https.html"
+  },
+  "webxr/hit-test/ar_hittest_subscription_transientInputSources.https.html": {
+    "sha256": "11ae950c627f97ecfae6311a1c9d82e06e8101a1b13a8f52e0837431973c795b",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/ar_hittest_subscription_transientInputSources.https.html"
+  },
+  "webxr/hit-test/ar_hittest_subscription_unlocalizable.https.html": {
+    "sha256": "ade2f72669adb8a4f0908d6e7bc272a97d60d6c2ffde451ddc9efa9ec18ae18b",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/ar_hittest_subscription_unlocalizable.https.html"
   }
 }

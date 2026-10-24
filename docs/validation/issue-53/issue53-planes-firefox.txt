@@ -1,0 +1,6 @@
+scenario firefox Meta Quest 3 immersive-vr
+scenario firefox Meta Quest 3 immersive-ar
+scenario firefox Generic Android Phone (ARCore) immersive-ar
+scenario firefox Meta Quest 3 inline
+scenario firefox Generic Android Phone (ARCore) inline
+{"status":"passed","browser":"firefox","scenarios":5,"assertions":12943,"failures":[]}

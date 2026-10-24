@@ -1,0 +1,11 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:hit-test-applications:chromium
+> tsx tests/reference-space-browser.ts chromium hit-test-applications
+
+hit-test application chromium quest sample
+hit-test application chromium quest three
+hit-test application chromium android sample
+touch targets [{"point":{"x":603,"y":242},"target":"CANVAS","rect":{"x":0,"y":0,"width":1280,"height":720,"top":0,"right":1280,"bottom":720,"left":0}},{"point":{"x":677,"y":242},"target":"CANVAS","rect":{"x":0,"y":0,"width":1280,"height":720,"top":0,"right":1280,"bottom":720,"left":0}}]
+hit-test application chromium android three
+touch targets [{"point":{"x":603,"y":242},"target":"CANVAS","rect":{"x":0,"y":0,"width":1280,"height":720,"top":0,"right":1280,"bottom":720,"left":0}},{"point":{"x":677,"y":242},"target":"CANVAS","rect":{"x":0,"y":0,"width":1280,"height":720,"top":0,"right":1280,"bottom":720,"left":0}}]
+{"status":"passed","browser":"chromium","scenarios":4,"assertions":0,"failures":[]}

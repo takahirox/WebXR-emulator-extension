@@ -12,23 +12,28 @@ import {referenceSpaceCases} from './reference-space';
 import {rigidTransformCases} from './rigid-transform';
 import {poseViewCases} from './pose-view';
 import {planeCases} from './planes';
+import {hitTestCases} from './hit-test';
+import {runHitTestApplications} from './hit-test-applications';
 import {runPlaneApplications} from './plane-applications';
 
 const browser = process.argv[2];
-const applications = process.argv[3] === 'plane-applications';
+const hitApplications = process.argv[3] === 'hit-test-applications';
+const hitTests = process.argv[3] === 'hit-test';
+const applications = process.argv[3] === 'plane-applications' || hitApplications;
+const runApplications = hitApplications ? runHitTestApplications : runPlaneApplications;
 const planes = process.argv[3] === 'planes';
 const transforms = process.argv[3] === 'transforms';
 const poses = process.argv[3] === 'poses';
-const selection = applications ? 'planes-applications' : planes ? 'planes-contract' : poses ? 'pose-view' : transforms ? 'rigid-transform' : 'reference-space';
-const cases = planes ? planeCases : poses ? poseViewCases : transforms ? rigidTransformCases : referenceSpaceCases;
+const selection = hitApplications ? 'hit-test-applications' : hitTests ? 'hit-test-contract' : applications ? 'planes-applications' : planes ? 'planes-contract' : poses ? 'pose-view' : transforms ? 'rigid-transform' : 'reference-space';
+const cases = hitTests ? hitTestCases : planes ? planeCases : poses ? poseViewCases : transforms ? rigidTransformCases : referenceSpaceCases;
 assert(['chromium', 'firefox'].includes(browser), 'Select chromium or firefox');
 const {origin, server, provenance} = await serveFirefoxFixtures();
-const report: any = {issue: planes || applications ? 51 : poses ? 49 : transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: applications ? [
-  'Unchanged pinned applications and their dependencies; only Sample existing overlay checkbox disabled.',
+const report: any = {issue: hitTests || hitApplications ? 53 : planes || applications ? 51 : poses ? 49 : transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: applications ? [
+  ...(hitApplications ? ['Unchanged pinned hit-test applications and dependencies; API and scene observation retains original calls/results/exceptions. Actual panel buttons and phone screen pointer events exercise selection.'] : ['Unchanged pinned applications and their dependencies; only Sample existing overlay checkbox disabled.']),
   'Three.js observe events installed before scripts; original scene.onBeforeRender called with original arguments. Chromium panel bootstrap paused once to install observer, then resumed before running scenarios.',
-  'XR request/frame/pose/createAnchor observation preserves arguments, return values and exceptions; inspect application scene geometry, actual presentation canvas, retained plane spaces and cleanup counters.',
+  ...(hitApplications ? ['XR request/frame/hit-result pose and original scene-node observation preserves calls, return values and exceptions; actual presentation pixels and backend cleanup counters. Additional observer-owned Android transient subscriptions exercise matching/unmatched profiles and pointer movement; application requests remain unchanged.'] : ['XR request/frame/pose/createAnchor observation preserves arguments, return values and exceptions; inspect application scene geometry, actual presentation canvas, retained plane spaces and cleanup counters.']),
   'Genuine panel TransformControls changes viewer/phone poses; real Quest panel button clicks and desktop right-click on the rendered Android phone dispatch selection. No application geometry or logic replaced.',
-] : planes ? [
+] : hitTests ? ['Unchanged pinned WPT XRRay constructor/matrix in real injected frames. Genuine request/frame operations across separately injected same-origin realms. Private room, source, matrix-provider and backend collection inspection is restricted to contract cases; unavailable provider restored synchronously. Real RAF, WebGL and extension panel configuration.'] : planes ? [
   'Genuine injected iframe and main realm interfaces and borrowed operations; real RAF and extension panel configuration.',
   'API fixture temporarily moves/scales the actual room, removes/restores its room pointer, and makes one plane native provider unavailable; restored in cleanup. These controls are absent from application scenarios.',
   'WPT assertions adapted from pinned e185958; see docs/webxr-planes.md for fake-device setup differences.',
@@ -65,12 +70,12 @@ try {
     report.versions = firefox.versions;
     if (applications) await firefox.bidi('script.addPreloadScript', {functionDeclaration: await readFile('tests/firefox-scenes.js','utf8')});
     await firefox.navigate(origin + '/csp'); await firefox.openPanel();
-    if (applications) report.results=await runPlaneApplications({
+    if (applications) report.results=await runApplications({
       browser,origin,navigate:url=>firefox.navigate(url),configure:device=>configure(firefox,device,'immersive-ar'),
       evaluate:(script,args)=>firefox.evaluate(script,args),panel:(script,args)=>firefox.panel(script,args),
       clickEntry:async()=>{const button=await firefox.evaluate<Record<string,string>>(`return [...document.querySelectorAll('button')].find(b=>/START|ENTER/.test(b.textContent)&&!b.disabled)`);await firefox.request('POST',`/element/${button['element-6066-11e4-a52e-4f735466cecf']}/click`,{});},
       screenshot:async()=>Buffer.from(await firefox.request<string>('GET','/screenshot'),'base64'),
-      phoneSelect:point=>firefox.request('POST','/actions',{actions:[{type:'pointer',id:'mouse',parameters:{pointerType:'mouse'},actions:[{type:'pointerMove',duration:100,origin:'viewport',...point},{type:'pointerDown',button:2},{type:'pause',duration:150},{type:'pointerUp',button:2}]}]}),
+      phoneSelect:(point,moveTo,button='right')=>firefox.request('POST','/actions',{actions:[{type:'pointer',id:'mouse',parameters:{pointerType:'mouse'},actions:[{type:'pointerMove',duration:100,origin:'viewport',...point},{type:'pointerDown',button:button==='left'?0:2},{type:'pause',duration:button==='left'?50:200},...(moveTo?[{type:'pointerMove',duration:200,origin:'viewport',...moveTo},{type:'pause',duration:200}]:[]),{type:'pointerUp',button:button==='left'?0:2}]}]}),
     });
     else for (const [device, selected, mode] of scenarios) {
       console.log('scenario', browser, device, mode);
@@ -149,7 +154,7 @@ try {
       await panel.command('Debugger.evaluateOnCallFrame',{callFrameId:pause.callFrames[0].callFrameId,expression:observed+';observeScenes();'});
       await panel.command('Debugger.removeBreakpoint',{breakpointId});await panel.command('Debugger.resume',{});await panel.command('Debugger.disable',{});
       await eventually(()=>panel.evaluate(()=>!!(window as any).firefoxScenes?.length && !!document.querySelector('#rightControllerPosition')?.textContent),Boolean,'observed real panel/assets');
-      report.results=await runPlaneApplications({
+      report.results=await runApplications({
         browser,origin,navigate:async url=>{await page.goto(url);await page.bringToFront();},
         configure:async device=>{
           await panel.evaluate(device=>{const d=document.querySelector('#deviceSelect') as HTMLSelectElement;d.value=device;d.dispatchEvent(new Event('change'));const m=document.querySelector('#questModeSelect') as HTMLSelectElement;m.value='immersive-ar';m.dispatchEvent(new Event('change'));},device);
@@ -158,7 +163,7 @@ try {
         evaluate:(script,args=[])=>page.evaluate(`(function(){${script}}).apply(null,${JSON.stringify(args)})`),
         panel:async(script,args=[])=>{const r=await panel.command<any>('Runtime.evaluate',{expression:`(function(){${script}}).apply(null,${JSON.stringify(args)})`,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value;},
         clickEntry:async()=>{await page.getByRole('button',{name:/START AR|ENTER AR/}).click();},
-        screenshot:()=>page.screenshot(),phoneSelect:async point=>{await page.mouse.click(point.x,point.y,{button:'right',delay:150});},
+        screenshot:()=>page.screenshot(),phoneSelect:async(point,moveTo,button='right')=>{await page.mouse.move(point.x,point.y);await page.mouse.down({button});await page.waitForTimeout(button==='left'?50:200);if(moveTo){await page.mouse.move(moveTo.x,moveTo.y,{steps:8});await page.waitForTimeout(200);}await page.mouse.up({button});},
       });
       assert.deepEqual(errors,[],'no application runtime errors');
     } else for (const [device, selected, mode] of scenarios) {
@@ -190,7 +195,7 @@ finally {
   report.completedAt = new Date().toISOString();
   report.servedSources=[...provenance.values()];
   report.provenance = {};
-  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'package.json', 'src/polyfill/api/layer-allocation.ts', 'tests/environment.ts', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/pose-view.ts', 'src/polyfill/api/environment.ts', 'src/polyfill/api/plane-regions.ts', 'tests/planes.ts', 'tests/plane-applications.ts', 'src/polyfill/api/sensing.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
+  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'package.json', 'src/polyfill/api/layer-allocation.ts', 'tests/environment.ts', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/pose-view.ts', 'src/polyfill/api/environment.ts', 'src/polyfill/api/plane-regions.ts', 'tests/planes.ts', 'tests/plane-applications.ts', 'tests/hit-test.ts', 'tests/hit-test-applications.ts', 'tests/hit-test-sample-observer.js', 'src/polyfill/api/hit-test-options.ts', 'src/polyfill/api/hit-test-geometry.ts', 'src/polyfill/api/XRHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestResult.ts', 'src/polyfill/ARScene.ts', 'src/polyfill/api/sensing.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
     report.provenance[file] = createHash('sha256').update(await readFile(file)).digest('hex');
   }
   await writeFile(filename, JSON.stringify(report, null, 2));

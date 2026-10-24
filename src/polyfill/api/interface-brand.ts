@@ -35,6 +35,13 @@ function createBrands() {
     }>(),
     planeSets: new WeakMap<object, Set<import('./environment').XRPlane>>(),
     roomCaptures: new WeakMap<object, () => Promise<void>>(),
+    rays: new WeakMap<object, {
+      origin: DOMPointReadOnly; direction: DOMPointReadOnly; matrix: () => Float32Array;
+    }>(),
+    hitSources: new WeakMap<object, import('../../types/polyfill').HitTestState>(),
+    transientHitSources: new WeakMap<object, import('../../types/polyfill').TransientHitTestState>(),
+    hitResults: new WeakMap<object, {frame: XRFrame; transform: XRRigidTransform}>(),
+    transientHitResults: new WeakMap<object, {inputSource: XRInputSource; results: readonly import('./XRHitTestResult').default[]}>(),
     // Invoke the session realm's operation without consulting public properties.
     transforms: new WeakMap<object, {
       position: DOMPointReadOnly; orientation: DOMPointReadOnly; geometry: mat4;

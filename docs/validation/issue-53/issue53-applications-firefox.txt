@@ -1,0 +1,11 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:hit-test-applications:firefox
+> tsx tests/reference-space-browser.ts firefox hit-test-applications
+
+hit-test application firefox quest sample
+hit-test application firefox quest three
+hit-test application firefox android sample
+touch targets [{"point":{"x":598,"y":272},"rect":{"bottom":809,"height":809,"left":0,"right":1280,"top":0,"width":1280,"x":0,"y":0},"target":"CANVAS"},{"point":{"x":682,"y":272},"rect":{"bottom":809,"height":809,"left":0,"right":1280,"top":0,"width":1280,"x":0,"y":0},"target":"CANVAS"}]
+hit-test application firefox android three
+touch targets [{"point":{"x":598,"y":272},"rect":{"bottom":809,"height":809,"left":0,"right":1280,"top":0,"width":1280,"x":0,"y":0},"target":"CANVAS"},{"point":{"x":682,"y":272},"rect":{"bottom":809,"height":809,"left":0,"right":1280,"top":0,"width":1280,"x":0,"y":0},"target":"CANVAS"}]
+{"status":"passed","browser":"firefox","scenarios":4,"assertions":0,"failures":[]}

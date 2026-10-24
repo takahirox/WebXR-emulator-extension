@@ -37,6 +37,8 @@ export async function serveFirefoxFixtures() {
       if (pathname.endsWith('/webxr_util.js')) response.end(`function xr_session_promise_test(name, body) { promise_test(async t => {const s=await navigator.xr.requestSession('inline');const c=document.createElement('canvas'),g=c.getContext('webgl');await g.makeXRCompatible();s.updateRenderState({baseLayer:new XRWebGLLayer(s,g)});try{await body(s,null,t);}finally{await s.end();}},name);}`);
       else if (pathname === '/resources/testharnessreport.js') response.end(`add_completion_callback((tests,status)=>{window.wptResults={status:status.status,tests:tests.map(t=>({name:t.name,status:t.status,message:t.message}))};});`);
       else response.end(await upstream(`https://raw.githubusercontent.com/web-platform-tests/wpt/${revisions.wpt}/${pathname.replace(/^\/wpt\//, '').replace(/^\//, '')}`));
+    } else if (pathname === '/hit-test-sample-observer.js') {
+      response.setHeader('Content-Type', 'application/javascript'); response.end(await readFile('tests/hit-test-sample-observer.js'));
     } else if (pathname === '/transform-sloppy.js') {
       response.setHeader('Content-Type', 'application/javascript'); response.end('window.assignTransformSloppy = function(t, name, value) { t[name] = value; };');
     } else if (pathname === '/fixture.js') {
