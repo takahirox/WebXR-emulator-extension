@@ -88,7 +88,7 @@ function handPixels() {
 
 const browser=process.argv[2];assert(['chromium','firefox'].includes(browser));
 const {origin,server,provenance}=await serveFirefoxFixtures();
-const report:any={issue:59,browser,status:'running',startedAt:new Date().toISOString(),command:`npm run test:hand-applications:${browser}`,revisions,failures:[],skips:[],cycles:[],instrumentation:[
+const report:any={issue:61,browser,status:'running',startedAt:new Date().toISOString(),command:`npm run test:hand-applications:${browser}`,revisions,failures:[],skips:[],cycles:[],instrumentation:[
   'Unchanged upstream handinput HTML and all Three.js modules served byte-for-byte at the pinned revision. No application/dependency logic changes.',
   'Existing Three.js devtools observe event and original scene.onBeforeRender; request/frame/joint-pose wrappers preserve receivers, arguments, results and exceptions. Post-render inspection of both original hand joint groups, sphere instance transforms/radii and presentation canvas pixels projected separately in both eyes.',
   'Genuine unpacked extension and DevTools panel. Panel reset, stereo/Quest VR selection, retained TransformControls movement and real panel trigger clicks. No synthetic XR adapter, clocks, GL or production test API.',
@@ -161,6 +161,6 @@ try {
 finally {
   if(b){await b.evaluate(`if(window.firefoxSession&&!window.firefoxSession.ended)return window.firefoxSession.end();`).catch(()=>{});await b.panel(`for(const id of ['rightSelectButton','leftSelectButton']){const e=document.getElementById(id);if(e?.classList.contains('pressed'))e.click();}document.querySelector('#resetPoseButton').click();`).catch(()=>{});await b.close();report.cleanup=b.cleanup;}
   server.close();report.servedSources=[...provenance.values()];report.sourceHashes={};
-  for(const file of ['src/polyfill/api/hand-allocation.ts','src/polyfill/api/sensing.ts','src/polyfill/api/runtime.ts','src/polyfill/api/interface-brand.ts','src/polyfill/api/geometry.ts','src/polyfill/EmulatedXRDevice.ts','src/polyfill/CustomWebXRPolyfill.ts','tests/hand-applications.ts','tests/tracking-browser.ts','tests/tracking-observation.ts','tests/firefox-upstream.ts','tests/firefox-scenes.js','polyfill/webxr-polyfill.js','build/firefox/polyfill/webxr-polyfill.js','package.json','package-lock.json'])report.sourceHashes[file]=createHash('sha256').update(await readFile(file)).digest('hex');
+  for(const file of ['src/polyfill/api/hand-allocation.ts','src/polyfill/api/sensing.ts','src/polyfill/api/runtime.ts','src/polyfill/api/interface-brand.ts','src/polyfill/api/geometry.ts','src/polyfill/api/bulk-input.ts','src/polyfill/api/session-init.ts','src/polyfill/ARScene.ts','src/polyfill/DOMOverlay.ts', 'src/polyfill/EmulatedXRDevice.ts','src/polyfill/CustomWebXRPolyfill.ts','tests/hand-applications.ts','tests/tracking-browser.ts','tests/tracking-observation.ts','tests/firefox-upstream.ts','tests/firefox-scenes.js','polyfill/webxr-polyfill.js','build/firefox/polyfill/webxr-polyfill.js','package.json','package-lock.json'])report.sourceHashes[file]=createHash('sha256').update(await readFile(file)).digest('hex');
   report.completedAt=new Date().toISOString();await writeFile(filename,JSON.stringify(report,null,2));console.log(JSON.stringify({status:report.status,browser,cycles:report.cycles.length,failures:report.failures,cleanup:report.cleanup}));
 }

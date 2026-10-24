@@ -1,0 +1,67 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:hands:firefox
+> tsx tests/reference-space-browser.ts firefox hands
+
+scenario firefox Meta Quest 3 immersive-vr
+{"status":"failed","browser":"firefox","scenarios":0,"assertions":0,"failures":["AssertionError [ERR_ASSERTION]: Error: immersive-vr: attached untrusted getter cannot authorize allocation: [{\"phase\":\"attached\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25},{\"phase\":\"attached\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25},{\"phase\":\"removed\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25},{\"phase\":\"removed\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25}]\ncheck@http://127.0.0.1:60889/hands-isolated:3:405\nhandCases/<@http://127.0.0.1:60889/hands-isolated:3:19177\nhandCases/frame</</<@http://127.0.0.1:60889/hands-isolated:3:1630\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27115:35\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nWebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47\nFrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30\nXRSession@<anonymous code>:27215:38\nWebXRPolyfillInjection/</XRSystem/this.request@<anonymous code>:26921:35\nasync*requestSession@<anonymous code>:26970:23\nrequest/</b.onclick@http://127.0.0.1:60889/hands-isolated:3:1087\n\n\n'failed' !== 'passed'\n"]}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Error: immersive-vr: attached untrusted getter cannot authorize allocation: [{"phase":"attached","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25},{"phase":"attached","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25},{"phase":"removed","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25},{"phase":"removed","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25}]
+check@http://127.0.0.1:60889/hands-isolated:3:405
+handCases/<@http://127.0.0.1:60889/hands-isolated:3:19177
+handCases/frame</</<@http://127.0.0.1:60889/hands-isolated:3:1630
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27115:35
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+WebXRPolyfillInjection/</XRSession/this.tick@<anonymous code>:27023:47
+FrameRequestCallback*requestAnimationFrame@<anonymous code>:32056:30
+XRSession@<anonymous code>:27215:38
+WebXRPolyfillInjection/</XRSystem/this.request@<anonymous code>:26921:35
+async*requestSession@<anonymous code>:26970:23
+request/</b.onclick@http://127.0.0.1:60889/hands-isolated:3:1087
+
+
+'failed' !== 'passed'
+
+    at <anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/tests/reference-space-browser.ts:114:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'failed',
+  expected: 'passed',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.12.0

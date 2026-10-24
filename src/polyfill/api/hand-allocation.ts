@@ -7,38 +7,14 @@ import type {DeviceInput} from '../device-adapter';
 export const jointNames = Object.freeze(['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
   ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))]);
 
-// The shared SessionObject constructor supplies an interface brand, not backend
-// allocation permission. Only token-authorized XRSession construction initializes
-// the private input-source slot. Invoke the installed getter from related injected
-// realms, never a getter supplied by the candidate session or its device records.
-// As elsewhere in the polyfill, arbitrary replacement of installed bindings is
-// outside this allocation protection; this is not native security isolation.
-function hasBackendSession(session: XRSession) {
-  const pending: Window[] = [window], visited = new Set<Window>();
-  while (pending.length) {
-    const realm = pending.pop()!;
-    if (visited.has(realm)) continue;
-    visited.add(realm);
-    try {
-      const constructor = (realm as Window & {XRSession?: typeof XRSession}).XRSession;
-      const getter = constructor && Object.getOwnPropertyDescriptor(constructor.prototype, 'inputSources')?.get;
-      if (getter) {
-        try { getter.call(session); return true; } catch { /* different injection or uninitialized session */ }
-      }
-      for (let index = 0; index < realm.frames.length; index++) pending.push(realm.frames[index]);
-    } catch { /* cross-origin or closed */ }
-    try { pending.push(realm.parent); } catch { /* closed */ }
-    try { if (realm.opener) pending.push(realm.opener as Window); } catch { /* closed */ }
-  }
-  return false;
-}
-
 /** Canonical backend allocations. Only frozen readers escape; neither a public
  * constructor nor the shared space superclass can register a joint. Trackers
  * can retrieve an existing source's hand, never accept caller-provided records,
  * joint names, radii, matrices, providers or membership lists. */
-export function createHandAllocations(sessions: WeakSet<object>, inputs: WeakSet<object>,
-  frames: WeakMap<object, {session: XRSession; pose: (matrix: mat4, emulated: boolean) => import('./geometry').XRPose}>) {
+export function createHandAllocations(inputs: WeakSet<object>,
+  poseValues: WeakMap<object, {transform: import('./geometry').XRRigidTransform; emulatedPosition: boolean}>) {
+  type PoseFactory = (matrix: mat4, emulated: boolean) => import('./geometry').XRPose;
+  const frames = new WeakMap<object, {session: XRSession; pose: PoseFactory}>();
   const hands = new WeakMap<object, Readonly<{size: number; get: (name: string) => XRJointSpace;
     keys: () => MapIterator<string>; values: () => MapIterator<XRJointSpace>; entries: () => MapIterator<[string, XRJointSpace]>}>>();
   const joints = new WeakMap<object, Readonly<{name: string; radius: number; session: XRSession; update: () => mat4 | null}>>();
@@ -47,7 +23,7 @@ export function createHandAllocations(sessions: WeakSet<object>, inputs: WeakSet
   const sourceHands = new WeakMap<XRInputSource, XRHand>();
   type Backend = {session: XRSession; hand: XRHand; joint: XRJointSpace; pose: XRJointPose};
   const backends = new WeakMap<XRSession, Backend>(), trackers = new WeakMap<HandTracker, Backend>();
-  function allocateHand(backend: Backend, source: XRInputSource, controller: number) {
+  function allocateHand(backend: Backend, source: XRInputSource, controller: number): XRHand {
     const {session} = backend;
     const collection = new Map<string, XRJointSpace>();
     const hand: XRHand = Object.create(backend.hand);
@@ -84,11 +60,8 @@ export function createHandAllocations(sessions: WeakSet<object>, inputs: WeakSet
   }
   class HandTracker {
     constructor(session: XRSession, hand: XRHand, joint: XRJointSpace, pose: XRJointPose) {
-      let backend = backends.get(session);
-      if (!backend) {
-        if (!sessions.has(session) || !hasBackendSession(session)) throw new TypeError('Expected backend XRSession.');
-        backend = {session, hand, joint, pose}; backends.set(session, backend);
-      }
+      const backend = backends.get(session);
+      if (!backend) throw new TypeError('Expected allocated hand backend.');
       trackers.set(this, backend);
     }
     hand(source: XRInputSource, raw?: DeviceInput): XRHand {
@@ -99,10 +72,7 @@ export function createHandAllocations(sessions: WeakSet<object>, inputs: WeakSet
         if (joints.get(hands.get(existing)!.get('wrist'))!.session !== backend.session) invalidState('Foreign hand source.');
         return existing;
       }
-      if (backend.session.ended || !backend.session.enabledFeatures.includes('hand-tracking') || !Array.from(backend.session.inputSources).includes(source)) invalidState('Source is not an active hand source.');
-      const controller = backend.session._device.gamepadInputSources.findIndex(input => input.inputSource === raw);
-      if (controller < 0) throw new TypeError('Expected connected backend input.');
-      return allocateHand(backend, source, controller);
+      return invalidState('Source has no allocated hand.');
     }
   }
   function pose(frame: XRFrame, joint: XRJointSpace, base: XRSpace): XRJointPose | null {
@@ -113,13 +83,14 @@ export function createHandAllocations(sessions: WeakSet<object>, inputs: WeakSet
     if (!metadata.update()) return null;
     const relative = relativePose(joint, base);
     if (!relative) return null;
-    const result = state.pose(relative.matrix, relative.emulated) as XRJointPose;
-    Object.setPrototypeOf(result, backends.get(state.session)!.pose);
+    const geometry = state.pose(relative.matrix, relative.emulated);
+    const result: XRJointPose = Object.create(backends.get(state.session)!.pose);
+    poseValues.set(result, {transform: geometry.transform, emulatedPosition: geometry.emulatedPosition});
     poses.set(result, metadata.radius);
     return result;
   }
   Object.freeze(HandTracker.prototype); Object.freeze(HandTracker);
-  return Object.freeze({HandTracker, pose,
+  const bindings = Object.freeze({HandTracker, pose,
     iterator: (hand: XRHand, kind: 'keys' | 'values' | 'entries', prototype: object): IterableIterator<any> => {
       const state = hands.get(hand);
       if (!state) throw new TypeError('Expected XRHand.');
@@ -136,4 +107,15 @@ export function createHandAllocations(sessions: WeakSet<object>, inputs: WeakSet
     hands: Object.freeze({get: (value: object) => hands.get(value)}),
     joints: Object.freeze({get: (value: object) => joints.get(value), has: (value: object) => joints.has(value)}),
     poses: Object.freeze({get: (value: object) => poses.get(value)})});
+  // This writer is retained by the fixed runtime factory, never published in
+  // the shared interface registry. Public trackers only read canonical hands.
+  const initialize = (session: XRSession, hand: XRHand, joint: XRJointSpace, pose: XRJointPose): {
+    hand(source: XRInputSource, controller: number): XRHand; frame(frame: XRFrame, pose: PoseFactory): void;
+  } => {
+    if (backends.has(session)) throw new TypeError('Hand backend already allocated.');
+    const backend = {session, hand, joint, pose}; backends.set(session, backend);
+    return {hand: (source, controller) => sourceHands.get(source) ?? allocateHand(backend, source, controller),
+      frame: (frame, pose) => { frames.set(frame, {session, pose}); }};
+  };
+  return {bindings, initialize};
 }
