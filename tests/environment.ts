@@ -4,7 +4,8 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, Vector3} from 'three';
 import {mat4, vec3} from 'gl-matrix';
-import {EnvironmentTracker, XRPlane, XRPlaneSet, roomSurfaces} from '../src/polyfill/api/environment';
+import {EnvironmentTracker, XRPlane, XRPlaneSet, XRMesh, XRMeshSet, roomSurfaces} from '../src/polyfill/api/environment';
+import {interfaceBrands} from '../src/polyfill/api/interface-brand';
 import type {XRSession} from '../src/polyfill/api/runtime';
 import type {XRFrame} from '../src/polyfill/api/runtime';
 import {XRCPUDepthInformation} from '../src/polyfill/api/sensing';
@@ -210,6 +211,7 @@ test('plane interfaces are nonconstructible, branded readonly setlikes',()=>{
   assert.throws(()=>new XRPlane(session),TypeError);assert.throws(()=>new XRPlaneSet([]),TypeError);
   assert.equal(XRPlane.length,0);assert.equal(XRPlaneSet.length,0);assert.equal(set.forEach.length,1);
   assert.equal(set.keys,set.values);assert.equal(set.values,set[Symbol.iterator]);
+  assert.equal(Object.prototype.toString.call(set.values()),'[object Set Iterator]');assert.equal(Object.prototype.toString.call(set.entries()),'[object Set Iterator]');
   for(const name of ['planeSpace','polygon','orientation','lastChangedTime','semanticLabel']) {
     const descriptor=Object.getOwnPropertyDescriptor(XRPlane.prototype,name)!;
     assert(descriptor.get && !descriptor.set && descriptor.enumerable && descriptor.configurable);
@@ -301,4 +303,112 @@ test('hit testing filters independently classified plane and mesh fixtures', asy
   for (const hit of cast(['plane','mesh'])) assert.deepEqual(hit.normal.toArray(), [0,0,1]);
   geometry.meshes.push(surface(-2));
   assert.equal(cast(['plane','mesh']).filter(h => h.distance === 2).length, 2, 'coincident representations retain genuine classification');
+});
+
+
+test('mesh publication retains the published baseline and isolates writable arrays', () => {
+  const room=new Group(),floor=rectangle(-2,-2,2,2);room.add(floor);
+  const session={_device:{arScene:{room}},enabledFeatures:['mesh-detection'],ended:false} as unknown as XRSession;
+  const tracker=new EnvironmentTracker(session),peer=new EnvironmentTracker({...session} as XRSession);tracker.update(1);peer.update(1);
+  const first=tracker.snapshot(),mesh=[...first.meshes][0],space=mesh.meshSpace,initial=mesh.vertices,indices=mesh.indices;
+  for(const field of ['space','matrix','signature','changed','verticesValue','indicesValue','_update','_remove']) assert(!Object.prototype.hasOwnProperty.call(mesh,field));
+  const record=interfaceBrands.meshAllocations.meshes.get(mesh)!;
+  assert(Object.isFrozen(record));assert(Object.isFrozen(interfaceBrands.meshAllocations.meshes));
+  assert(!('set' in interfaceBrands.meshAllocations.meshes));assert(!('set' in interfaceBrands.meshAllocations.sets));
+  assert.equal(Reflect.set(record,'changed',()=>99),false); // frozen reader rejects replacement
+  const expected=initial.slice();initial.fill(999);indices.fill(999);
+  structuredClone(initial.buffer,{transfer:[initial.buffer]});
+  tracker.update(2);assert.equal(mesh.lastChangedTime,1);assert.deepEqual(mesh.vertices,expected);assert.deepEqual([...mesh.indices],[0,1,2]);
+  assert.deepEqual([...peer.snapshot().meshes][0].vertices,expected,'another tracker/session has independent storage');
+  room.position.set(2,3,4);room.rotation.set(Math.PI/2,0.4,0.2);tracker.update(3);
+  assert.equal(mesh.lastChangedTime,1,'pitch crossing orientation classifications is pose-only');
+  assert.deepEqual(mesh.vertices,expected);assert.equal(mesh.meshSpace,space);
+  floor.scale.x=1+1e-6;tracker.update(4);
+  assert.equal(mesh.lastChangedTime,1);assert.deepEqual(mesh.vertices,expected,'subthreshold geometry is not silently published');
+  for(let i=2;i<=30;i++){floor.scale.x=1+i*1e-6;tracker.update(i+4);}
+  assert(mesh.lastChangedTime>4);assert.notDeepEqual(mesh.vertices,expected,'cumulative deformation eventually publishes');
+  const changed=mesh.lastChangedTime;tracker.update(99);assert.equal(mesh.lastChangedTime,changed);
+  const sourceBefore=roomSurfaces(room).map(s=>s.vertices);mesh.vertices.fill(NaN);mesh.indices.fill(42);
+  assert.deepEqual(roomSurfaces(room).map(s=>s.vertices),sourceBefore,'public arrays cannot corrupt room sensing');
+  floor.geometry.setIndex([0,3,1]);tracker.update(100);
+  assert.equal(tracker.snapshot().meshes.size,1,'topology removal retires a partition');
+  assert(tracker.snapshot().meshes.has(mesh));assert.equal(mesh.lastChangedTime,100,'changed source connectivity publishes shape and timestamp');
+  assert.equal(first.meshes.size,2,'prior membership snapshot retained');
+  tracker.clear();assert.equal(space._update(),null);
+  tracker.update(101);assert(!tracker.snapshot().meshes.has(mesh),'reacquisition has fresh identity');
+});
+
+test('mesh interfaces provide branded readonly setlike descriptors and conversion',()=>{
+  const room=new Group();room.add(rectangle(-2,-2,2,2));
+  const session={_device:{arScene:{room}},enabledFeatures:['mesh-detection'],ended:false} as unknown as XRSession;
+  const tracker=new EnvironmentTracker(session);tracker.update(1);const set=tracker.snapshot().meshes,mesh=[...set][0];
+  assert.throws(()=>new XRMesh(session),TypeError);assert.throws(()=>new XRMeshSet([]),TypeError);
+  assert.equal(XRMesh.length,0);assert.equal(XRMeshSet.length,0);assert.equal(set.forEach.length,1);
+  assert.equal(set.keys,set.values);assert.equal(set.values,set[Symbol.iterator]);
+  assert.equal(Object.prototype.toString.call(set.values()),'[object Set Iterator]');assert.equal(Object.prototype.toString.call(set.entries()),'[object Set Iterator]');
+  assert.equal(Object.prototype.toString.call(mesh),'[object XRMesh]');assert.equal(Object.prototype.toString.call(set),'[object XRMeshSet]');
+  for(const name of ['meshSpace','vertices','indices','lastChangedTime','semanticLabel']) {
+    const d=Object.getOwnPropertyDescriptor(XRMesh.prototype,name)!;assert(d.get && !d.set && d.enumerable && d.configurable);assert(!Object.prototype.hasOwnProperty.call(mesh,name));
+    for(const bad of [null,{},XRMesh.prototype,Object.create(XRMesh.prototype),new Proxy(mesh,{})])assert.throws(()=>d.get!.call(bad),TypeError);
+  }
+  for(const bad of [null,{},XRMeshSet.prototype,Object.create(XRMeshSet.prototype),new Proxy(set,{})]) {
+    for(const method of ['has','keys','values','entries','forEach'] as const)assert.throws(()=>Reflect.apply(XRMeshSet.prototype[method],bad,[mesh]),TypeError);
+    assert.throws(()=>Object.getOwnPropertyDescriptor(XRMeshSet.prototype,'size')!.get!.call(bad),TypeError);
+  }
+  for(const bad of [undefined,null,{},Object.create(XRMesh.prototype),new Proxy(mesh,{})])assert.throws(()=>set.has(bad as XRMesh),TypeError);
+  const order=[...set],receiver={};let count=0;
+  set.forEach(function(this:unknown,value,key,collection){assert.equal(this,receiver);assert.equal(value,order[count++]);assert.equal(key,value);assert.equal(collection,set);},receiver);
+  assert.equal(count,order.length);assert.deepEqual([...set.entries()],order.map(m=>[m,m]));
+  const error={};assert.throws(()=>set.forEach(()=>{throw error;}),e=>e===error);
+  for(const name of ['add','delete','clear'])assert(!(name in set));
+  tracker.clear();const empty=tracker.snapshot().meshes;
+  for(const callback of [undefined,null,42,{}])assert.throws(()=>empty.forEach(callback as never),TypeError);
+  assert.equal(empty.has(mesh),false);
+});
+
+// Reconstruct independently from source buffers and published indices; never
+// use roomSurfaces to generate expected points, normals, areas or coverage.
+function measureMeshes(room: Group) {
+  room.updateWorldMatrix(true,true);
+  const source:Vector3[][]=[];let degenerate=0;
+  room.traverse(object=>{
+    if(!(object instanceof Mesh)||object.name==='sky')return;
+    const p=object.geometry.getAttribute('position'),index=object.geometry.index;
+    for(let i=0;i+2<(index?.count??p.count);i+=3){
+      const points=[0,1,2].map(j=>new Vector3().fromBufferAttribute(p,index?index.getX(i+j):i+j).applyMatrix4(object.matrixWorld));
+      if(points[1].clone().sub(points[0]).cross(points[2].clone().sub(points[0])).lengthSq()<1e-12){degenerate++;continue;}source.push(points);
+    }
+  });
+  const session={_device:{arScene:{room}},enabledFeatures:['mesh-detection'],ended:false} as unknown as XRSession;
+  const tracker=new EnvironmentTracker(session);tracker.update(1);const meshes=[...tracker.snapshot().meshes];
+  assert.equal(meshes.length,source.length);
+  let maxError=0,maxNormalError=0,area=0,sourceArea=0;
+  for(let n=0;n<meshes.length;n++){
+    const mesh=meshes[n],v=mesh.vertices,index=mesh.indices,m=mesh.meshSpace._update()!;
+    assert(v.every(Number.isFinite));assert(index.every(i=>Number.isInteger(i)&&i>=0&&i<v.length/3));assert.equal(index.length,3);
+    const actual=Array.from(index,i=>new Vector3(v[i*3],v[i*3+1],v[i*3+2]).applyMatrix4({elements:Array.from(m)} as any));
+    maxError=Math.max(maxError,...actual.map((p,i)=>p.distanceTo(source[n][i])));
+    const cross=(p:Vector3[])=>p[1].clone().sub(p[0]).cross(p[2].clone().sub(p[0]));
+    const expectedCross=cross(source[n]);sourceArea+=expectedCross.length()/2;area+=cross(actual).length()/2;
+    maxNormalError=Math.max(maxNormalError,new Vector3(m[4],m[5],m[6]).distanceTo(expectedCross.normalize()));
+  }
+  assert(maxError<1e-4);assert(maxNormalError<1e-5);assert(Math.abs(area-sourceArea)<1e-3);
+  return {triangles:meshes.length,degenerate,sourceArea,publishedArea:area,coverage:area/sourceArea,maxErrorMetres:maxError,maxNormalError};
+}
+
+test('indexed and nonindexed rectangular/sloped/degenerate meshes reconstruct source geometry',()=>{
+  for(const indexed of [true,false])for(const slope of [0,0.6]) {
+    const room=new Group(),floor=rectangle(-3,-1,3,1);floor.rotation.set(slope,0.7,0.2);floor.position.set(2,1,-3);
+    if(!indexed)floor.geometry=floor.geometry.toNonIndexed();room.add(floor);
+    const bad=new BufferGeometry().setAttribute('position',new Float32BufferAttribute([0,0,0,0,0,0,0,0,0],3));room.add(new Mesh(bad));
+    const result=measureMeshes(room);assert.equal(result.triangles,2);assert.equal(result.degenerate,1);
+  }
+});
+
+test('packaged hall mesh coverage independently matches source triangles',async()=>{
+  const buffer=await readFile(new URL('../assets/hall_empty.glb',import.meta.url));
+  const loader=new GLTFLoader().register(()=>({name:'test_material',loadMaterial:async()=>new MeshBasicMaterial()}));
+  const {scene}=await loader.parseAsync(buffer.buffer.slice(buffer.byteOffset,buffer.byteOffset+buffer.byteLength),'');
+  const report=measureMeshes(scene);await mkdir('test-results',{recursive:true});await writeFile('test-results/mesh-room.json',JSON.stringify(report,null,2));
+  console.log('independent mesh coverage',JSON.stringify(report));
 });

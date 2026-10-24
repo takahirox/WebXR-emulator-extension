@@ -11,24 +11,28 @@ import {attachTarget, getTargets} from './cdp-target';
 import {referenceSpaceCases} from './reference-space';
 import {rigidTransformCases} from './rigid-transform';
 import {poseViewCases} from './pose-view';
+import {meshCases} from './meshes';
+import {runMeshApplications} from './mesh-applications';
 import {planeCases} from './planes';
 import {hitTestCases} from './hit-test';
 import {runHitTestApplications} from './hit-test-applications';
 import {runPlaneApplications} from './plane-applications';
 
 const browser = process.argv[2];
+const meshApplications = process.argv[3] === 'mesh-applications';
+const meshes = process.argv[3] === 'meshes';
 const hitApplications = process.argv[3] === 'hit-test-applications';
 const hitTests = process.argv[3] === 'hit-test';
-const applications = process.argv[3] === 'plane-applications' || hitApplications;
-const runApplications = hitApplications ? runHitTestApplications : runPlaneApplications;
+const applications = process.argv[3] === 'plane-applications' || hitApplications || meshApplications;
+const runApplications = meshApplications ? runMeshApplications : hitApplications ? runHitTestApplications : runPlaneApplications;
 const planes = process.argv[3] === 'planes';
 const transforms = process.argv[3] === 'transforms';
 const poses = process.argv[3] === 'poses';
-const selection = hitApplications ? 'hit-test-applications' : hitTests ? 'hit-test-contract' : applications ? 'planes-applications' : planes ? 'planes-contract' : poses ? 'pose-view' : transforms ? 'rigid-transform' : 'reference-space';
-const cases = hitTests ? hitTestCases : planes ? planeCases : poses ? poseViewCases : transforms ? rigidTransformCases : referenceSpaceCases;
+const selection = meshApplications ? 'mesh-applications' : meshes ? 'meshes-contract' : hitApplications ? 'hit-test-applications' : hitTests ? 'hit-test-contract' : applications ? 'planes-applications' : planes ? 'planes-contract' : poses ? 'pose-view' : transforms ? 'rigid-transform' : 'reference-space';
+const cases = meshes ? meshCases : hitTests ? hitTestCases : planes ? planeCases : poses ? poseViewCases : transforms ? rigidTransformCases : referenceSpaceCases;
 assert(['chromium', 'firefox'].includes(browser), 'Select chromium or firefox');
 const {origin, server, provenance} = await serveFirefoxFixtures();
-const report: any = {issue: hitTests || hitApplications ? 53 : planes || applications ? 51 : poses ? 49 : transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: applications ? [
+const report: any = {issue: meshes || meshApplications ? 55 : hitTests || hitApplications ? 53 : planes || applications ? 51 : poses ? 49 : transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: applications ? [
   ...(hitApplications ? ['Unchanged pinned hit-test applications and dependencies; API and scene observation retains original calls/results/exceptions. Actual panel buttons and phone screen pointer events exercise selection.'] : ['Unchanged pinned applications and their dependencies; only Sample existing overlay checkbox disabled.']),
   'Three.js observe events installed before scripts; original scene.onBeforeRender called with original arguments. Chromium panel bootstrap paused once to install observer, then resumed before running scenarios.',
   ...(hitApplications ? ['XR request/frame/hit-result pose and original scene-node observation preserves calls, return values and exceptions; actual presentation pixels and backend cleanup counters. Additional observer-owned Android transient subscriptions exercise matching/unmatched profiles and pointer movement; application requests remain unchanged.'] : ['XR request/frame/pose/createAnchor observation preserves arguments, return values and exceptions; inspect application scene geometry, actual presentation canvas, retained plane spaces and cleanup counters.']),
@@ -44,6 +48,10 @@ const report: any = {issue: hitTests || hitApplications ? 53 : planes || applica
   'Proxy transform matrix counts numeric allocation reads; count timer calls from late adapter continuations.',
   'Call real device endSession; inline additionally emits its presentation-end notification because it has no presentation.',
 ]};
+if (meshes || meshApplications) report.instrumentation = [
+  'Actual unpacked extension, real DevTools panel and genuine separately injected same-origin realms. No synthetic XR adapter, GL or frame clock.',
+  ...(meshApplications ? ['Unchanged pinned Sample and dependency bytes; only existing DOM overlay checkbox disabled. Three.js observe events and original request/frame/pose calls retain results and exceptions.', 'Controlled virtual backend: room translation/rotation, 10% shape scale, removal/restoration. Independent source-buffer reconstruction and observation of original Sample scene geometry, geometry identity/disposal and presentation pixels. Application logic and results unchanged.', 'Genuine panel TransformControls move viewer/phone. Presentation textures and full browser captures retained.'] : ['Temporary room translation/rotation/scale/removal and unavailable native provider restored in cleanup. Private backend inspection used only to control fixture lifetime and verify cleanup. Frozen registry readers inspected for mutation resistance.']),
+];
 const filename = `test-results/${selection}-${browser}.json`;
 await mkdir('test-results', {recursive: true});
 async function saveRendering(result: any, device: string) {
@@ -129,7 +137,7 @@ try {
     const page = await context.newPage();
     if(applications)await page.addInitScript((await readFile('tests/firefox-scenes.js','utf8'))+';observeScenes();');
     await page.goto(origin + '/csp');
-    const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    const errors: string[] = []; report.runtimeErrors=errors; page.on('pageerror', error => errors.push(error.message));
     const cdp = await context.newCDPSession(page);
     const info = await eventually(async () => (await getTargets(cdp)).find(t => t.url.startsWith('devtools://') && t.title.includes(new URL(origin).host)), Boolean, 'real Chromium DevTools target');
     const devtools = await attachTarget(cdp, info!.targetId); targets.push(devtools);
@@ -195,7 +203,7 @@ finally {
   report.completedAt = new Date().toISOString();
   report.servedSources=[...provenance.values()];
   report.provenance = {};
-  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/hit-test-allocation.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'package.json', 'src/polyfill/api/layer-allocation.ts', 'tests/environment.ts', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/pose-view.ts', 'src/polyfill/api/environment.ts', 'src/polyfill/api/plane-regions.ts', 'tests/planes.ts', 'tests/plane-applications.ts', 'tests/hit-test.ts', 'tests/hit-test-applications.ts', 'tests/hit-test-sample-observer.js', 'src/polyfill/api/hit-test-options.ts', 'src/polyfill/api/hit-test-geometry.ts', 'src/polyfill/api/XRHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestResult.ts', 'src/polyfill/ARScene.ts', 'src/polyfill/api/sensing.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
+  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/hit-test-allocation.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'package.json', 'src/polyfill/api/layer-allocation.ts', 'tests/environment.ts', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/pose-view.ts', 'src/polyfill/api/environment.ts', 'src/polyfill/api/plane-regions.ts', 'tests/meshes.ts', 'tests/mesh-applications.ts', 'src/polyfill/api/mesh-allocation.ts', 'tests/planes.ts', 'tests/plane-applications.ts', 'tests/hit-test.ts', 'tests/hit-test-applications.ts', 'tests/hit-test-sample-observer.js', 'src/polyfill/api/hit-test-options.ts', 'src/polyfill/api/hit-test-geometry.ts', 'src/polyfill/api/XRHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestResult.ts', 'src/polyfill/ARScene.ts', 'src/polyfill/api/sensing.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
     report.provenance[file] = createHash('sha256').update(await readFile(file)).digest('hex');
   }
   await writeFile(filename, JSON.stringify(report, null, 2));

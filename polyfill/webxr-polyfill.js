@@ -1045,6 +1045,35 @@ function WebXRPolyfillInjection() {
       });
   }
 
+  function createMeshAllocations() {
+      const meshes = new WeakMap();
+      const sets = new WeakMap();
+      class MeshAllocation {
+          constructor(space, read) {
+              meshes.set(this, Object.freeze({ space,
+                  vertices: () => new Float32Array(read().vertices),
+                  indices: () => new Uint32Array(read().indices), changed: () => read().changed }));
+          }
+      }
+      class MeshSetAllocation {
+          constructor(values) {
+              const snapshot = [...new Set(values)];
+              if (snapshot.some(value => !meshes.has(value)))
+                  throw new TypeError('Expected XRMesh.');
+              const set = new Set(snapshot);
+              sets.set(this, Object.freeze({ size: set.size, has: (value) => set.has(value),
+                  values: () => set.values(), entries: () => set.entries() }));
+          }
+      }
+      for (const C of [MeshAllocation, MeshSetAllocation]) {
+          Object.freeze(C.prototype);
+          Object.freeze(C);
+      }
+      return Object.freeze({ MeshAllocation, MeshSetAllocation,
+          meshes: Object.freeze({ get: (value) => meshes.get(value) }),
+          sets: Object.freeze({ get: (value) => sets.get(value) }) });
+  }
+
   function createHitTestAllocations(brands) {
       const rays = new WeakMap();
       const hitSources = new WeakMap();
@@ -1164,6 +1193,7 @@ function WebXRPolyfillInjection() {
       const hitTestAllocations = createHitTestAllocations({ sessions, spaces, frames, inputSources, transforms });
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
           layerAllocations: createLayerAllocations(sessions),
+          meshAllocations: createMeshAllocations(),
           planeValues: new WeakMap(),
           planeSets: new WeakMap(),
           roomCaptures: new WeakMap(),
@@ -25800,17 +25830,6 @@ void main() {
       }
       return surfaces;
   }
-  class ReadonlyDetectionSet {
-      constructor(values) { this.set = new Set(values); }
-      get size() { return this.set.size; }
-      has(value) { return this.set.has(value); }
-      values() { return this.set.values(); }
-      keys() { return this.set.keys(); }
-      entries() { return this.set.entries(); }
-      forEach(callback, thisArg) { for (const value of this)
-          callback.call(thisArg, value, value, this); }
-      [Symbol.iterator]() { return this.values(); }
-  }
   const planeAllocation = Symbol('plane allocation');
   function planeState(value) {
       const state = interfaceBrands.planeValues.get(value);
@@ -25855,27 +25874,51 @@ void main() {
       [Symbol.iterator]: { value: XRPlaneSet.prototype.values, writable: true, configurable: true },
       [Symbol.toStringTag]: { value: 'XRPlaneSet', configurable: true },
   });
-  class XRMeshSet extends ReadonlyDetectionSet {
+  const meshAllocation = Symbol('mesh allocation');
+  const meshBindings = interfaceBrands.meshAllocations;
+  function meshState(value) {
+      const state = meshBindings.meshes.get(value);
+      if (!state)
+          throw new TypeError('Expected XRMesh.');
+      return state;
   }
-  class TrackedSurface {
-      constructor(session) {
-          this.matrix = null;
-          this.signature = [];
-          this.changed = 0;
-          this.orientationValue = null;
-          this.space = new XRSpace(session, () => session.ended ? null : this.matrix);
-      }
-      get lastChangedTime() { return this.changed; }
-      get semanticLabel() { return null; }
-      _remove() { this.matrix = null; }
-      _update(surface, time) {
-          if (this.signature.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - this.signature[i]) > 1e-5) || surface.orientation !== this.orientationValue)
-              this.changed = time;
-          this.signature = surface.vertices.slice();
-          this.orientationValue = surface.orientation;
-          this.matrix = surface.matrix;
-      }
+  function meshSetState(value) {
+      const state = meshBindings.sets.get(value);
+      if (!state)
+          throw new TypeError('Expected XRMeshSet.');
+      return state;
   }
+  class XRMeshSet extends meshBindings.MeshSetAllocation {
+      constructor(values, token) {
+          if (token !== meshAllocation)
+              throw new TypeError('Illegal constructor.');
+          super(values);
+      }
+      get size() { return meshSetState(this).size; }
+      has(value) {
+          const set = meshSetState(this);
+          if (!arguments.length)
+              throw new TypeError('XRMesh is required.');
+          meshState(value);
+          return set.has(value);
+      }
+      values() { return meshSetState(this).values(); }
+      keys() { return this.values(); }
+      entries() { return meshSetState(this).entries(); }
+      forEach(callback, thisArg = undefined) {
+          const set = meshSetState(this);
+          if (typeof callback !== 'function')
+              throw new TypeError('Expected callable callback.');
+          for (const value of set.values())
+              Reflect.apply(callback, thisArg, [value, value, this]);
+      }
+      [Symbol.iterator]() { return this.values(); }
+  }
+  Object.defineProperties(XRMeshSet.prototype, {
+      keys: { value: XRMeshSet.prototype.values, writable: true, configurable: true, enumerable: true },
+      [Symbol.iterator]: { value: XRMeshSet.prototype.values, writable: true, configurable: true },
+      [Symbol.toStringTag]: { value: 'XRMeshSet', configurable: true },
+  });
   class XRPlane {
       constructor(session, token) {
           if (token !== planeAllocation)
@@ -25910,20 +25953,38 @@ void main() {
       state.orientation = surface.orientation;
       state.matrix = surface.matrix;
   }
-  class XRMesh extends TrackedSurface {
-      constructor() {
-          super(...arguments);
-          this.verticesValue = new Float32Array();
-          this.indicesValue = new Uint32Array();
+  const meshTracking = new WeakMap();
+  class XRMesh extends meshBindings.MeshAllocation {
+      constructor(session, token) {
+          if (token !== meshAllocation)
+              throw new TypeError('Illegal constructor.');
+          const state = { matrix: null, vertices: new Float32Array(), indices: new Uint32Array(), changed: 0 };
+          const space = new XRSpace(session, () => session.ended ? null : state.matrix);
+          super(space, () => state);
+          meshTracking.set(this, state);
       }
-      get meshSpace() { return this.space; }
-      get vertices() { return this.verticesValue; }
-      get indices() { return this.indicesValue; }
-      _update(surface, time) {
-          super._update(surface, time);
-          this.verticesValue = new Float32Array(surface.vertices);
-          this.indicesValue = new Uint32Array([0, 1, 2]);
+      get meshSpace() { return meshState(this).space; }
+      get vertices() { return meshState(this).vertices(); }
+      get indices() { return meshState(this).indices(); }
+      get lastChangedTime() { return meshState(this).changed(); }
+      get semanticLabel() { meshState(this); return null; }
+  }
+  Object.defineProperty(XRMesh.prototype, Symbol.toStringTag, { value: 'XRMesh', configurable: true });
+  for (const C of [XRMesh, XRMeshSet]) {
+      Object.defineProperty(C, 'length', { value: 0 });
+      for (const name of Object.getOwnPropertyNames(C.prototype)) {
+          if (name !== 'constructor')
+              Object.defineProperty(C.prototype, name, { enumerable: true });
       }
+  }
+  function updateMesh(mesh, surface, time) {
+      const state = meshTracking.get(mesh);
+      if (state.vertices.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - state.vertices[i]) > 1e-5)) {
+          state.vertices = new Float32Array(surface.vertices);
+          state.indices = new Uint32Array([0, 1, 2]);
+          state.changed = time;
+      }
+      state.matrix = surface.matrix;
   }
   class EnvironmentTracker {
       constructor(session) {
@@ -25941,7 +26002,12 @@ void main() {
                   planeState(plane).matrix = null;
                   this.planes.delete(key);
               }
-          this.reconcile(this.meshes, new Set(surfaces.map(surface => surface.key)));
+          const meshKeys = new Set(surfaces.map(surface => surface.key));
+          for (const [key, mesh] of this.meshes)
+              if (!meshKeys.has(key)) {
+                  meshTracking.get(mesh).matrix = null;
+                  this.meshes.delete(key);
+              }
           if (this.session.enabledFeatures.includes('plane-detection'))
               for (const surface of planeSurfaces) {
                   let plane = this.planes.get(surface.key);
@@ -25953,21 +26019,15 @@ void main() {
               if (this.session.enabledFeatures.includes('mesh-detection')) {
                   let mesh = this.meshes.get(surface.key);
                   if (!mesh)
-                      this.meshes.set(surface.key, mesh = new XRMesh(this.session));
-                  mesh._update(surface, time);
+                      this.meshes.set(surface.key, mesh = new XRMesh(this.session, meshAllocation));
+                  updateMesh(mesh, surface, time);
               }
           }
       }
-      reconcile(map, keys) {
-          for (const [key, value] of map)
-              if (!keys.has(key)) {
-                  value._remove();
-                  map.delete(key);
-              }
-      }
-      snapshot() { return { planes: new XRPlaneSet(this.planes.values(), planeAllocation), meshes: new XRMeshSet(this.meshes.values()) }; }
+      snapshot() { return { planes: new XRPlaneSet(this.planes.values(), planeAllocation), meshes: new XRMeshSet(this.meshes.values(), meshAllocation) }; }
       clear() { for (const plane of this.planes.values())
-          planeState(plane).matrix = null; this.planes.clear(); this.reconcile(this.meshes, new Set()); }
+          planeState(plane).matrix = null; this.planes.clear(); for (const mesh of this.meshes.values())
+          meshTracking.get(mesh).matrix = null; this.meshes.clear(); }
   }
 
   var environment = /*#__PURE__*/Object.freeze({
@@ -27177,7 +27237,7 @@ void main() {
           return interfaceBrands.viewerPoses.get(state.session)(this, referenceSpace);
       }
       get detectedPlanes() { frameState(this); this._assertActive(); return this.environmentSnapshot.planes; }
-      get detectedMeshes() { this._assertActive(); return this.environmentSnapshot.meshes; }
+      get detectedMeshes() { frameState(this); this._assertActive(); return this.environmentSnapshot.meshes; }
       get trackedAnchors() { this._assertActive(); this.session._require('anchors'); return this.anchorSnapshot; }
       async createAnchor(pose, space) {
           this._assertActive();
