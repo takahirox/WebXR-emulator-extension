@@ -68,9 +68,9 @@ test at tests/environment.ts:251:129
 test at tests/environment.ts:251:129
 ✖ replacement (1.000917ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   0 !== 1
-  
+
       at TestContext.<anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/tests/environment.ts:277:12)
       at Test.runInAsyncScope (node:async_hooks:214:14)
       at Test.run (node:internal/test_runner/test:1106:25)
@@ -105,7 +105,7 @@ test at tests/environment.ts:251:129
 ✖ record (1.800458ms)
   AssertionError [ERR_ASSERTION]: Expected "actual" to be reference-equal to "expected":
   + actual - expected
-  
+
   + []
   - [
   -   value {
@@ -133,7 +133,7 @@ test at tests/environment.ts:251:129
   -     z: 1
   -   }
   - ]
-  
+
       at TestContext.<anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/tests/environment.ts:277:60)
       at Test.runInAsyncScope (node:async_hooks:214:14)
       at Test.run (node:internal/test_runner/test:1106:25)
@@ -154,7 +154,7 @@ test at tests/environment.ts:251:129
 ✖ pose (0.671875ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
   + actual - expected
-  
+
     [
   +   999,
   +   999,
@@ -189,7 +189,7 @@ test at tests/environment.ts:251:129
   -   0,
   -   1
     ]
-  
+
       at TestContext.<anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/tests/environment.ts:278:50)
       at Test.runInAsyncScope (node:async_hooks:214:14)
       at Test.run (node:internal/test_runner/test:1106:25)
@@ -218,9 +218,9 @@ test at tests/environment.ts:251:129
 test at tests/environment.ts:251:129
 ✖ signature (0.283125ms)
   AssertionError [ERR_ASSERTION]: comparison baseline cannot be changed
-  
+
   2 !== 1
-  
+
       at TestContext.<anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/tests/environment.ts:279:30)
       at Test.runInAsyncScope (node:async_hooks:214:14)
       at Test.run (node:internal/test_runner/test:1106:25)
@@ -240,9 +240,9 @@ test at tests/environment.ts:251:129
 test at tests/environment.ts:251:129
 ✖ populated set (0.162709ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   0 !== 1
-  
+
       at TestContext.<anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/tests/environment.ts:277:12)
       at Test.runInAsyncScope (node:async_hooks:214:14)
       at Test.run (node:internal/test_runner/test:1106:25)
@@ -262,9 +262,9 @@ test at tests/environment.ts:251:129
 test at tests/environment.ts:251:129
 ✖ empty set (0.150375ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   1 !== 0
-  
+
       at TestContext.<anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-7678c796-ue_x4_zt/gitweave-7678c796-ue_x4_zt/tests/environment.ts:273:54)
       at Test.runInAsyncScope (node:async_hooks:214:14)
       at Test.run (node:internal/test_runner/test:1106:25)
