@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {chromium} from 'playwright';
 import {createServer} from 'node:http';
-import {mkdtemp, mkdir, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, mkdir, rm, writeFile, readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 
@@ -11,11 +12,14 @@ import path from 'node:path';
 const revision = 'e1859580b5fcf74940a18d2f783296b4961035e3';
 const cases = ['xrRigidTransform_constructor', 'xrRigidTransform_inverse', 'xrRigidTransform_matrix', 'xrRigidTransform_sameObject', 'navigator_xr_sameObject'];
 const paths = ['resources/testharness.js', 'webxr/resources/webxr_test_constants.js', 'webxr/resources/webxr_test_asserts.js', 'webxr/resources/webxr_math_utils.js', ...cases.map(name => `webxr/${name}.https.html`)];
+const manifest = JSON.parse(await readFile('tests/vendor/wpt/manifest.json', 'utf8'));
 const files = new Map<string, string>();
 for (const file of paths) {
-  const response = await fetch(`https://raw.githubusercontent.com/web-platform-tests/wpt/${revision}/${file}`);
-  if (!response.ok) throw new Error(`WPT download ${file}: ${response.status}`);
-  let body = await response.text();
+  const retained = file.startsWith('webxr/xrRigidTransform_');
+  const response = retained ? null : await fetch(`https://raw.githubusercontent.com/web-platform-tests/wpt/${revision}/${file}`);
+  if (response && !response.ok) throw new Error(`WPT download ${file}: ${response.status}`);
+  let body = retained ? await readFile(`tests/vendor/wpt/${file.slice(6)}`, 'utf8') : await response!.text();
+  if (retained) assert.equal(createHash('sha256').update(body).digest('hex'), manifest[file].sha256, `Pinned WPT bytes: ${file}`);
   if (file.endsWith('.html')) {
     body = body.replace('/resources/testharnessreport.js', '/capture.js');
     body = body.replace('<script src="resources/webxr_util.js"></script>', '<script src="/session-adapter.js"></script>');
@@ -52,7 +56,7 @@ try {
     results.push({file: `${name}.https.html`, ...await page.evaluate(() => (window as unknown as {wptResults: Omit<typeof results[number], 'file'>}).wptResults)});
     await page.close();
   }
-  const report = {revision, browser: await context.browser()!.version(), results};
+  const report = {revision, browser: await context.browser()!.version(), node: process.version, playwright: JSON.parse(await readFile('node_modules/playwright/package.json', 'utf8')).version, bundleSHA256: createHash('sha256').update(await readFile('polyfill/webxr-polyfill.js')).digest('hex'), retained: manifest, results};
   await mkdir('test-results', {recursive: true}); await writeFile('test-results/webxr-wpt.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert(results.every(result => result.status === 0 && result.tests.length > 0 && result.tests.every(test => test.status === 0)), 'All selected WPT assertions pass');

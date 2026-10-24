@@ -1,4 +1,4 @@
-import {mat4, quat, vec3} from 'gl-matrix';
+import {mat4, vec3} from 'gl-matrix';
 import type {XRSession} from './runtime';
 import {interfaceBrands} from './interface-brand';
 
@@ -10,35 +10,69 @@ export const compatibleContexts = new WeakSet<WebGLRenderingContext | WebGL2Rend
 export const invalidState = (message: string): never => { throw new DOMException(message, 'InvalidStateError'); };
 export const unsupported = (message: string): never => { throw new DOMException(message, 'NotSupportedError'); };
 
+// DOMPointInit members are unrestricted doubles. WebIDL converts dictionaries
+// before running constructor validation; null dictionaries are empty, whereas
+// null members convert to zero. Unary + implements ToNumber, rejecting BigInt.
+function convertPoint(value: DOMPointInit | null | undefined): [number, number, number, number] {
+  const empty = value === null || value === undefined;
+  // Object identity also recognizes document.all's legacy typeof behavior.
+  if (!empty && Object(value) !== value) throw new TypeError('Expected DOMPointInit.');
+  const result = {w: 1, x: 0, y: 0, z: 0};
+  for (const key of ['w', 'x', 'y', 'z'] as const) {
+    const component = empty ? undefined : value![key];
+    if (component !== undefined) result[key] = +component;
+  }
+  return [result.x, result.y, result.z, result.w];
+}
+function transformState(value: XRRigidTransform) {
+  const state = interfaceBrands.transforms.get(value);
+  if (!state) throw new TypeError('Expected XRRigidTransform.');
+  return state;
+}
+export const transformObjects = Object.freeze({has: (value: object) => interfaceBrands.transforms.has(value)});
+// Only geometric consumers use this matrix. Never expose it as a JS attribute.
+export const transformMatrix = (value: XRRigidTransform): mat4 => transformState(value).geometry;
+
 export class XRRigidTransform {
-  readonly position: DOMPointReadOnly;
-  readonly orientation: DOMPointReadOnly;
-  readonly matrix: Float32Array;
-  private inverseValue?: XRRigidTransform;
-  constructor(position: DOMPointInit = {}, orientation: DOMPointInit = {}) {
-    const p = [position.x ?? 0, position.y ?? 0, position.z ?? 0];
-    const q = [orientation.x ?? 0, orientation.y ?? 0, orientation.z ?? 0, orientation.w ?? 1];
-    if (![...p, ...q, position.w ?? 1].every(Number.isFinite)) throw new TypeError('Transform components must be finite.');
-    if ((position.w ?? 1) !== 1) throw new TypeError('Position w must equal 1.');
-    if (!Math.hypot(...q) || !Number.isFinite(q.reduce((sum, value) => sum + value * value, 0))) throw new DOMException('Orientation cannot be zero.', 'InvalidStateError');
-    quat.normalize(q, q);
-    this.position = new DOMPointReadOnly(...p, 1);
-    this.orientation = new DOMPointReadOnly(...q);
-    this.matrix = new Float32Array(16);
-    mat4.fromRotationTranslation(this.matrix, q, p);
+  constructor(position: DOMPointInit | null = {}, orientation: DOMPointInit | null = {}) {
+    const p = convertPoint(position), q = convertPoint(orientation);
+    if (p[3] !== 1) throw new TypeError('Position w must equal 1.');
+    if (![...p, ...q].every(Number.isFinite)) throw new TypeError('Transform components must be finite.');
+    const lengthSquared = q.reduce((sum, value) => sum + value * value, 0);
+    if (!lengthSquared || !Number.isFinite(lengthSquared)) throw new DOMException('Orientation cannot be normalized.', 'InvalidStateError');
+    const length = Math.sqrt(lengthSquared);
+    for (let i = 0; i < 4; i++) q[i] /= length;
+    // Keep double-precision geometry independent of the exported mutable array.
+    const geometry = mat4.fromRotationTranslation(new Array(16) as mat4, q, p);
+    let matrix: Float32Array | undefined, inverse: XRRigidTransform | undefined;
+    interfaceBrands.transforms.set(this, {
+      position: new DOMPointReadOnly(...p), orientation: new DOMPointReadOnly(...q), geometry,
+      // These closures retain the allocating realm even through borrowed getters.
+      matrix: () => {
+        if (!matrix || matrix.buffer.byteLength === 0) matrix = new Float32Array(geometry);
+        return matrix;
+      },
+      inverse: () => {
+        if (!inverse) {
+          inverse = XRRigidTransform._fromMatrix(mat4.invert(new Array(16) as mat4, geometry)!);
+          interfaceBrands.transforms.get(inverse)!.inverse = () => this;
+        }
+        return inverse;
+      },
+    });
   }
   static _fromMatrix(matrix: mat4) {
-    const p = mat4.getTranslation(vec3.create(), matrix);
-    const q = mat4.getRotation(quat.create(), matrix);
+    const p = mat4.getTranslation([0, 0, 0], matrix);
+    const q = mat4.getRotation([0, 0, 0, 1], matrix);
     return new XRRigidTransform({x: p[0], y: p[1], z: p[2]}, {x: q[0], y: q[1], z: q[2], w: q[3]});
   }
-  get inverse(): XRRigidTransform {
-    if (!this.inverseValue) {
-      this.inverseValue = XRRigidTransform._fromMatrix(mat4.invert(mat4.create(), this.matrix)!);
-      this.inverseValue.inverseValue = this;
-    }
-    return this.inverseValue;
-  }
+  get position() { return transformState(this).position; }
+  get orientation() { return transformState(this).orientation; }
+  get matrix() { return transformState(this).matrix(); }
+  get inverse(): XRRigidTransform { return transformState(this).inverse(); }
+}
+for (const name of ['position', 'orientation', 'matrix', 'inverse']) {
+  Object.defineProperty(XRRigidTransform.prototype, name, {...Object.getOwnPropertyDescriptor(XRRigidTransform.prototype, name), enumerable: true});
 }
 
 // Every space carries a session and a world-space matrix provider.
@@ -60,15 +94,20 @@ export class XRReferenceSpace extends XRSpace {
       const matrix = nativeMatrix();
       return matrix && mat4.multiply(mat4.create(), matrix, offset);
     });
+    const allocate = this.createOffsetSpace.bind(this);
+    interfaceBrands.referenceOffsets.set(this, transform => allocate(mat4.multiply(mat4.create(), offset, transform)));
   }
   getOffsetReferenceSpace(transform: XRRigidTransform) {
-    if (!(transform instanceof XRRigidTransform)) throw new TypeError('Expected XRRigidTransform.');
-    return this.createOffsetSpace(mat4.multiply(mat4.create(), this.offset, transform.matrix));
+    const allocate = interfaceBrands.referenceOffsets.get(this);
+    if (!allocate) throw new TypeError('Expected XRReferenceSpace.');
+    return allocate(transformMatrix(transform));
   }
   protected createOffsetSpace(offset: mat4): XRReferenceSpace {
     return new XRReferenceSpace(this._session, this._type, this.nativeMatrix, offset);
   }
 }
+
+Object.defineProperty(XRReferenceSpace.prototype, 'getOffsetReferenceSpace', {enumerable: true});
 
 export class XRBoundedReferenceSpace extends XRReferenceSpace {
   private readonly boundsValue: readonly DOMPointReadOnly[];

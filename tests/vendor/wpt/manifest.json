@@ -1,0 +1,18 @@
+{
+  "webxr/xrRigidTransform_constructor.https.html": {
+    "sha256": "052ce63f5f79bf46a44f3c05d8a79571b0d6f0a0f8dc7d47136b41af7abddf91",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/xrRigidTransform_constructor.https.html"
+  },
+  "webxr/xrRigidTransform_inverse.https.html": {
+    "sha256": "0ddc996aca0c1d75b8866051d9975cf967fbdcb468293f9fb335ff5c45473297",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/xrRigidTransform_inverse.https.html"
+  },
+  "webxr/xrRigidTransform_matrix.https.html": {
+    "sha256": "fbd8dbd8ef691eb0b1c44afda64a2ca876dc2fc20754d002a95fc1ce1af195b6",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/xrRigidTransform_matrix.https.html"
+  },
+  "webxr/xrRigidTransform_sameObject.https.html": {
+    "sha256": "79b69b27995f4cbaffbc9abeb7f66f8ca8a513c5d1e864ff25b84616679feec0",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/xrRigidTransform_sameObject.https.html"
+  }
+}

@@ -1106,6 +1106,8 @@ function WebXRPolyfillInjection() {
       Object.freeze(InputSourceObject);
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
           layerAllocations: createLayerAllocations(sessions),
+          transforms: new WeakMap(),
+          referenceOffsets: new WeakMap(),
           referenceSpaceRequests: new WeakMap(),
           eventSessions: new WeakMap(),
           eventInputs: new WeakMap(),
@@ -1158,35 +1160,69 @@ function WebXRPolyfillInjection() {
   const compatibleContexts = new WeakSet();
   const invalidState = (message) => { throw new DOMException(message, 'InvalidStateError'); };
   const unsupported = (message) => { throw new DOMException(message, 'NotSupportedError'); };
+  function convertPoint(value) {
+      const empty = value === null || value === undefined;
+      if (!empty && Object(value) !== value)
+          throw new TypeError('Expected DOMPointInit.');
+      const result = { w: 1, x: 0, y: 0, z: 0 };
+      for (const key of ['w', 'x', 'y', 'z']) {
+          const component = empty ? undefined : value[key];
+          if (component !== undefined)
+              result[key] = +component;
+      }
+      return [result.x, result.y, result.z, result.w];
+  }
+  function transformState(value) {
+      const state = interfaceBrands.transforms.get(value);
+      if (!state)
+          throw new TypeError('Expected XRRigidTransform.');
+      return state;
+  }
+  const transformObjects = Object.freeze({ has: (value) => interfaceBrands.transforms.has(value) });
+  const transformMatrix = (value) => transformState(value).geometry;
   class XRRigidTransform {
       constructor(position = {}, orientation = {}) {
-          var _a, _b, _c, _d, _e, _f, _g, _h, _j;
-          const p = [(_a = position.x) !== null && _a !== void 0 ? _a : 0, (_b = position.y) !== null && _b !== void 0 ? _b : 0, (_c = position.z) !== null && _c !== void 0 ? _c : 0];
-          const q = [(_d = orientation.x) !== null && _d !== void 0 ? _d : 0, (_e = orientation.y) !== null && _e !== void 0 ? _e : 0, (_f = orientation.z) !== null && _f !== void 0 ? _f : 0, (_g = orientation.w) !== null && _g !== void 0 ? _g : 1];
-          if (![...p, ...q, (_h = position.w) !== null && _h !== void 0 ? _h : 1].every(Number.isFinite))
-              throw new TypeError('Transform components must be finite.');
-          if (((_j = position.w) !== null && _j !== void 0 ? _j : 1) !== 1)
+          const p = convertPoint(position), q = convertPoint(orientation);
+          if (p[3] !== 1)
               throw new TypeError('Position w must equal 1.');
-          if (!Math.hypot(...q) || !Number.isFinite(q.reduce((sum, value) => sum + value * value, 0)))
-              throw new DOMException('Orientation cannot be zero.', 'InvalidStateError');
-          normalize$1(q, q);
-          this.position = new DOMPointReadOnly(...p, 1);
-          this.orientation = new DOMPointReadOnly(...q);
-          this.matrix = new Float32Array(16);
-          fromRotationTranslation(this.matrix, q, p);
+          if (![...p, ...q].every(Number.isFinite))
+              throw new TypeError('Transform components must be finite.');
+          const lengthSquared = q.reduce((sum, value) => sum + value * value, 0);
+          if (!lengthSquared || !Number.isFinite(lengthSquared))
+              throw new DOMException('Orientation cannot be normalized.', 'InvalidStateError');
+          const length = Math.sqrt(lengthSquared);
+          for (let i = 0; i < 4; i++)
+              q[i] /= length;
+          const geometry = fromRotationTranslation(new Array(16), q, p);
+          let matrix, inverse;
+          interfaceBrands.transforms.set(this, {
+              position: new DOMPointReadOnly(...p), orientation: new DOMPointReadOnly(...q), geometry,
+              matrix: () => {
+                  if (!matrix || matrix.buffer.byteLength === 0)
+                      matrix = new Float32Array(geometry);
+                  return matrix;
+              },
+              inverse: () => {
+                  if (!inverse) {
+                      inverse = XRRigidTransform._fromMatrix(invert(new Array(16), geometry));
+                      interfaceBrands.transforms.get(inverse).inverse = () => this;
+                  }
+                  return inverse;
+              },
+          });
       }
       static _fromMatrix(matrix) {
-          const p = getTranslation(create$2(), matrix);
-          const q = getRotation(create(), matrix);
+          const p = getTranslation([0, 0, 0], matrix);
+          const q = getRotation([0, 0, 0, 1], matrix);
           return new XRRigidTransform({ x: p[0], y: p[1], z: p[2] }, { x: q[0], y: q[1], z: q[2], w: q[3] });
       }
-      get inverse() {
-          if (!this.inverseValue) {
-              this.inverseValue = XRRigidTransform._fromMatrix(invert(create$3(), this.matrix));
-              this.inverseValue.inverseValue = this;
-          }
-          return this.inverseValue;
-      }
+      get position() { return transformState(this).position; }
+      get orientation() { return transformState(this).orientation; }
+      get matrix() { return transformState(this).matrix(); }
+      get inverse() { return transformState(this).inverse(); }
+  }
+  for (const name of ['position', 'orientation', 'matrix', 'inverse']) {
+      Object.defineProperty(XRRigidTransform.prototype, name, { ...Object.getOwnPropertyDescriptor(XRRigidTransform.prototype, name), enumerable: true });
   }
   class XRSpace extends interfaceBrands.SpaceObject {
       constructor(_session, matrixProvider, joint = false) {
@@ -1210,16 +1246,20 @@ function WebXRPolyfillInjection() {
           this.nativeMatrix = nativeMatrix;
           this.offset = offset;
           this.onreset = null;
+          const allocate = this.createOffsetSpace.bind(this);
+          interfaceBrands.referenceOffsets.set(this, transform => allocate(multiply(create$3(), offset, transform)));
       }
       getOffsetReferenceSpace(transform) {
-          if (!(transform instanceof XRRigidTransform))
-              throw new TypeError('Expected XRRigidTransform.');
-          return this.createOffsetSpace(multiply(create$3(), this.offset, transform.matrix));
+          const allocate = interfaceBrands.referenceOffsets.get(this);
+          if (!allocate)
+              throw new TypeError('Expected XRReferenceSpace.');
+          return allocate(transformMatrix(transform));
       }
       createOffsetSpace(offset) {
           return new XRReferenceSpace(this._session, this._type, this.nativeMatrix, offset);
       }
   }
+  Object.defineProperty(XRReferenceSpace.prototype, 'getOffsetReferenceSpace', { enumerable: true });
   class XRBoundedReferenceSpace extends XRReferenceSpace {
       constructor(session, nativeMatrix, nativeBounds, offset = create$3()) {
           super(session, 'bounded-floor', nativeMatrix, offset);
@@ -1294,6 +1334,8 @@ function WebXRPolyfillInjection() {
     invalidState: invalidState,
     sessionObjects: sessionObjects,
     spaceObjects: spaceObjects,
+    transformMatrix: transformMatrix,
+    transformObjects: transformObjects,
     unsupported: unsupported
   });
 
@@ -1822,7 +1864,7 @@ function WebXRPolyfillInjection() {
           for (const value of [init.viewPixelWidth, init.viewPixelHeight])
               if (value === undefined || !Number.isInteger(value) || value <= 0)
                   throw new TypeError('Quad pixel dimensions must be positive integers.');
-          if (init.transform && !(init.transform instanceof XRRigidTransform))
+          if (init.transform && !transformObjects.has(init.transform))
               throw new TypeError('Expected XRRigidTransform.');
           if (((_b = init.width) !== null && _b !== void 0 ? _b : 1) <= 0 || ((_c = init.height) !== null && _c !== void 0 ? _c : 1) <= 0)
               throw new TypeError('Quad physical dimensions must be positive.');
@@ -1966,7 +2008,7 @@ function WebXRPolyfillInjection() {
                               const world = frame._world(layer.space);
                               if (!world)
                                   continue;
-                              matrix = multiply(matrix, world, layer.transform.matrix);
+                              matrix = multiply(matrix, world, transformMatrix(layer.transform));
                               scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
                               multiply(matrix, invert(create$3(), view._worldMatrix), matrix);
                               multiply(matrix, view.projectionMatrix, matrix);
@@ -25696,9 +25738,9 @@ void main() {
           var _a, _b, _c, _d, _e, _f, _g, _h;
           const _origin = { x: 0, y: 0, z: 0, w: 1 };
           const _direction = { x: 0, y: 0, z: -1, w: 0 };
-          if (origin && origin instanceof XRRigidTransform) {
+          if (origin && transformObjects.has(origin)) {
               const transform = origin;
-              const matrix = transform.matrix;
+              const matrix = transformMatrix(transform);
               const originVec4 = set(create$1(), _origin.x, _origin.y, _origin.z, _origin.w);
               const directionVec4 = set(create$1(), _direction.x, _direction.y, _direction.z, _direction.w);
               transformMat4(originVec4, originVec4, matrix);
@@ -25714,6 +25756,7 @@ void main() {
           }
           else {
               if (origin) {
+                  origin = origin;
                   _origin.x = (_a = origin.x) !== null && _a !== void 0 ? _a : _origin.x;
                   _origin.y = (_b = origin.y) !== null && _b !== void 0 ? _b : _origin.y;
                   _origin.z = (_c = origin.z) !== null && _c !== void 0 ? _c : _origin.z;
@@ -25872,11 +25915,11 @@ void main() {
       }
       async createAnchor() {
           const { frame, transform } = this[PRIVATE$1];
-          const space = new XRSpace(frame.session, () => clone$1(transform.matrix));
+          const space = new XRSpace(frame.session, () => clone$1(transformMatrix(transform)));
           return frame.createAnchor(new XRRigidTransform(), space);
       }
       getPose(baseSpace) {
-          const space = new XRSpace(this[PRIVATE$1].frame.session, () => clone$1(this[PRIVATE$1].transform.matrix));
+          const space = new XRSpace(this[PRIVATE$1].frame.session, () => clone$1(transformMatrix(this[PRIVATE$1].transform)));
           return this[PRIVATE$1].frame.getPose(space, baseSpace);
       }
   }
@@ -26736,12 +26779,12 @@ void main() {
       async createAnchor(pose, space) {
           this._assertActive();
           this.session._require('anchors');
-          if (!(pose instanceof XRRigidTransform))
+          if (!transformObjects.has(pose))
               throw new TypeError('Expected XRRigidTransform.');
           const world = this._world(space);
           if (!world)
               throw new DOMException('Space is not tracked.', 'OperationError');
-          const anchor = new XRAnchor(this.session, multiply(create$3(), world, pose.matrix));
+          const anchor = new XRAnchor(this.session, multiply(create$3(), world, transformMatrix(pose)));
           return new Promise((resolve, reject) => queueMicrotask(() => {
               if (this.session.ended) {
                   anchor.delete();
@@ -26800,7 +26843,7 @@ void main() {
               if (!pose)
                   valid = false;
               for (let component = 0; component < 16; component++)
-                  transforms[index * 16 + component] = pose ? pose.transform.matrix[component] : NaN;
+                  transforms[index * 16 + component] = pose ? transformMatrix(pose.transform)[component] : NaN;
           }
           return valid;
       }
@@ -26864,8 +26907,8 @@ void main() {
           world._update();
           const target = this.session._device.getInputPose(this.raw, world, 'target-ray');
           const grip = this.session._device.getInputPose(this.raw, world, 'grip');
-          this.targetWorld = target ? clone$1(target.transform.matrix) : null;
-          this.gripWorld = grip ? clone$1(grip.transform.matrix) : null;
+          this.targetWorld = target ? clone$1(transformMatrix(target.transform)) : null;
+          this.gripWorld = grip ? clone$1(transformMatrix(grip.transform)) : null;
       }
       get hand() { return this.handValue; }
       get targetRaySpace() { return this.targetSpace; }
@@ -31519,7 +31562,6 @@ void main() {
           return [dx, dy];
       }
       _hitTest(sessionId, hitTestSources, hitTestResults) {
-          var _a;
           let activeHitTestSourceNum = 0;
           for (let i = 0; i < hitTestSources.length; i++) {
               const source = hitTestSources[i];
@@ -31546,7 +31588,8 @@ void main() {
                   }
                   const world = new XRSpace(source._session, () => create$3());
                   world._update();
-                  baseMatrix = (_a = this.getInputPose(this.gamepadInputSources[0].inputSource, world, 'target-ray')) === null || _a === void 0 ? void 0 : _a.transform.matrix;
+                  const pose = this.getInputPose(this.gamepadInputSources[0].inputSource, world, 'target-ray');
+                  baseMatrix = pose ? transformMatrix(pose.transform) : undefined;
                   if (!baseMatrix)
                       continue;
               }

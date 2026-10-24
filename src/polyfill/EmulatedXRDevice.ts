@@ -5,7 +5,7 @@ import type XRHitTestSource from './api/XRHitTestSource';
 import { dispatchCustomEvent } from '../types/contracts';
 import {DeviceAdapter as XRDevice, ControllerInput as GamepadXRInputSource, type DeviceInput as XRInputSource} from './device-adapter';
 import XRTransientInputHitTestSource from './api/XRTransientInputHitTestSource';
-import {XRSpace as OwnedSpace, XRRigidTransform, XRPose} from './api/geometry';
+import {XRSpace as OwnedSpace, XRRigidTransform, transformMatrix, XRPose} from './api/geometry';
 import {
   vec3,
   quat,
@@ -562,7 +562,8 @@ export default class EmulatedXRDevice extends XRDevice {
           continue;
         }
         const world = new OwnedSpace(source._session, () => mat4.create()); world._update();
-        baseMatrix = this.getInputPose(this.gamepadInputSources[0].inputSource, world, 'target-ray')?.transform.matrix;
+        const pose = this.getInputPose(this.gamepadInputSources[0].inputSource, world, 'target-ray');
+        baseMatrix = pose ? transformMatrix(pose.transform) : undefined;
         if (!baseMatrix) continue;
       } else {
         baseMatrix = source._space._update();

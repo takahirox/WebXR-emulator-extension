@@ -156,3 +156,7 @@ and shutdown. These are focused adaptations, not verbatim upstream WPT execution
 or a full WPT/IDL pass. The optional pinned Three.js startup scenario was not run;
 existing Three.js application evidence remains separate. Generic suites and
 independent AI re-review were not run for this Issue.
+
+## Transform prerequisite (Issue #47)
+
+[Transform bindings, matrix lifetime and offset integration](webxr-rigid-transform.md) add genuine cross-realm offset arguments/receivers, base-realm allocation, internal geometric state independent of mutable exported arrays, and focused rendered navigation. The original request/shutdown commands above are also rerun for that change; their completed acceptance and the viewer-only inline policy remain intact.
