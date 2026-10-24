@@ -1,5 +1,5 @@
 import type {XRSession, XRFrame, XRInputSource} from './runtime';
-import type {XRReferenceSpace, XRRigidTransform} from './geometry';
+import type {XRReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, XRViewport} from './geometry';
 import type {mat4} from 'gl-matrix';
 import type {EventHandler} from './event-handlers';
 import {createLayerAllocations} from './layer-allocation';
@@ -35,6 +35,18 @@ function createBrands() {
     }>(),
     referenceOffsets: new WeakMap<object, (transform: mat4) => XRReferenceSpace>(),
     referenceSpaceRequests: new WeakMap<object, (type: string) => Promise<XRReferenceSpace>>(),
+    frameValues: new WeakMap<object, {session: XRSession; predictedDisplayTime: number; pose: (matrix: mat4, emulated: boolean) => XRPose}>(),
+    viewerPoses: new WeakMap<object, (frame: XRFrame, reference: XRReferenceSpace) => XRViewerPose | null>(),
+    poses: new WeakMap<object, {transform: XRRigidTransform; emulatedPosition: boolean}>(),
+    viewerViews: new WeakMap<object, readonly XRView[]>(),
+    views: new WeakMap<object, {frame: XRFrame; eye: 'none' | 'left' | 'right'; index: number; world: mat4}>(),
+    viewGeometry: new WeakMap<object, {transform: XRRigidTransform; projection: mat4; array: () => Float32Array}>(),
+    depthGeometry: new WeakSet<object>(),
+    spaceRelations: new WeakMap<object, {origin: object; offset: mat4; tracking: {emulatedPosition: boolean}}>(),
+    trackingOrigins: new WeakMap<object, {emulatedPosition: boolean}>(),
+    bindingSubImages: new WeakMap<object, (layer: import('./layers').XRProjectionLayer, view: XRView) => import('./layers').XRWebGLSubImage>(),
+    viewports: new WeakMap<object, {x: number; y: number; width: number; height: number}>(),
+    layerViewports: new WeakMap<object, (view: XRView) => XRViewport>(),
     // Dispatch and declared event attributes belong to the object, even when an
     // accessor from another injection is borrowed. Weak keys reject proxies and
     // prototype forgeries just as they do in an individual injection.

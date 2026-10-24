@@ -1,5 +1,5 @@
 import {mat4, vec3} from 'gl-matrix';
-import {XRSpace, XRPose, XRRigidTransform, XRView, XRViewGeometry, invalidState, unsupported} from './geometry';
+import {XRSpace, XRPose, XRRigidTransform, XRView, initializeViewGeometry, installViewGeometry, projectionData, invalidState, unsupported} from './geometry';
 import type {XRSession, XRFrame} from './runtime';
 import {interfaceBrands} from './interface-brand';
 
@@ -30,7 +30,7 @@ export const jointObjects = interfaceBrands.joints;
 export class XRJointSpace extends XRSpace {
   constructor(session: XRSession, readonly jointName: string, readonly _radius: number, provider: () => mat4 | null) { super(session, provider, true); }
 }
-export class XRJointPose extends XRPose { constructor(transform: XRRigidTransform, readonly radius: number) { super(transform); } }
+export class XRJointPose extends XRPose { constructor(transform: XRRigidTransform, readonly radius: number, emulatedPosition: boolean, token?: symbol) { super(transform, emulatedPosition, token); } }
 export class XRHand implements Iterable<[string, XRJointSpace]> {
   private joints = new Map<string, XRJointSpace>();
   constructor(session: XRSession, controller: number, active: () => boolean) {
@@ -83,23 +83,27 @@ export class XRLightEstimate {
     this.sphericalHarmonicsCoefficients = new Float32Array(basis.flatMap(value => [value * light, value * light, value * light]));
   }
 }
-export class XRDepthInformation extends XRViewGeometry {
+export class XRDepthInformation {
+  declare readonly transform: XRRigidTransform;
+  declare readonly projectionMatrix: Float32Array;
   readonly width = 32; readonly height = 32;
   readonly rawValueToMeters: number;
   readonly normDepthBufferFromNormView = new XRRigidTransform();
   constructor(readonly _frame: XRFrame, readonly view: XRView) {
     // The simulated depth sensor is aligned with this view, including its
     // reference-space offset. Raycasting below still uses the world-space pose.
-    super(view.transform, view.projectionMatrix);
+    interfaceBrands.depthGeometry.add(this);
+    initializeViewGeometry(this, view.transform, projectionData(view));
     this.rawValueToMeters = _frame.session.depthDataFormat === 'float32' ? 1 : 0.001;
   }
 }
+installViewGeometry(XRDepthInformation.prototype, value => interfaceBrands.depthGeometry.has(value));
 export class XRCPUDepthInformation extends XRDepthInformation {
   private samples: Float32Array | Uint16Array;
   constructor(frame: XRFrame, view: XRView) {
     super(frame, view); this.samples = this.rawValueToMeters === 1 ? new Float32Array(this.width * this.height) : new Uint16Array(this.width * this.height);
     const origin = mat4.getTranslation(vec3.create(), view._worldMatrix);
-    const inverseProjection = mat4.invert(mat4.create(), view.projectionMatrix)!;
+    const inverseProjection = mat4.invert(mat4.create(), projectionData(view))!;
     const local = vec3.create(); const world = vec3.create();
     for (let y = 0; y < this.height; y++) for (let x = 0; x < this.width; x++) {
       vec3.transformMat4(local, [(x + 0.5) / this.width * 2 - 1, 1 - (y + 0.5) / this.height * 2, 0], inverseProjection);

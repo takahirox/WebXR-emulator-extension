@@ -3,7 +3,7 @@ import type EmulatedXRDevice from '../EmulatedXRDevice';
 import type {SessionMode} from '../../types/contracts';
 import type {HitTestOptions, TransientHitTestOptions} from '../../types/polyfill';
 import {SourceGamepad, type DeviceInput, type InputSignal} from '../device-adapter';
-import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, transformMatrix, transformObjects, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, spaceObjects, invalidState, unsupported} from './geometry';
+import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, transformMatrix, transformObjects, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, spaceObjects, relativePose, geometryAllocation, requireGeometryAllocation, enumerableMembers, viewState, invalidState, unsupported} from './geometry';
 import {HALL_PLAY_AREA} from '../virtual-play-area';
 import {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
 import {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation, jointObjects} from './sensing';
@@ -200,7 +200,9 @@ export class XRSession extends interfaceBrands.SessionObject {
   constructor(readonly _device: EmulatedXRDevice, readonly _mode: SessionMode, readonly _id: number, enabled: Set<string>, private onShutdown: () => void) {
     super(); this.features = Object.freeze([...enabled]); this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
     this.activeRenderState = new XRRenderState({inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null});
-    this._viewer = new XRReferenceSpace(this, 'viewer', () => mat4.clone(_device.getBasePoseMatrix()));
+    const viewerMatrix = () => mat4.clone(_device.getBasePoseMatrix());
+    this._viewer = new XRReferenceSpace(this, 'viewer', viewerMatrix);
+    interfaceBrands.viewerPoses.set(this, (frame, reference) => allocateViewerPose(frame, reference));
     // Capture this injection's constructors, Promise and task queue. Borrowed
     // operations must allocate in the session's relevant realm (Device §6.2).
     interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
@@ -230,7 +232,7 @@ export class XRSession extends interfaceBrands.SessionObject {
         void ready.then(inverse => {
           queue(() => {
             if (type === 'viewer') {
-              resolve(new XRReferenceSpace(this, type, () => mat4.clone(_device.getBasePoseMatrix())));
+              resolve(new XRReferenceSpace(this, type, viewerMatrix));
             } else {
               const world = mat4.invert(mat4.create(), inverse!)!;
               resolve(type === 'bounded-floor'
@@ -280,6 +282,7 @@ export class XRSession extends interfaceBrands.SessionObject {
   }
   get environmentBlendMode() { return this._mode === 'immersive-ar' ? 'alpha-blend' : 'opaque'; }
   get domOverlayState() { return this.overlayState; }
+  get _currentAnimationFrame() { return this.animationFrame; }
   _assertLive() { if (this.ended) invalidState('The session has ended.'); }
   _require(feature: string) { this._assertLive(); if (!this.enabledFeatures.includes(feature)) unsupported(`${feature} was not enabled.`); }
   _owns(space: XRSpace) {
@@ -374,7 +377,7 @@ export class XRSession extends interfaceBrands.SessionObject {
     this._require('hit-test'); const source = new XRTransientInputHitTestSource(this, options); this._transientSources.add(source); this._device.addHitTestSourceForTransientInput(source); return source;
   }
   private emitInput(type: string, inputSource: XRInputSource, time: number) {
-    const frame = new XRFrame(this, time, false); frame._active = true;
+    const frame = new XRFrame(this, time, false, geometryAllocation); frame._active = true;
     try { this._emit(new XRInputSourceEvent(type, {frame, inputSource})); } finally { frame._active = false; }
   }
   private tick = (time: number) => {
@@ -436,7 +439,7 @@ export class XRSession extends interfaceBrands.SessionObject {
     for (const [raw, wrapper] of this.inputWrappers) if (removed.includes(wrapper)) this.inputWrappers.delete(raw);
     this._device.computeHitTests(this._id);
     if (this.enabledFeatures.some(feature => feature === 'plane-detection' || feature === 'mesh-detection')) this._environment.update(time);
-    const frame = new XRFrame(this, time, true);
+    const frame = new XRFrame(this, time, true, geometryAllocation);
     const layers = this.renderState.layers;
     if (layers?.length) layers[0]._binding._prepare(layers);
     const callbacks = this.currentCallbacks = this.callbacks; this.callbacks = new Map(); frame._active = true;
@@ -465,8 +468,11 @@ export class XRFrame extends interfaceBrands.FrameObject {
   private anchorSnapshot: XRAnchorSet;
   private environmentSnapshot: ReturnType<EnvironmentTracker['snapshot']>;
   private transientResults = new Map<XRTransientInputHitTestSource, XRTransientInputHitTestResult[]>();
-  constructor(readonly session: XRSession, readonly predictedDisplayTime: number, readonly _animation: boolean) {
+  constructor(session: XRSession, predictedDisplayTime: number, readonly _animation: boolean, token?: symbol) {
+    requireGeometryAllocation(token);
     super();
+    interfaceBrands.frameValues.set(this, {session, predictedDisplayTime,
+      pose: (matrix, emulated) => new XRPose(XRRigidTransform._fromMatrix(matrix), emulated, geometryAllocation)});
     this.anchorSnapshot = new XRAnchorSet(session._anchors);
     this.environmentSnapshot = session._environment.snapshot();
     if (_animation) {
@@ -483,21 +489,25 @@ export class XRFrame extends interfaceBrands.FrameObject {
     this.session._owns(space);
     return space._update();
   }
+  get session() { return frameState(this).session; }
+  get predictedDisplayTime() { return frameState(this).predictedDisplayTime; }
   getPose(space: XRSpace, baseSpace: XRSpace) {
-    this._assertActive(); const world = this._world(space); const base = this._world(baseSpace);
-    return world && base ? new XRPose(XRRigidTransform._fromMatrix(mat4.multiply(mat4.create(), mat4.invert(mat4.create(), base)!, world))) : null;
+    const state = frameState(this);
+    if (arguments.length < 2) throw new TypeError('Expected space and baseSpace.');
+    interfaceValue(space, spaceObjects, 'XRSpace');
+    interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+    this._assertActive();
+    // Ownership is checked for both arguments before any unavailable-tracking
+    // shortcut or provider call.
+    state.session._owns(space); state.session._owns(baseSpace);
+    const relative = relativePose(space, baseSpace);
+    return relative ? state.pose(relative.matrix, relative.emulated) : null;
   }
   getViewerPose(referenceSpace: XRReferenceSpace) {
-    this._assertActive(true); if (!(referenceSpace instanceof XRReferenceSpace)) throw new TypeError('Expected XRReferenceSpace.');
-    const pose = this.getPose(this.session._viewer, referenceSpace); if (!pose) return null;
-    const device = this.session._device;
-    const eyes: ('none' | 'left' | 'right')[] = this.session._mode === 'inline' || device.handheld ? ['none'] : ['left', 'right'];
-    const inverse = mat4.invert(mat4.create(), this._world(referenceSpace)!)!;
-    const views = eyes.map(eye => {
-      const world = mat4.invert(mat4.create(), device.getBaseViewMatrix(eye))!;
-      return new XRView(this, eye, XRRigidTransform._fromMatrix(mat4.multiply(mat4.create(), inverse, world)), new Float32Array(device.getProjectionMatrix(eye)), world);
-    });
-    return new XRViewerPose(pose.transform, Object.freeze(views));
+    const state = frameState(this);
+    if (arguments.length < 1 || !interfaceBrands.referenceOffsets.has(referenceSpace)) throw new TypeError('Expected XRReferenceSpace.');
+    this._assertActive(true); state.session._owns(referenceSpace);
+    return interfaceBrands.viewerPoses.get(state.session)!(this, referenceSpace);
   }
   get detectedPlanes() { this._assertActive(); return this.environmentSnapshot.planes; }
   get detectedMeshes() { this._assertActive(); return this.environmentSnapshot.meshes; }
@@ -515,7 +525,7 @@ export class XRFrame extends interfaceBrands.FrameObject {
   getJointPose(joint: XRJointSpace, baseSpace: XRSpace) {
     this._assertActive(); this.session._require('hand-tracking');
     if (!(joint instanceof XRJointSpace)) throw new TypeError('Expected XRJointSpace.');
-    const pose = this.getPose(joint, baseSpace); return pose ? new XRJointPose(pose.transform, joint._radius) : null;
+    const pose = this.getPose(joint, baseSpace); return pose ? new XRJointPose(pose.transform, joint._radius, pose.emulatedPosition, geometryAllocation) : null;
   }
   fillJointRadii(joints: Iterable<XRJointSpace>, radii: Float32Array) {
     interfaceValue(this, frameObjects, 'XRFrame');
@@ -559,13 +569,38 @@ export class XRFrame extends interfaceBrands.FrameObject {
   }
   getDepthInformation(view: XRView) {
     this._assertActive(true); this.session._require('depth-sensing');
-    if (!(view instanceof XRView)) throw new TypeError('Expected XRView.'); if (view._frame !== this) invalidState('View belongs to a different frame.');
+    if (viewState(view).frame !== this) invalidState('View belongs to a different frame.');
     if (!this.session.depthActive || !this.session._device.arScene?.room) return null;
     return new XRCPUDepthInformation(this, view);
   }
   getHitTestResults(source: XRHitTestSource) { this._assertActive(); if (!this.hitResults.has(source)) invalidState('Hit test source was not active for this frame.'); return this.hitResults.get(source)!.slice(); }
   getHitTestResultsForTransientInput(source: XRTransientInputHitTestSource) { this._assertActive(); if (!this.transientResults.has(source)) invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source)!.slice(); }
 }
+function frameState(value: object) {
+  const state = interfaceBrands.frameValues.get(value);
+  if (!state) throw new TypeError('Expected XRFrame.');
+  return state;
+}
+// Invoked through the session's captured operation, even when the frame method
+// was borrowed from a separately injected same-origin document.
+function allocateViewerPose(frame: XRFrame, reference: XRReferenceSpace) {
+  const session = frameState(frame).session;
+  const relative = relativePose(session._viewer, reference);
+  if (!relative) return null;
+  const viewerWorld = session._viewer._update();
+  if (!viewerWorld) return null;
+  const inverseViewer = mat4.invert(mat4.create(), viewerWorld)!;
+  const transform = XRRigidTransform._fromMatrix(relative.matrix);
+  const device = session._device;
+  const eyes: ('none' | 'left' | 'right')[] = session._mode === 'inline' || device.handheld ? ['none'] : ['left', 'right'];
+  const views = eyes.map((eye, index) => {
+    const viewWorld = mat4.invert(mat4.create(), device.getBaseViewMatrix(eye))!;
+    return new XRView(frame, eye, XRRigidTransform._fromMatrix(mat4.multiply(mat4.create(), relative.matrix, mat4.multiply(mat4.create(), inverseViewer, viewWorld))),
+      device.getProjectionMatrix(eye), viewWorld, index, geometryAllocation);
+  });
+  return new XRViewerPose(transform, views, relative.emulated, geometryAllocation);
+}
+enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose']);
 // Share allocation branding while retaining the public prototype's own realm.
 Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
 

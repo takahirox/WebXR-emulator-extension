@@ -1,0 +1,2468 @@
+{
+  "issue": 49,
+  "status": "passed",
+  "recordedAt": "2026-10-24T01:22:37.284298+00:00",
+  "evaluationBaseline": "baf056097b1a366a61927e75666473ce44793ba9",
+  "executionBaseCommit": "080867051b0098c18578e5f7d5c5c66e897f8351",
+  "testedRevision": "Issue #49 working tree, identified by exact source and executable bundle hashes below. The final checkpoint commit is reported in the node Result.",
+  "sourceIssue": "https://github.com/takahirox/WebXR-emulator-extension/issues/49",
+  "checks": [
+    {
+      "command": "npm ci",
+      "outcome": "passed",
+      "details": "54 packages installed; 0 audit vulnerabilities; dependency versions unchanged."
+    },
+    {
+      "command": "npm run build:firefox",
+      "outcome": "passed",
+      "details": "Strict TypeScript check, emission, Rollup build and Firefox packaging. Generated bundle changes inspected; the packaged polyfills are byte-identical."
+    },
+    {
+      "command": "npm run test:environment",
+      "outcome": "passed",
+      "tests": 4,
+      "details": "Includes analytic CPU depth after exposed view projection writes/transfer."
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "passed"
+    }
+  ],
+  "runs": [
+    {
+      "issue": 49,
+      "browser": "chromium",
+      "status": "passed",
+      "startedAt": "2026-10-24T01:16:50.349Z",
+      "failures": [],
+      "skips": [],
+      "instrumentation": [
+        "Genuine separately injected iframe and popup constructors, getters and borrowed operations; real inline animation frames in all three realms.",
+        "Inspect _device, _session, callbacks.size and _presentationCanvas for ownership, calibration/presentation, cleanup and controlled input-button events.",
+        "Construct explicit unavailable/estimated XRSpace providers; mark _emulatedPosition only for the estimated-provider case. Temporarily remove/restore one gamepad slot synchronously for existing joint tracking loss; toggle/restore one existing input slot for source retirement/reacquisition. Await real AR room readiness. Firefox WebDriver activates the actual main/popup windows for realm inline frames, without modifying visibility. No GL, timers or animation callbacks replaced."
+      ],
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "cleanup": {
+        "contextClosed": true,
+        "profileRemoved": true
+      },
+      "completedAt": "2026-10-24T01:16:59.156Z",
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
+        "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
+        "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+        "src/polyfill/api/XRRay.ts": "f05bda68251ce1afd949a50d581db9f8aa356350678e7d102077ac09ee881b74",
+        "src/polyfill/api/XRHitTestResult.ts": "d1cf9f42dd4b2df8880f69bdfade63ffb99138d9a0697b02f3f9bd915846dd89",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "34f8d849ef03318b0952f2e9d2e5355df1b546050850b27f955953decbb50e5a",
+        "src/polyfill/EmulatedXRDevice.ts": "07eafcee7e90a8fe80e80f03241f9d769e0b0a80b6dbeef796fb1a9ac098d3b6",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "ae5920aba9698fed3c8fdda94c057be90383e864add44f76390b4a807f751d3e",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
+        "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
+        "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+      },
+      "selection": "pose-view",
+      "command": "npm run test:pose-view:chromium",
+      "rawReportSHA256": "c1cd5139c6cf72a02063447c83bc2f3ae222a70063271459c67c46831ca57fda",
+      "durationSeconds": 8.807,
+      "results": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "immersive-vr",
+          "assertions": 6904,
+          "adaptations": [],
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "10af5311257e37d75d38e1f01d27e6f8ede4876bf111c740a41dafe1af845a0b",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-base-before.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-base-transfer.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 431,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 424,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-base-navigation.png",
+              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d"
+            },
+            {
+              "label": "projection-before",
+              "path": "projection",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-projection-before.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            },
+            {
+              "label": "projection-transfer",
+              "path": "projection",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-projection-transfer.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            },
+            {
+              "label": "projection-navigation",
+              "path": "projection",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 431,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 424,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-projection-navigation.png",
+              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-restart.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            }
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 6915,
+          "adaptations": [],
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "bbb1e05859e9a5094aea785ac4047d3d381bf0ac0d47f70c3cc380c7708de91f",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-base-before.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-base-transfer.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 431,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 424,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-base-navigation.png",
+              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d"
+            },
+            {
+              "label": "projection-before",
+              "path": "projection",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-projection-before.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            },
+            {
+              "label": "projection-transfer",
+              "path": "projection",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-projection-transfer.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            },
+            {
+              "label": "projection-navigation",
+              "path": "projection",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 431,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 424,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-projection-navigation.png",
+              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "left",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 323,
+                  "presentedPixels": 5832
+                },
+                {
+                  "eye": "right",
+                  "index": 1,
+                  "viewport": {
+                    "x": 640,
+                    "y": 0,
+                    "width": 640,
+                    "height": 720
+                  },
+                  "pixels": 5832,
+                  "centroidX": 316,
+                  "presentedPixels": 5832
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-restart.png",
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+            }
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 5968,
+          "adaptations": [],
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "ce7d5c06a7b4b6a00553d626f23083f21ee66857bb8048d78435c20b964b8519",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  "pixels": 41472,
+                  "centroidX": 539.5,
+                  "presentedPixels": 41472
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-base-before.png",
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  "pixels": 41472,
+                  "centroidX": 539.5,
+                  "presentedPixels": 41472
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-base-transfer.png",
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  "pixels": 41472,
+                  "centroidX": 827.5,
+                  "presentedPixels": 41472
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-base-navigation.png",
+              "captureSHA256": "d3da2189416a7616f5314a09463779e1159ad077b20d9d01717a0a8517b2c22a"
+            },
+            {
+              "label": "projection-before",
+              "path": "projection",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  "pixels": 41472,
+                  "centroidX": 539.5,
+                  "presentedPixels": 41472
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-projection-before.png",
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+            },
+            {
+              "label": "projection-transfer",
+              "path": "projection",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  "pixels": 41472,
+                  "centroidX": 539.5,
+                  "presentedPixels": 41472
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-projection-transfer.png",
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+            },
+            {
+              "label": "projection-navigation",
+              "path": "projection",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  "pixels": 41472,
+                  "centroidX": 827.5,
+                  "presentedPixels": 41472
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-projection-navigation.png",
+              "captureSHA256": "d3da2189416a7616f5314a09463779e1159ad077b20d9d01717a0a8517b2c22a"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 1080,
+                    "height": 1920
+                  },
+                  "pixels": 41472,
+                  "centroidX": 539.5,
+                  "presentedPixels": 41472
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-restart.png",
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+            }
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "inline",
+          "assertions": 5930,
+          "adaptations": [
+            "Inline has no input/depth/hand features; immersive scenarios exercise their existing paths."
+          ],
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "a6c9dcc45bc0d2ab9048240cb63b8310afad7d741b4cd8425753ca7c26e3eb34",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 480
+                  },
+                  "pixels": 2520,
+                  "centroidX": 319.5
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-inline-base-before.png",
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 480
+                  },
+                  "pixels": 2520,
+                  "centroidX": 319.5
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-inline-base-transfer.png",
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 480
+                  },
+                  "pixels": 2520,
+                  "centroidX": 391.5
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-inline-base-navigation.png",
+              "captureSHA256": "94c6ba5e4e95c3c1bdbb140d374101db07adf95678add6cea9551944807815e8"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 480
+                  },
+                  "pixels": 2520,
+                  "centroidX": 319.5
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-quest-inline-restart.png",
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+            }
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "inline",
+          "assertions": 5930,
+          "adaptations": [
+            "Inline has no input/depth/hand features; immersive scenarios exercise their existing paths."
+          ],
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "a6c9dcc45bc0d2ab9048240cb63b8310afad7d741b4cd8425753ca7c26e3eb34",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 480
+                  },
+                  "pixels": 2520,
+                  "centroidX": 319.5
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-inline-base-before.png",
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 480
+                  },
+                  "pixels": 2520,
+                  "centroidX": 319.5
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-inline-base-transfer.png",
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 480
+                  },
+                  "pixels": 2520,
+                  "centroidX": 391.5
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-inline-base-navigation.png",
+              "captureSHA256": "94c6ba5e4e95c3c1bdbb140d374101db07adf95678add6cea9551944807815e8"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "eye": "none",
+                  "index": 0,
+                  "viewport": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 480
+                  },
+                  "pixels": 2520,
+                  "centroidX": 319.5
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-chromium-android-inline-restart.png",
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "issue": 49,
+      "browser": "firefox",
+      "status": "passed",
+      "startedAt": "2026-10-24T01:17:28.832Z",
+      "failures": [],
+      "skips": [],
+      "instrumentation": [
+        "Genuine separately injected iframe and popup constructors, getters and borrowed operations; real inline animation frames in all three realms.",
+        "Inspect _device, _session, callbacks.size and _presentationCanvas for ownership, calibration/presentation, cleanup and controlled input-button events.",
+        "Construct explicit unavailable/estimated XRSpace providers; mark _emulatedPosition only for the estimated-provider case. Temporarily remove/restore one gamepad slot synchronously for existing joint tracking loss; toggle/restore one existing input slot for source retirement/reacquisition. Await real AR room readiness. Firefox WebDriver activates the actual main/popup windows for realm inline frames, without modifying visibility. No GL, timers or animation callbacks replaced."
+      ],
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      },
+      "completedAt": "2026-10-24T01:17:48.727Z",
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
+        "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
+        "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+        "src/polyfill/api/XRRay.ts": "f05bda68251ce1afd949a50d581db9f8aa356350678e7d102077ac09ee881b74",
+        "src/polyfill/api/XRHitTestResult.ts": "d1cf9f42dd4b2df8880f69bdfade63ffb99138d9a0697b02f3f9bd915846dd89",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "34f8d849ef03318b0952f2e9d2e5355df1b546050850b27f955953decbb50e5a",
+        "src/polyfill/EmulatedXRDevice.ts": "07eafcee7e90a8fe80e80f03241f9d769e0b0a80b6dbeef796fb1a9ac098d3b6",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "ae5920aba9698fed3c8fdda94c057be90383e864add44f76390b4a807f751d3e",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
+        "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
+        "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+      },
+      "selection": "pose-view",
+      "command": "WEBXR_FIREFOX_EXECUTABLE=\"$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox\" WEBXR_GECKODRIVER=\"$PWD/test-results/browser-tools/geckodriver\" npm run test:pose-view:firefox",
+      "rawReportSHA256": "8f00abb554cfd95ae1fc52c694d8def5cd0d88b58eb3da1eccdf0632bb295e10",
+      "durationSeconds": 19.895,
+      "results": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "adaptations": [],
+          "assertions": 6904,
+          "mode": "immersive-vr",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "10af5311257e37d75d38e1f01d27e6f8ede4876bf111c740a41dafe1af845a0b",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 323.5,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 315.5,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 640,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-base-before.png",
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 323.5,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 315.5,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 640,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-base-transfer.png",
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 444.75206611570246,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 7381,
+                  "presentedPixels": 7381,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 436.75206611570246,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 7381,
+                  "presentedPixels": 7381,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 640,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-base-navigation.png",
+              "captureSHA256": "8467eba6b9fc2f5f9e44d2ce4707afdb2cfa844be599bd86bb36e9cb72a7da6e"
+            },
+            {
+              "label": "projection-before",
+              "path": "projection",
+              "views": [
+                {
+                  "centroidX": 323.5,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 315.5,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 640,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-projection-before.png",
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+            },
+            {
+              "label": "projection-transfer",
+              "path": "projection",
+              "views": [
+                {
+                  "centroidX": 323.5,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 315.5,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 640,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-projection-transfer.png",
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+            },
+            {
+              "label": "projection-navigation",
+              "path": "projection",
+              "views": [
+                {
+                  "centroidX": 444.75206611570246,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 7381,
+                  "presentedPixels": 7381,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 436.75206611570246,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 7381,
+                  "presentedPixels": 7381,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 640,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-projection-navigation.png",
+              "captureSHA256": "8467eba6b9fc2f5f9e44d2ce4707afdb2cfa844be599bd86bb36e9cb72a7da6e"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 323.5,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 315.5,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 7320,
+                  "presentedPixels": 7320,
+                  "viewport": {
+                    "height": 809,
+                    "width": 640,
+                    "x": 640,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-restart.png",
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+            }
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "adaptations": [],
+          "assertions": 6915,
+          "mode": "immersive-ar",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "bbb1e05859e9a5094aea785ac4047d3d381bf0ac0d47f70c3cc380c7708de91f",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 647.7489711934156,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 631.2510288065844,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 1280,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-base-before.png",
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 647.7489711934156,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 631.2510288065844,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 1280,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-base-transfer.png",
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 890.2510288065844,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 874.2510288065844,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 1280,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-base-navigation.png",
+              "captureSHA256": "84a0efe20e3e76e8bf6444d4c4797bf58f6391e66bd31c43f357f46d82d8f200"
+            },
+            {
+              "label": "projection-before",
+              "path": "projection",
+              "views": [
+                {
+                  "centroidX": 647.7489711934156,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 631.2510288065844,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 1280,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-projection-before.png",
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+            },
+            {
+              "label": "projection-transfer",
+              "path": "projection",
+              "views": [
+                {
+                  "centroidX": 647.7489711934156,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 631.2510288065844,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 1280,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-projection-transfer.png",
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+            },
+            {
+              "label": "projection-navigation",
+              "path": "projection",
+              "views": [
+                {
+                  "centroidX": 890.2510288065844,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 874.2510288065844,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 1280,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-projection-navigation.png",
+              "captureSHA256": "84a0efe20e3e76e8bf6444d4c4797bf58f6391e66bd31c43f357f46d82d8f200"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 647.7489711934156,
+                  "eye": "left",
+                  "index": 0,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 0,
+                    "y": 0
+                  }
+                },
+                {
+                  "centroidX": 631.2510288065844,
+                  "eye": "right",
+                  "index": 1,
+                  "pixels": 29403,
+                  "presentedPixels": 29403,
+                  "viewport": {
+                    "height": 1618,
+                    "width": 1280,
+                    "x": 1280,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-restart.png",
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+            }
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "adaptations": [],
+          "assertions": 5968,
+          "mode": "immersive-ar",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "ce7d5c06a7b4b6a00553d626f23083f21ee66857bb8048d78435c20b964b8519",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 539.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 41472,
+                  "presentedPixels": 41472,
+                  "viewport": {
+                    "height": 1920,
+                    "width": 1080,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-base-before.png",
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 539.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 41472,
+                  "presentedPixels": 41472,
+                  "viewport": {
+                    "height": 1920,
+                    "width": 1080,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-base-transfer.png",
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 827.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 41472,
+                  "presentedPixels": 41472,
+                  "viewport": {
+                    "height": 1920,
+                    "width": 1080,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-base-navigation.png",
+              "captureSHA256": "d05d37c72999d3f27c7b6e2d085801f8756d5d69c7428bf7621f99a53ab10410"
+            },
+            {
+              "label": "projection-before",
+              "path": "projection",
+              "views": [
+                {
+                  "centroidX": 539.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 41472,
+                  "presentedPixels": 41472,
+                  "viewport": {
+                    "height": 1920,
+                    "width": 1080,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-projection-before.png",
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+            },
+            {
+              "label": "projection-transfer",
+              "path": "projection",
+              "views": [
+                {
+                  "centroidX": 539.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 41472,
+                  "presentedPixels": 41472,
+                  "viewport": {
+                    "height": 1920,
+                    "width": 1080,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-projection-transfer.png",
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+            },
+            {
+              "label": "projection-navigation",
+              "path": "projection",
+              "views": [
+                {
+                  "centroidX": 827.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 41472,
+                  "presentedPixels": 41472,
+                  "viewport": {
+                    "height": 1920,
+                    "width": 1080,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-projection-navigation.png",
+              "captureSHA256": "d05d37c72999d3f27c7b6e2d085801f8756d5d69c7428bf7621f99a53ab10410"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 539.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 41472,
+                  "presentedPixels": 41472,
+                  "viewport": {
+                    "height": 1920,
+                    "width": 1080,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-restart.png",
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+            }
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "adaptations": [
+            "Inline has no input/depth/hand features; immersive scenarios exercise their existing paths."
+          ],
+          "assertions": 5930,
+          "mode": "inline",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "a6c9dcc45bc0d2ab9048240cb63b8310afad7d741b4cd8425753ca7c26e3eb34",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 319.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 2520,
+                  "viewport": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-inline-base-before.png",
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 319.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 2520,
+                  "viewport": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-inline-base-transfer.png",
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 391.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 2520,
+                  "viewport": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-inline-base-navigation.png",
+              "captureSHA256": "ffb7a9fe6afb16f94c065c93f061df4c494ec9423f43b02b412034b27ff26915"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 319.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 2520,
+                  "viewport": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-quest-inline-restart.png",
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+            }
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "adaptations": [
+            "Inline has no input/depth/hand features; immersive scenarios exercise their existing paths."
+          ],
+          "assertions": 5930,
+          "mode": "inline",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "a6c9dcc45bc0d2ab9048240cb63b8310afad7d741b4cd8425753ca7c26e3eb34",
+          "rendering": [
+            {
+              "label": "base-before",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 319.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 2520,
+                  "viewport": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-inline-base-before.png",
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+            },
+            {
+              "label": "base-transfer",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 319.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 2520,
+                  "viewport": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-inline-base-transfer.png",
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+            },
+            {
+              "label": "base-navigation",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 391.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 2520,
+                  "viewport": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-inline-base-navigation.png",
+              "captureSHA256": "ffb7a9fe6afb16f94c065c93f061df4c494ec9423f43b02b412034b27ff26915"
+            },
+            {
+              "label": "restart",
+              "path": "base",
+              "views": [
+                {
+                  "centroidX": 319.5,
+                  "eye": "none",
+                  "index": 0,
+                  "pixels": 2520,
+                  "viewport": {
+                    "height": 480,
+                    "width": 640,
+                    "x": 0,
+                    "y": 0
+                  }
+                }
+              ],
+              "capture": "docs/validation/issue-49/pose-view-firefox-android-inline-restart.png",
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "issue": 47,
+      "browser": "chromium",
+      "status": "passed",
+      "startedAt": "2026-10-24T01:18:10.495Z",
+      "failures": [],
+      "skips": [],
+      "instrumentation": [
+        "Real injected iframe/popup realms; application-visible matrix transfers, pose queries and WebGL triangle pixels.",
+        "Inspect _session ownership, callbacks.size and the real layer _presentationCanvas for presented pixels/captures; no adapter, GL or timer replacements."
+      ],
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "cleanup": {
+        "contextClosed": true,
+        "profileRemoved": true
+      },
+      "completedAt": "2026-10-24T01:18:16.496Z",
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
+        "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
+        "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+        "src/polyfill/api/XRRay.ts": "f05bda68251ce1afd949a50d581db9f8aa356350678e7d102077ac09ee881b74",
+        "src/polyfill/api/XRHitTestResult.ts": "d1cf9f42dd4b2df8880f69bdfade63ffb99138d9a0697b02f3f9bd915846dd89",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "34f8d849ef03318b0952f2e9d2e5355df1b546050850b27f955953decbb50e5a",
+        "src/polyfill/EmulatedXRDevice.ts": "07eafcee7e90a8fe80e80f03241f9d769e0b0a80b6dbeef796fb1a9ac098d3b6",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "ae5920aba9698fed3c8fdda94c057be90383e864add44f76390b4a807f751d3e",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
+        "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
+        "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+      },
+      "selection": "rigid-transform",
+      "command": "npm run test:transform:chromium",
+      "rawReportSHA256": "ef5bcb7f45f84226ee38fa8c4c702df1f94891f1c17cef40c2938fca763d56c2",
+      "durationSeconds": 6.001,
+      "results": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "immersive-vr",
+          "assertions": 620,
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "d09c56d6af46177462acbb8a2f6162cf5e8f8217ea5e63132cef7ce725d8ce66"
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 620,
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "d09c56d6af46177462acbb8a2f6162cf5e8f8217ea5e63132cef7ce725d8ce66"
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 597,
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "00f6253c637f2d47a8766fdabb0cfb7bd0b57e78de429a4f39c8a367bb3ae747"
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "inline",
+          "assertions": 589,
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "6d147d9ac9a93dd54e5855d9b48b1962f3c4fe55a5c6dcd26ec71de984dab033"
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "inline",
+          "assertions": 589,
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "6d147d9ac9a93dd54e5855d9b48b1962f3c4fe55a5c6dcd26ec71de984dab033"
+        }
+      ]
+    },
+    {
+      "issue": 47,
+      "browser": "firefox",
+      "status": "passed",
+      "startedAt": "2026-10-24T01:19:16.471Z",
+      "failures": [],
+      "skips": [],
+      "instrumentation": [
+        "Real injected iframe/popup realms; application-visible matrix transfers, pose queries and WebGL triangle pixels.",
+        "Inspect _session ownership, callbacks.size and the real layer _presentationCanvas for presented pixels/captures; no adapter, GL or timer replacements."
+      ],
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      },
+      "completedAt": "2026-10-24T01:19:52.919Z",
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
+        "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
+        "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+        "src/polyfill/api/XRRay.ts": "f05bda68251ce1afd949a50d581db9f8aa356350678e7d102077ac09ee881b74",
+        "src/polyfill/api/XRHitTestResult.ts": "d1cf9f42dd4b2df8880f69bdfade63ffb99138d9a0697b02f3f9bd915846dd89",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "34f8d849ef03318b0952f2e9d2e5355df1b546050850b27f955953decbb50e5a",
+        "src/polyfill/EmulatedXRDevice.ts": "07eafcee7e90a8fe80e80f03241f9d769e0b0a80b6dbeef796fb1a9ac098d3b6",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "ae5920aba9698fed3c8fdda94c057be90383e864add44f76390b4a807f751d3e",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
+        "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
+        "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+      },
+      "selection": "rigid-transform",
+      "command": "WEBXR_FIREFOX_EXECUTABLE=\"$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox\" WEBXR_GECKODRIVER=\"$PWD/test-results/browser-tools/geckodriver\" npm run test:transform:firefox",
+      "rawReportSHA256": "7f3e9d2a905f7a9a20c1a88d5436aba9bce1c44c37b6b462b560c5ca349abedf",
+      "durationSeconds": 36.448,
+      "results": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "assertions": 620,
+          "mode": "immersive-vr",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "d09c56d6af46177462acbb8a2f6162cf5e8f8217ea5e63132cef7ce725d8ce66"
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "assertions": 620,
+          "mode": "immersive-ar",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "d09c56d6af46177462acbb8a2f6162cf5e8f8217ea5e63132cef7ce725d8ce66"
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "assertions": 597,
+          "mode": "immersive-ar",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "00f6253c637f2d47a8766fdabb0cfb7bd0b57e78de429a4f39c8a367bb3ae747"
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "assertions": 589,
+          "mode": "inline",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "6d147d9ac9a93dd54e5855d9b48b1962f3c4fe55a5c6dcd26ec71de984dab033"
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "assertions": 589,
+          "mode": "inline",
+          "tolerance": 0.0001,
+          "errors": [],
+          "assertionLabelsSHA256": "6d147d9ac9a93dd54e5855d9b48b1962f3c4fe55a5c6dcd26ec71de984dab033"
+        }
+      ]
+    },
+    {
+      "issue": 41,
+      "browser": "chromium",
+      "status": "passed",
+      "startedAt": "2026-10-24T01:18:42.467Z",
+      "failures": [],
+      "skips": [],
+      "instrumentation": [
+        "Inspect session pendingReferenceRequests sizes for release; access _device/_id only for targeted races.",
+        "Temporarily replace adapter transform method with controlled Promises; restore in finally.",
+        "Capture real timer callbacks through calling-task microtasks; restore timers, shut down, then replay cancelled callbacks.",
+        "Proxy transform matrix counts numeric allocation reads; count timer calls from late adapter continuations.",
+        "Call real device endSession; inline additionally emits its presentation-end notification because it has no presentation."
+      ],
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "cleanup": {
+        "contextClosed": true,
+        "profileRemoved": true
+      },
+      "completedAt": "2026-10-24T01:18:50.755Z",
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
+        "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
+        "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+        "src/polyfill/api/XRRay.ts": "f05bda68251ce1afd949a50d581db9f8aa356350678e7d102077ac09ee881b74",
+        "src/polyfill/api/XRHitTestResult.ts": "d1cf9f42dd4b2df8880f69bdfade63ffb99138d9a0697b02f3f9bd915846dd89",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "34f8d849ef03318b0952f2e9d2e5355df1b546050850b27f955953decbb50e5a",
+        "src/polyfill/EmulatedXRDevice.ts": "07eafcee7e90a8fe80e80f03241f9d769e0b0a80b6dbeef796fb1a9ac098d3b6",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "ae5920aba9698fed3c8fdda94c057be90383e864add44f76390b4a807f751d3e",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
+        "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
+        "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+      },
+      "selection": "reference-space",
+      "command": "npm run test:reference-space:chromium",
+      "rawReportSHA256": "d3e56219931f838327757231401ad9494c477bc834aead208b3f2a1540a8b0d5",
+      "durationSeconds": 8.288,
+      "results": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "immersive-vr",
+          "assertions": 256,
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "failures": [],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "8f926e6aaa7cb5738510d7b9f331ad12434136bd7a34ed3134ffdafb1e89671d"
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 256,
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "failures": [],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "8f926e6aaa7cb5738510d7b9f331ad12434136bd7a34ed3134ffdafb1e89671d"
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 256,
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "failures": [],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "8f926e6aaa7cb5738510d7b9f331ad12434136bd7a34ed3134ffdafb1e89671d"
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "inline",
+          "assertions": 196,
+          "positions": [],
+          "failures": [],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "ad7f7081fb0330695cb7c72d5f9257e01ff7f8eaf0633c74f22c685defef089a"
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "inline",
+          "assertions": 196,
+          "positions": [],
+          "failures": [],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "ad7f7081fb0330695cb7c72d5f9257e01ff7f8eaf0633c74f22c685defef089a"
+        }
+      ]
+    },
+    {
+      "issue": 41,
+      "browser": "firefox",
+      "status": "passed",
+      "startedAt": "2026-10-24T01:20:08.854Z",
+      "failures": [],
+      "skips": [],
+      "instrumentation": [
+        "Inspect session pendingReferenceRequests sizes for release; access _device/_id only for targeted races.",
+        "Temporarily replace adapter transform method with controlled Promises; restore in finally.",
+        "Capture real timer callbacks through calling-task microtasks; restore timers, shut down, then replay cancelled callbacks.",
+        "Proxy transform matrix counts numeric allocation reads; count timer calls from late adapter continuations.",
+        "Call real device endSession; inline additionally emits its presentation-end notification because it has no presentation."
+      ],
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      },
+      "completedAt": "2026-10-24T01:21:21.918Z",
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
+        "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
+        "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+        "src/polyfill/api/XRRay.ts": "f05bda68251ce1afd949a50d581db9f8aa356350678e7d102077ac09ee881b74",
+        "src/polyfill/api/XRHitTestResult.ts": "d1cf9f42dd4b2df8880f69bdfade63ffb99138d9a0697b02f3f9bd915846dd89",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "34f8d849ef03318b0952f2e9d2e5355df1b546050850b27f955953decbb50e5a",
+        "src/polyfill/EmulatedXRDevice.ts": "07eafcee7e90a8fe80e80f03241f9d769e0b0a80b6dbeef796fb1a9ac098d3b6",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "ae5920aba9698fed3c8fdda94c057be90383e864add44f76390b4a807f751d3e",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
+        "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
+        "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+      },
+      "selection": "reference-space",
+      "command": "WEBXR_FIREFOX_EXECUTABLE=\"$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox\" WEBXR_GECKODRIVER=\"$PWD/test-results/browser-tools/geckodriver\" npm run test:reference-space:firefox",
+      "rawReportSHA256": "f8ff944d6d28df5281a6079780f1b3c7d8bf2108a26c460b07fdfd364732182b",
+      "durationSeconds": 73.064,
+      "results": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "assertions": 256,
+          "failures": [],
+          "mode": "immersive-vr",
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "8f926e6aaa7cb5738510d7b9f331ad12434136bd7a34ed3134ffdafb1e89671d"
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "assertions": 256,
+          "failures": [],
+          "mode": "immersive-ar",
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "8f926e6aaa7cb5738510d7b9f331ad12434136bd7a34ed3134ffdafb1e89671d"
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "assertions": 256,
+          "failures": [],
+          "mode": "immersive-ar",
+          "positions": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.4000000059604645,
+              0.19999992847442627,
+              -0.699999988079071
+            ],
+            [
+              25,
+              0.3999999761581421,
+              -30
+            ]
+          ],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "8f926e6aaa7cb5738510d7b9f331ad12434136bd7a34ed3134ffdafb1e89671d"
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "assertions": 196,
+          "failures": [],
+          "mode": "inline",
+          "positions": [],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "ad7f7081fb0330695cb7c72d5f9257e01ff7f8eaf0633c74f22c685defef089a"
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "assertions": 196,
+          "failures": [],
+          "mode": "inline",
+          "positions": [],
+          "skips": [],
+          "errors": [],
+          "assertionLabelsSHA256": "ad7f7081fb0330695cb7c72d5f9257e01ff7f8eaf0633c74f22c685defef089a"
+        }
+      ]
+    }
+  ],
+  "resolvedFailedAttempts": [
+    {
+      "command": "npm run typecheck",
+      "outcome": "resolved",
+      "failure": "The existing analytic depth fixture still called the old five-argument XRView constructor.",
+      "correction": "Update that internal allocation with index and the internal construction token."
+    },
+    {
+      "command": "npm run test:environment",
+      "outcome": "resolved",
+      "failure": "Node import failed because the existing shared layer allocator captured WebGLRenderingContext during geometry-only imports.",
+      "correction": "Guard the browser-only intrinsic capture; the final four tests pass."
+    },
+    {
+      "command": "npm run test:pose-view:chromium",
+      "outcome": "resolved",
+      "failure": "Realm fixture copied only enumerable globals, omitting native nonenumerable globals overwritten by injection such as XRWebGLLayer.",
+      "correction": "Retain the explicit constructor list from each genuine injected document."
+    },
+    {
+      "command": "npm run test:pose-view:chromium",
+      "outcome": "resolved",
+      "failure": "Fixture supplied both baseLayer:null and layers in one render-state update, rejected by the existing API contract.",
+      "correction": "Supply only layers; the existing render-state implementation clears baseLayer."
+    },
+    {
+      "command": "npm run test:pose-view:chromium",
+      "outcome": "resolved",
+      "failure": "MR CPU depth was queried before the real virtual room finished loading.",
+      "correction": "Wait for actual AR room readiness before depth assertions, without substituting sensor/scene data."
+    },
+    {
+      "command": "npm run test:pose-view:firefox",
+      "outcome": "resolved",
+      "failure": "Popup hid the main document and Firefox ignored script window.focus(), correctly suspending its inline callbacks.",
+      "correction": "Activate the actual main/popup window through WebDriver for the realm under test; preserve document visibility and inline suppression."
+    }
+  ],
+  "skips": [
+    "Inline has no input, hand/depth feature or immersive projection binding. Those cases execute in their supported immersive scenarios; inline uses the base-layer path.",
+    "CPU depth is exercised on Quest MR and Android AR, not unsupported Quest VR. Hand tracking is exercised on Quest immersive profiles, not Android or inline.",
+    "Optional dynamic viewport scaling and scale recommendations are unsupported; test conversion, stable fixed-resolution no-op behavior and null recommendations without claiming optional scaling support."
+  ],
+  "unperformedChecks": [
+    {
+      "check": "Standalone pinned WPT runner/full WPT suite",
+      "reason": "Pinned assertions are inspected and explicitly adapted to the real extension harness. The five-file standalone runner is unchanged; no native WPT execution credit is claimed."
+    },
+    {
+      "check": "Generic application-suite rerun",
+      "reason": "Not required by Issue #49; focused base/projection pixel, navigation, tracking and lifetime checks executed."
+    },
+    {
+      "check": "Optional unchanged Three.js r186 teleport at 9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8",
+      "reason": "Not executed; no optional application execution credit claimed."
+    }
+  ],
+  "specificationReconciliation": {
+    "acceptanceChanged": false,
+    "details": "No correction to Issue #49 acceptance was needed. Pinned WPT optional scaling and per-object identity assertions are adapted as documented; native fake-device setup is not available in this extension."
+  },
+  "primaryEvidence": {
+    "baseline": "baf056097b1a366a61927e75666473ce44793ba9",
+    "baselineSourceSHA256": {
+      "src/polyfill/api/geometry.ts": "58fc1063e68725bded2ba5f6a64def13a60e786be8ec428508bd8eece6b2735f",
+      "src/polyfill/api/runtime.ts": "c5e4383061a1f93d155f412c4e37dcfe88d9ccc78c459811cf35d1f5034375db",
+      "src/polyfill/api/layers.ts": "8be2fa2e3019df24fa87c29e6c44ac49ab17f7260772fc731b118b9f0107a1b4",
+      "src/polyfill/api/sensing.ts": "fd5ef371827e8b587f5658554a9a043c590e88430ff2404cc7d7c652ad530cf6",
+      "src/polyfill/api/interface-brand.ts": "0e953851d290c10246ad67ce4aa2419964e7eff4e5d5429a190b85a400f396ff"
+    },
+    "wptRevision": "e1859580b5fcf74940a18d2f783296b4961035e3",
+    "inspectedWPTSourceSHA256": {
+      "xrView_sameObject.https.html": "1ee029a485a89ff53f5af161fb400e3ed87e1f1cba20e8471e38f7062246bf52",
+      "xrFrame_getViewerPose_getPose_identities.https.html": "6b67a90e58b1453bb6451c6b172f11693d6f48231c22bdd78c41da7c0dfb9d02",
+      "xrViewerPose_views_sameObject.https.html": "0cf0c12195fe488a527973839ea52e610e1f784c955fa31f88518e0d6f312cf1",
+      "getViewerPose_emulatedPosition.https.html": "bfe46d75048bbca23e16c06c5b2222e7035810e2252680eda969e95af023d834",
+      "xrFrame_getPose.https.html": "7081fe1cc7015229578f0df42c1a16082d944c74941994a5a72be08e8be58bba",
+      "xr_viewport_scale.https.html": "2b3dce98f1da897b1de17178757949791b60125f70cfdd891d2f3c46aa098bb7",
+      "xrPose_transform_sameObject.https.html": "3c1bba8a7c7ee0f783f03eb7566cc487ae9f54fd65f3fc599e042a95b709b8aa",
+      "xrWebGLLayer_viewports.https.html": "c97867d529a6ef58b9cb00ac9a56dc1d456c9e91c05b008e60332d5f40825aae",
+      "xrFrame_lifetime.https.html": "5ed970e5e1a01ed1bce7361ae1390074c8d87070bfddeddfbd25a5d62d62c77f"
+    },
+    "webIDLRevision": "622910c67c724e362f71e8255a0380bade261acb",
+    "webIDLSourceSHA256": "8db18145ddf051a30d6cad35fde25537fad8c9b0ee2f993e341091cd51c31013"
+  },
+  "requiredPostMergeVerification": [],
+  "totals": {
+    "poseViewScenarios": 10,
+    "poseViewAssertions": 63294,
+    "versionedCaptures": 58,
+    "relatedRegressionScenarios": 20
+  },
+  "sourceAndDocumentationSHA256": {
+    "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+    "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
+    "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
+    "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+    "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+    "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+    "src/polyfill/EmulatedXRDevice.ts": "07eafcee7e90a8fe80e80f03241f9d769e0b0a80b6dbeef796fb1a9ac098d3b6",
+    "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+    "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
+    "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
+    "docs/webxr-pose-view.md": "a097dfaf67f8f70febe7bf3a9e1f5cf521dce89d7b58a72d4cdad5b4460e058b",
+    "docs/webxr-conformance.md": "19ae01ca12b3ad44d0ec105670b4d328cffb2c2abd155355593ed4e7d5705914",
+    "package.json": "ae5920aba9698fed3c8fdda94c057be90383e864add44f76390b4a807f751d3e",
+    "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+    "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
+    "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+  }
+}

@@ -1,11 +1,11 @@
 import {XRFramebuffer, convertWebGLLayerOptions} from '../xr-framebuffer';
 import {compositorOperation} from '../opaque-framebuffer';
 import {mat4} from 'gl-matrix';
-import {XRSpace, XRRigidTransform, transformMatrix, transformObjects, XRView, XRViewport, sessionObjects, frameObjects, compatibleContexts, invalidState, unsupported} from './geometry';
+import {XRSpace, XRRigidTransform, transformMatrix, transformObjects, XRView, XRViewport, viewState, projectionData, geometryAllocation, enumerableMembers, sessionObjects, frameObjects, compatibleContexts, invalidState, unsupported} from './geometry';
 import type {XRSession, XRFrame} from './runtime';
 import type {BaseLayer} from '../../types/polyfill';
 import type {XRLightProbe} from './sensing';
-import {layerBrands} from './interface-brand';
+import {interfaceBrands, layerBrands} from './interface-brand';
 
 function convertNullableFloat(value: unknown) {
   if (value === null || value === undefined) return;
@@ -29,6 +29,22 @@ export class XRWebGLLayer extends XRLayer implements BaseLayer {
     const storage = _session._mode === 'inline' ? null : new XRFramebuffer(context, _session._device.getRecommendedFramebufferSize(_session._id), options, !_session._device.handheld);
     const layer = Reflect.construct(layerBrands.WebGLLayerAllocation, [_session, context, storage], new.target) as unknown as XRWebGLLayer;
     if (storage) webglStorage.set(layer, storage);
+    const viewports = new Map<string, {viewport: XRViewport; frame: XRFrame}>();
+    interfaceBrands.layerViewports.set(layer, view => {
+      const {eye, frame} = viewState(view);
+      const cached = viewports.get(eye);
+      // The first query locks a view's viewport for the entire frame, including
+      // fresh view snapshots and inline canvas resizes during that callback.
+      if (cached?.frame === frame) return cached.viewport;
+      const target = {x: 0, y: 0, width: 0, height: 0};
+      _session._device.getViewport(_session._id, eye, layer, target);
+      let viewport = cached?.viewport;
+      if (!viewport || (['x', 'y', 'width', 'height'] as const).some(key => viewport![key] !== target[key])) {
+        viewport = new XRViewport(target.x, target.y, target.width, target.height, geometryAllocation);
+      }
+      viewports.set(eye, {viewport, frame});
+      return viewport;
+    });
     return layer;
   }
   declare private readonly lost: () => void;
@@ -54,14 +70,18 @@ export class XRWebGLLayer extends XRLayer implements BaseLayer {
     this.context.canvas.removeEventListener('webglcontextlost', this.lost);
   }
   getViewport(view: XRView) {
-    if (!(view instanceof XRView)) throw new TypeError('Expected XRView.');
-    view._frame._assertActive(true); if (view._frame.session !== this._session) invalidState('View belongs to a different session.');
-    const target = {x: 0, y: 0, width: 0, height: 0}; this._session._device.getViewport(this._session._id, view.eye, this, target);
-    return new XRViewport(target.x, target.y, target.width, target.height);
+    const allocate = interfaceBrands.layerViewports.get(this);
+    if (!allocate) throw new TypeError('Expected XRWebGLLayer.');
+    if (arguments.length < 1) throw new TypeError('Expected XRView.');
+    const {frame} = viewState(view);
+    frame._assertActive(true);
+    if (frame.session !== this._session || this._session._currentAnimationFrame !== frame) invalidState('View does not belong to the current animation frame of this session.');
+    return allocate(view);
   }
   static getNativeFramebufferScaleFactor(session: XRSession) { if (!sessionObjects.has(session)) throw new TypeError('Expected XRSession.'); return session.ended ? 0 : 1; }
 }
 
+enumerableMembers(XRWebGLLayer.prototype, ['getViewport']);
 
 type GL = WebGL2RenderingContext;
 export interface LayerInit {
@@ -185,6 +205,7 @@ export class XRWebGLBinding {
   constructor(readonly _session: XRSession, readonly _context: WebGLRenderingContext | GL) {
     if (!sessionObjects.has(_session)) throw new TypeError('Expected XRSession.');
     _session._assertLive(); if (_session._mode === 'inline') invalidState('XRWebGLBinding requires an immersive session.');
+    interfaceBrands.bindingSubImages.set(this, this.allocateViewSubImage.bind(this));
     this._presentation = new XRWebGLLayer(_session, _context, {antialias: false});
     _session.addEventListener('end', () => {
       for (const layer of this.layers) layer.destroy();
@@ -231,6 +252,7 @@ export class XRWebGLBinding {
   createCubeLayer(): never { return unsupported('Cube layers are not implemented.'); }
   private check(layer: XRCompositionLayer, frame: XRFrame) {
     this.assert(); frame._assertActive(true);
+    if (this._session._currentAnimationFrame !== frame) invalidState('Frame is not current for this session.');
     if (layer._binding._session !== this._session || layer._binding._context !== this._context || frame.session !== this._session || layer._destroyed) invalidState('Layer/frame is not usable with this binding.');
     if (!this._session.renderState.layers?.includes(layer)) invalidState('Layer is not in the active render state.');
     this.allocate(layer);
@@ -250,10 +272,17 @@ export class XRWebGLBinding {
     layer._allocate(width, height);
   }
   getViewSubImage(layer: XRProjectionLayer, view: XRView) {
-    if (!(layer instanceof XRProjectionLayer) || !(view instanceof XRView)) throw new TypeError('Expected projection layer and XRView.');
+    const allocate = interfaceBrands.bindingSubImages.get(this);
+    if (!allocate) throw new TypeError('Expected XRWebGLBinding.');
+    if (arguments.length < 2) throw new TypeError('Expected projection layer and view.');
+    if (!layerBrands.projection.has(layer)) throw new TypeError('Expected projection layer.');
+    viewState(view);
+    return allocate(layer, view);
+  }
+  private allocateViewSubImage(layer: XRProjectionLayer, view: XRView) {
     this.check(layer, view._frame);
     const stereo = view.eye !== 'none'; const half = Math.floor(layer._width / 2);
-    const viewport = new XRViewport(view.eye === 'right' ? half : 0, 0, stereo ? (view.eye === 'right' ? layer._width - half : half) : layer._width, layer._height);
+    const viewport = new XRViewport(view.eye === 'right' ? half : 0, 0, stereo ? (view.eye === 'right' ? layer._width - half : half) : layer._width, layer._height, geometryAllocation);
     layer._needsRedraw = false;
     return new XRWebGLSubImage(viewport, layer._color, layer._depth, layer._width, layer._height);
   }
@@ -262,7 +291,7 @@ export class XRWebGLBinding {
     if (!['none', 'left', 'right'].includes(eye)) throw new TypeError('Invalid XREye.'); this.check(layer, frame);
     // Unlike projection access, composition access clears the flag in a task.
     setTimeout(() => { layer._needsRedraw = false; }, 0);
-    return new XRWebGLSubImage(new XRViewport(0, 0, layer._width, layer._height), layer._color, layer._depth, layer._width, layer._height);
+    return new XRWebGLSubImage(new XRViewport(0, 0, layer._width, layer._height, geometryAllocation), layer._color, layer._depth, layer._width, layer._height);
   }
   getDepthInformation(view: XRView): never { this.assert(); view._frame._assertActive(true); return unsupported('GPU depth is not supported; request cpu-optimized depth.'); }
   getReflectionCubeMap(probe: XRLightProbe) { this.assert(); if (probe._session !== this._session) invalidState('Probe belongs to a different session.'); return null; }
@@ -316,7 +345,7 @@ export class XRWebGLBinding {
               matrix = mat4.multiply(matrix, world, transformMatrix(layer.transform));
               mat4.scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
               mat4.multiply(matrix, mat4.invert(mat4.create(), view._worldMatrix)!, matrix);
-              mat4.multiply(matrix, view.projectionMatrix, matrix);
+              mat4.multiply(matrix, projectionData(view), matrix);
             }
             gl.uniform2f(gl.getUniformLocation(this.program!, 'alphaOptions'), layer.opacity, layer.blendTextureSourceAlpha ? 1 : 0);
             gl.uniformMatrix4fv(gl.getUniformLocation(this.program!, 'matrix'), false, matrix as Float32Array);

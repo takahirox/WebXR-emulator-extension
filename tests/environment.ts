@@ -6,7 +6,7 @@ import {EnvironmentTracker} from '../src/polyfill/api/environment';
 import type {XRSession} from '../src/polyfill/api/runtime';
 import type {XRFrame} from '../src/polyfill/api/runtime';
 import {XRCPUDepthInformation} from '../src/polyfill/api/sensing';
-import {XRView, XRRigidTransform} from '../src/polyfill/api/geometry';
+import {XRView, XRRigidTransform, geometryAllocation} from '../src/polyfill/api/geometry';
 
 // Node lacks the browser's immutable geometry point. Browser conformance tests
 // exercise the real DOMPointReadOnly and public XRFrame interfaces as well.
@@ -92,8 +92,11 @@ test('depth formats encode a known plane in meters, quantize and never wrap', ()
       getHitTestResults: (_origin: unknown, direction: vec3) => [{distance: distance / -direction[2]}],
     }}}, _assertActive() {}} as unknown as XRFrame;
     const projection = mat4.perspective(mat4.create(), Math.PI / 2, 1, 0.1, 1000);
-    const view = new XRView(frame, 'none', new XRRigidTransform(), new Float32Array(projection), mat4.create());
+    const view = new XRView(frame, 'none', new XRRigidTransform(), new Float32Array(projection), mat4.create(), 0, geometryAllocation);
+    const exported = view.projectionMatrix;
+    exported.fill(99); structuredClone(exported.buffer, {transfer: [exported.buffer]});
     let info = new XRCPUDepthInformation(frame, view);
+    assert.deepEqual(Array.from(info.projectionMatrix), Array.from(projection));
     const floating = format === 'float32';
     const samples = floating ? new Float32Array(info.data) : new Uint16Array(info.data);
     const expected = floating ? 2.3456 : 2346;

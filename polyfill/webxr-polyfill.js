@@ -1007,7 +1007,7 @@ function WebXRPolyfillInjection() {
 
   function createLayerAllocations(sessions) {
       const webgl = new WeakSet(), projection = new WeakSet();
-      const gl1Attributes = WebGLRenderingContext.prototype.getContextAttributes;
+      const gl1Attributes = typeof WebGLRenderingContext === 'undefined' ? null : WebGLRenderingContext.prototype.getContextAttributes;
       const gl2Attributes = typeof WebGL2RenderingContext === 'undefined' ? null : WebGL2RenderingContext.prototype.getContextAttributes;
       class WebGLLayerAllocation extends EventTarget {
           constructor(_session, context, storage) {
@@ -1018,6 +1018,8 @@ function WebXRPolyfillInjection() {
               if (!sessions.has(_session))
                   throw new TypeError('Expected XRSession.');
               try {
+                  if (!gl1Attributes)
+                      throw new TypeError('Expected WebGL context.');
                   gl1Attributes.call(context);
               }
               catch (_a) {
@@ -1109,6 +1111,18 @@ function WebXRPolyfillInjection() {
           transforms: new WeakMap(),
           referenceOffsets: new WeakMap(),
           referenceSpaceRequests: new WeakMap(),
+          frameValues: new WeakMap(),
+          viewerPoses: new WeakMap(),
+          poses: new WeakMap(),
+          viewerViews: new WeakMap(),
+          views: new WeakMap(),
+          viewGeometry: new WeakMap(),
+          depthGeometry: new WeakSet(),
+          spaceRelations: new WeakMap(),
+          trackingOrigins: new WeakMap(),
+          bindingSubImages: new WeakMap(),
+          viewports: new WeakMap(),
+          layerViewports: new WeakMap(),
           eventSessions: new WeakMap(),
           eventInputs: new WeakMap(),
           eventChanges: new WeakMap(),
@@ -1224,12 +1238,23 @@ function WebXRPolyfillInjection() {
   for (const name of ['position', 'orientation', 'matrix', 'inverse']) {
       Object.defineProperty(XRRigidTransform.prototype, name, { ...Object.getOwnPropertyDescriptor(XRRigidTransform.prototype, name), enumerable: true });
   }
+  function initializeSpaceRelation(space, origin, offset) {
+      let tracking = interfaceBrands.trackingOrigins.get(origin);
+      if (!tracking) {
+          tracking = { emulatedPosition: false };
+          interfaceBrands.trackingOrigins.set(origin, tracking);
+      }
+      interfaceBrands.spaceRelations.set(space, { origin, offset, tracking });
+  }
   class XRSpace extends interfaceBrands.SpaceObject {
+      get _emulatedPosition() { return interfaceBrands.spaceRelations.get(this).tracking.emulatedPosition; }
+      set _emulatedPosition(value) { interfaceBrands.spaceRelations.get(this).tracking.emulatedPosition = value; }
       constructor(_session, matrixProvider, joint = false) {
           super(joint);
           this._session = _session;
           this.matrixProvider = matrixProvider;
           this._baseMatrix = null;
+          initializeSpaceRelation(this, matrixProvider, create$3());
       }
       get _inverseBaseMatrix() { return this._baseMatrix && invert(create$3(), this._baseMatrix); }
       _update() { this._baseMatrix = this.matrixProvider(); return this._baseMatrix; }
@@ -1246,6 +1271,7 @@ function WebXRPolyfillInjection() {
           this.nativeMatrix = nativeMatrix;
           this.offset = offset;
           this.onreset = null;
+          initializeSpaceRelation(this, nativeMatrix, offset);
           const allocate = this.createOffsetSpace.bind(this);
           interfaceBrands.referenceOffsets.set(this, transform => allocate(multiply(create$3(), offset, transform)));
       }
@@ -1278,45 +1304,127 @@ function WebXRPolyfillInjection() {
           return new XRBoundedReferenceSpace(this._session, this.nativeMatrix, this.nativeBounds, offset);
       }
   }
+  const geometryAllocation = Symbol('geometry allocation');
+  function requireGeometryAllocation(token) {
+      if (token !== geometryAllocation)
+          throw new TypeError('Illegal constructor.');
+  }
+  function poseState(value) {
+      const state = interfaceBrands.poses.get(value);
+      if (!state)
+          throw new TypeError('Expected XRPose.');
+      return state;
+  }
+  function relativePose(space, base) {
+      const source = interfaceBrands.spaceRelations.get(space), target = interfaceBrands.spaceRelations.get(base);
+      if (source.origin === target.origin)
+          return {
+              matrix: multiply(create$3(), invert(create$3(), target.offset), source.offset), emulated: false,
+          };
+      const world = space._update(), baseWorld = base._update();
+      return world && baseWorld ? {
+          matrix: multiply(create$3(), invert(create$3(), baseWorld), world),
+          emulated: source.tracking.emulatedPosition || target.tracking.emulatedPosition,
+      } : null;
+  }
   class XRPose {
-      constructor(transform) {
-          this.transform = transform;
-          this.emulatedPosition = true;
-          this.linearVelocity = null;
-          this.angularVelocity = null;
+      constructor(transform, emulatedPosition, token) {
+          requireGeometryAllocation(token);
+          interfaceBrands.poses.set(this, { transform, emulatedPosition });
       }
+      get transform() { return poseState(this).transform; }
+      get emulatedPosition() { return poseState(this).emulatedPosition; }
+      get linearVelocity() { poseState(this); return null; }
+      get angularVelocity() { poseState(this); return null; }
   }
   class XRViewerPose extends XRPose {
-      constructor(transform, views) {
-          super(transform);
-          this.views = views;
+      constructor(transform, views, emulatedPosition, token) {
+          super(transform, emulatedPosition, token);
+          interfaceBrands.viewerViews.set(this, Object.freeze([...views]));
       }
+      get views() {
+          const views = interfaceBrands.viewerViews.get(this);
+          if (!views)
+              throw new TypeError('Expected XRViewerPose.');
+          return views;
+      }
+  }
+  function viewportState(value) {
+      const state = interfaceBrands.viewports.get(value);
+      if (!state)
+          throw new TypeError('Expected XRViewport.');
+      return state;
   }
   class XRViewport {
-      constructor(x, y, width, height) {
-          this.x = x;
-          this.y = y;
-          this.width = width;
-          this.height = height;
+      constructor(x, y, width, height, token) {
+          requireGeometryAllocation(token);
+          interfaceBrands.viewports.set(this, { x, y, width, height });
+      }
+      get x() { return viewportState(this).x; }
+      get y() { return viewportState(this).y; }
+      get width() { return viewportState(this).width; }
+      get height() { return viewportState(this).height; }
+  }
+  function initializeViewGeometry(value, transform, projection) {
+      const geometry = Array.from(projection);
+      let array;
+      interfaceBrands.viewGeometry.set(value, { transform, projection: geometry, array: () => {
+              if (!array || array.buffer.byteLength === 0)
+                  array = new Float32Array(geometry);
+              return array;
+          } });
+  }
+  function installViewGeometry(prototype, has) {
+      for (const name of ['transform', 'projectionMatrix']) {
+          Object.defineProperty(prototype, name, { enumerable: true, configurable: true, get() {
+                  if (!has(this))
+                      throw new TypeError('Expected a view geometry receiver.');
+                  const state = interfaceBrands.viewGeometry.get(this);
+                  return name === 'transform' ? state.transform : state.array();
+              } });
       }
   }
-  class XRViewGeometry {
-      constructor(transform, projectionMatrix) {
-          this.transform = transform;
-          this.projectionMatrix = projectionMatrix;
+  const projectionData = (value) => {
+      const state = interfaceBrands.viewGeometry.get(value);
+      if (!state)
+          throw new TypeError('Expected view geometry.');
+      return state.projection;
+  };
+  function viewState(value) {
+      const state = interfaceBrands.views.get(value);
+      if (!state)
+          throw new TypeError('Expected XRView.');
+      return state;
+  }
+  class XRView {
+      constructor(frame, eye, transform, projection, world, index, token) {
+          requireGeometryAllocation(token);
+          interfaceBrands.views.set(this, { frame, eye, index, world });
+          initializeViewGeometry(this, transform, projection);
+      }
+      get eye() { return viewState(this).eye; }
+      get index() { return viewState(this).index; }
+      get recommendedViewportScale() { viewState(this); return null; }
+      get isFirstPersonObserver() { viewState(this); return false; }
+      get _frame() { return viewState(this).frame; }
+      get _worldMatrix() { return viewState(this).world; }
+      requestViewportScale(scale) {
+          viewState(this);
+          if (arguments.length < 1)
+              throw new TypeError('Expected scale.');
+          if (scale != null && !Number.isFinite(+scale))
+              throw new TypeError('Expected a finite double.');
       }
   }
-  class XRView extends XRViewGeometry {
-      constructor(_frame, eye, transform, projectionMatrix, _worldMatrix) {
-          super(transform, projectionMatrix);
-          this._frame = _frame;
-          this.eye = eye;
-          this._worldMatrix = _worldMatrix;
-          this.recommendedViewportScale = null;
-          this.isFirstPersonObserver = false;
-      }
-      requestViewportScale(_scale) { }
+  installViewGeometry(XRView.prototype, value => interfaceBrands.views.has(value));
+  function enumerableMembers(prototype, names) {
+      for (const name of names)
+          Object.defineProperty(prototype, name, { ...Object.getOwnPropertyDescriptor(prototype, name), enumerable: true });
   }
+  enumerableMembers(XRPose.prototype, ['transform', 'emulatedPosition', 'linearVelocity', 'angularVelocity']);
+  enumerableMembers(XRViewerPose.prototype, ['views']);
+  enumerableMembers(XRViewport.prototype, ['x', 'y', 'width', 'height']);
+  enumerableMembers(XRView.prototype, ['eye', 'index', 'recommendedViewportScale', 'isFirstPersonObserver', 'requestViewportScale']);
 
   var geometry = /*#__PURE__*/Object.freeze({
     __proto__: null,
@@ -1326,17 +1434,24 @@ function WebXRPolyfillInjection() {
     XRRigidTransform: XRRigidTransform,
     XRSpace: XRSpace,
     XRView: XRView,
-    XRViewGeometry: XRViewGeometry,
     XRViewerPose: XRViewerPose,
     XRViewport: XRViewport,
     compatibleContexts: compatibleContexts,
+    enumerableMembers: enumerableMembers,
     frameObjects: frameObjects,
+    geometryAllocation: geometryAllocation,
+    initializeViewGeometry: initializeViewGeometry,
+    installViewGeometry: installViewGeometry,
     invalidState: invalidState,
+    projectionData: projectionData,
+    relativePose: relativePose,
+    requireGeometryAllocation: requireGeometryAllocation,
     sessionObjects: sessionObjects,
     spaceObjects: spaceObjects,
     transformMatrix: transformMatrix,
     transformObjects: transformObjects,
-    unsupported: unsupported
+    unsupported: unsupported,
+    viewState: viewState
   });
 
   function installWebGLCompatibility() {
@@ -1654,6 +1769,21 @@ function WebXRPolyfillInjection() {
           const layer = Reflect.construct(layerBrands.WebGLLayerAllocation, [_session, context, storage], new.target);
           if (storage)
               webglStorage.set(layer, storage);
+          const viewports = new Map();
+          interfaceBrands.layerViewports.set(layer, view => {
+              const { eye, frame } = viewState(view);
+              const cached = viewports.get(eye);
+              if ((cached === null || cached === void 0 ? void 0 : cached.frame) === frame)
+                  return cached.viewport;
+              const target = { x: 0, y: 0, width: 0, height: 0 };
+              _session._device.getViewport(_session._id, eye, layer, target);
+              let viewport = cached === null || cached === void 0 ? void 0 : cached.viewport;
+              if (!viewport || ['x', 'y', 'width', 'height'].some(key => viewport[key] !== target[key])) {
+                  viewport = new XRViewport(target.x, target.y, target.width, target.height, geometryAllocation);
+              }
+              viewports.set(eye, { viewport, frame });
+              return viewport;
+          });
           return layer;
       }
       get antialias() { var _a, _b, _c, _d; return (_d = (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.antialias) !== null && _b !== void 0 ? _b : (_c = this.context.getContextAttributes()) === null || _c === void 0 ? void 0 : _c.antialias) !== null && _d !== void 0 ? _d : false; }
@@ -1683,18 +1813,21 @@ function WebXRPolyfillInjection() {
           this.context.canvas.removeEventListener('webglcontextlost', this.lost);
       }
       getViewport(view) {
-          if (!(view instanceof XRView))
+          const allocate = interfaceBrands.layerViewports.get(this);
+          if (!allocate)
+              throw new TypeError('Expected XRWebGLLayer.');
+          if (arguments.length < 1)
               throw new TypeError('Expected XRView.');
-          view._frame._assertActive(true);
-          if (view._frame.session !== this._session)
-              invalidState('View belongs to a different session.');
-          const target = { x: 0, y: 0, width: 0, height: 0 };
-          this._session._device.getViewport(this._session._id, view.eye, this, target);
-          return new XRViewport(target.x, target.y, target.width, target.height);
+          const { frame } = viewState(view);
+          frame._assertActive(true);
+          if (frame.session !== this._session || this._session._currentAnimationFrame !== frame)
+              invalidState('View does not belong to the current animation frame of this session.');
+          return allocate(view);
       }
       static getNativeFramebufferScaleFactor(session) { if (!sessionObjects.has(session))
           throw new TypeError('Expected XRSession.'); return session.ended ? 0 : 1; }
   };
+  enumerableMembers(XRWebGLLayer$1.prototype, ['getViewport']);
   function validateLayerSpace(session, space) {
       if (!(space instanceof XRSpace) || space._session !== session)
           throw new TypeError('Layer space must belong to the same session.');
@@ -1812,6 +1945,7 @@ function WebXRPolyfillInjection() {
           _session._assertLive();
           if (_session._mode === 'inline')
               invalidState('XRWebGLBinding requires an immersive session.');
+          interfaceBrands.bindingSubImages.set(this, this.allocateViewSubImage.bind(this));
           this._presentation = new XRWebGLLayer$1(_session, _context, { antialias: false });
           _session.addEventListener('end', () => {
               for (const layer of this.layers)
@@ -1889,6 +2023,8 @@ function WebXRPolyfillInjection() {
           var _a;
           this.assert();
           frame._assertActive(true);
+          if (this._session._currentAnimationFrame !== frame)
+              invalidState('Frame is not current for this session.');
           if (layer._binding._session !== this._session || layer._binding._context !== this._context || frame.session !== this._session || layer._destroyed)
               invalidState('Layer/frame is not usable with this binding.');
           if (!((_a = this._session.renderState.layers) === null || _a === void 0 ? void 0 : _a.includes(layer)))
@@ -1913,12 +2049,21 @@ function WebXRPolyfillInjection() {
           layer._allocate(width, height);
       }
       getViewSubImage(layer, view) {
-          if (!(layer instanceof XRProjectionLayer) || !(view instanceof XRView))
-              throw new TypeError('Expected projection layer and XRView.');
+          const allocate = interfaceBrands.bindingSubImages.get(this);
+          if (!allocate)
+              throw new TypeError('Expected XRWebGLBinding.');
+          if (arguments.length < 2)
+              throw new TypeError('Expected projection layer and view.');
+          if (!layerBrands.projection.has(layer))
+              throw new TypeError('Expected projection layer.');
+          viewState(view);
+          return allocate(layer, view);
+      }
+      allocateViewSubImage(layer, view) {
           this.check(layer, view._frame);
           const stereo = view.eye !== 'none';
           const half = Math.floor(layer._width / 2);
-          const viewport = new XRViewport(view.eye === 'right' ? half : 0, 0, stereo ? (view.eye === 'right' ? layer._width - half : half) : layer._width, layer._height);
+          const viewport = new XRViewport(view.eye === 'right' ? half : 0, 0, stereo ? (view.eye === 'right' ? layer._width - half : half) : layer._width, layer._height, geometryAllocation);
           layer._needsRedraw = false;
           return new XRWebGLSubImage(viewport, layer._color, layer._depth, layer._width, layer._height);
       }
@@ -1929,7 +2074,7 @@ function WebXRPolyfillInjection() {
               throw new TypeError('Invalid XREye.');
           this.check(layer, frame);
           setTimeout(() => { layer._needsRedraw = false; }, 0);
-          return new XRWebGLSubImage(new XRViewport(0, 0, layer._width, layer._height), layer._color, layer._depth, layer._width, layer._height);
+          return new XRWebGLSubImage(new XRViewport(0, 0, layer._width, layer._height, geometryAllocation), layer._color, layer._depth, layer._width, layer._height);
       }
       getDepthInformation(view) { this.assert(); view._frame._assertActive(true); return unsupported('GPU depth is not supported; request cpu-optimized depth.'); }
       getReflectionCubeMap(probe) { this.assert(); if (probe._session !== this._session)
@@ -2011,7 +2156,7 @@ function WebXRPolyfillInjection() {
                               matrix = multiply(matrix, world, transformMatrix(layer.transform));
                               scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
                               multiply(matrix, invert(create$3(), view._worldMatrix), matrix);
-                              multiply(matrix, view.projectionMatrix, matrix);
+                              multiply(matrix, projectionData(view), matrix);
                           }
                           gl.uniform2f(gl.getUniformLocation(this.program, 'alphaOptions'), layer.opacity, layer.blendTextureSourceAlpha ? 1 : 0);
                           gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'matrix'), false, matrix);
@@ -2152,8 +2297,8 @@ function WebXRPolyfillInjection() {
       }
   }
   class XRJointPose extends XRPose {
-      constructor(transform, radius) {
-          super(transform);
+      constructor(transform, radius, emulatedPosition, token) {
+          super(transform, emulatedPosition, token);
           this.radius = radius;
       }
   }
@@ -2211,23 +2356,25 @@ function WebXRPolyfillInjection() {
           this.sphericalHarmonicsCoefficients = new Float32Array(basis.flatMap(value => [value * light, value * light, value * light]));
       }
   }
-  class XRDepthInformation extends XRViewGeometry {
+  class XRDepthInformation {
       constructor(_frame, view) {
-          super(view.transform, view.projectionMatrix);
           this._frame = _frame;
           this.view = view;
           this.width = 32;
           this.height = 32;
           this.normDepthBufferFromNormView = new XRRigidTransform();
+          interfaceBrands.depthGeometry.add(this);
+          initializeViewGeometry(this, view.transform, projectionData(view));
           this.rawValueToMeters = _frame.session.depthDataFormat === 'float32' ? 1 : 0.001;
       }
   }
+  installViewGeometry(XRDepthInformation.prototype, value => interfaceBrands.depthGeometry.has(value));
   class XRCPUDepthInformation extends XRDepthInformation {
       constructor(frame, view) {
           super(frame, view);
           this.samples = this.rawValueToMeters === 1 ? new Float32Array(this.width * this.height) : new Uint16Array(this.width * this.height);
           const origin = getTranslation(create$2(), view._worldMatrix);
-          const inverseProjection = invert(create$3(), view.projectionMatrix);
+          const inverseProjection = invert(create$3(), projectionData(view));
           const local = create$2();
           const world = create$2();
           for (let y = 0; y < this.height; y++)
@@ -26431,7 +26578,7 @@ void main() {
               this._device.computeHitTests(this._id);
               if (this.enabledFeatures.some(feature => feature === 'plane-detection' || feature === 'mesh-detection'))
                   this._environment.update(time);
-              const frame = new XRFrame(this, time, true);
+              const frame = new XRFrame(this, time, true, geometryAllocation);
               const layers = this.renderState.layers;
               if (layers === null || layers === void 0 ? void 0 : layers.length)
                   layers[0]._binding._prepare(layers);
@@ -26479,7 +26626,9 @@ void main() {
           this.features = Object.freeze([...enabled]);
           this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
           this.activeRenderState = new XRRenderState({ inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null });
-          this._viewer = new XRReferenceSpace(this, 'viewer', () => clone$1(_device.getBasePoseMatrix()));
+          const viewerMatrix = () => clone$1(_device.getBasePoseMatrix());
+          this._viewer = new XRReferenceSpace(this, 'viewer', viewerMatrix);
+          interfaceBrands.viewerPoses.set(this, (frame, reference) => allocateViewerPose(frame, reference));
           interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
               let settled = false;
               let task;
@@ -26514,7 +26663,7 @@ void main() {
                   void ready.then(inverse => {
                       queue(() => {
                           if (type === 'viewer') {
-                              resolve(new XRReferenceSpace(this, type, () => clone$1(_device.getBasePoseMatrix())));
+                              resolve(new XRReferenceSpace(this, type, viewerMatrix));
                           }
                           else {
                               const world = invert(create$3(), inverse);
@@ -26575,6 +26724,7 @@ void main() {
       }
       get environmentBlendMode() { return this._mode === 'immersive-ar' ? 'alpha-blend' : 'opaque'; }
       get domOverlayState() { return this.overlayState; }
+      get _currentAnimationFrame() { return this.animationFrame; }
       _assertLive() { if (this.ended)
           invalidState('The session has ended.'); }
       _require(feature) { this._assertLive(); if (!this.enabledFeatures.includes(feature))
@@ -26714,7 +26864,7 @@ void main() {
           return source;
       }
       emitInput(type, inputSource, time) {
-          const frame = new XRFrame(this, time, false);
+          const frame = new XRFrame(this, time, false, geometryAllocation);
           frame._active = true;
           try {
               this._emit(new XRInputSourceEvent(type, { frame, inputSource }));
@@ -26725,14 +26875,15 @@ void main() {
       }
   }
   class XRFrame extends interfaceBrands.FrameObject {
-      constructor(session, predictedDisplayTime, _animation) {
+      constructor(session, predictedDisplayTime, _animation, token) {
+          requireGeometryAllocation(token);
           super();
-          this.session = session;
-          this.predictedDisplayTime = predictedDisplayTime;
           this._animation = _animation;
           this._active = false;
           this.hitResults = new Map();
           this.transientResults = new Map();
+          interfaceBrands.frameValues.set(this, { session, predictedDisplayTime,
+              pose: (matrix, emulated) => new XRPose(XRRigidTransform._fromMatrix(matrix), emulated, geometryAllocation) });
           this.anchorSnapshot = new XRAnchorSet(session._anchors);
           this.environmentSnapshot = session._environment.snapshot();
           if (_animation) {
@@ -26751,27 +26902,27 @@ void main() {
           this.session._owns(space);
           return space._update();
       }
+      get session() { return frameState(this).session; }
+      get predictedDisplayTime() { return frameState(this).predictedDisplayTime; }
       getPose(space, baseSpace) {
+          const state = frameState(this);
+          if (arguments.length < 2)
+              throw new TypeError('Expected space and baseSpace.');
+          interfaceValue(space, spaceObjects, 'XRSpace');
+          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
           this._assertActive();
-          const world = this._world(space);
-          const base = this._world(baseSpace);
-          return world && base ? new XRPose(XRRigidTransform._fromMatrix(multiply(create$3(), invert(create$3(), base), world))) : null;
+          state.session._owns(space);
+          state.session._owns(baseSpace);
+          const relative = relativePose(space, baseSpace);
+          return relative ? state.pose(relative.matrix, relative.emulated) : null;
       }
       getViewerPose(referenceSpace) {
-          this._assertActive(true);
-          if (!(referenceSpace instanceof XRReferenceSpace))
+          const state = frameState(this);
+          if (arguments.length < 1 || !interfaceBrands.referenceOffsets.has(referenceSpace))
               throw new TypeError('Expected XRReferenceSpace.');
-          const pose = this.getPose(this.session._viewer, referenceSpace);
-          if (!pose)
-              return null;
-          const device = this.session._device;
-          const eyes = this.session._mode === 'inline' || device.handheld ? ['none'] : ['left', 'right'];
-          const inverse = invert(create$3(), this._world(referenceSpace));
-          const views = eyes.map(eye => {
-              const world = invert(create$3(), device.getBaseViewMatrix(eye));
-              return new XRView(this, eye, XRRigidTransform._fromMatrix(multiply(create$3(), inverse, world)), new Float32Array(device.getProjectionMatrix(eye)), world);
-          });
-          return new XRViewerPose(pose.transform, Object.freeze(views));
+          this._assertActive(true);
+          state.session._owns(referenceSpace);
+          return interfaceBrands.viewerPoses.get(state.session)(this, referenceSpace);
       }
       get detectedPlanes() { this._assertActive(); return this.environmentSnapshot.planes; }
       get detectedMeshes() { this._assertActive(); return this.environmentSnapshot.meshes; }
@@ -26802,7 +26953,7 @@ void main() {
           if (!(joint instanceof XRJointSpace))
               throw new TypeError('Expected XRJointSpace.');
           const pose = this.getPose(joint, baseSpace);
-          return pose ? new XRJointPose(pose.transform, joint._radius) : null;
+          return pose ? new XRJointPose(pose.transform, joint._radius, pose.emulatedPosition, geometryAllocation) : null;
       }
       fillJointRadii(joints, radii) {
           interfaceValue(this, frameObjects, 'XRFrame');
@@ -26860,9 +27011,7 @@ void main() {
           var _a;
           this._assertActive(true);
           this.session._require('depth-sensing');
-          if (!(view instanceof XRView))
-              throw new TypeError('Expected XRView.');
-          if (view._frame !== this)
+          if (viewState(view).frame !== this)
               invalidState('View belongs to a different frame.');
           if (!this.session.depthActive || !((_a = this.session._device.arScene) === null || _a === void 0 ? void 0 : _a.room))
               return null;
@@ -26873,6 +27022,31 @@ void main() {
       getHitTestResultsForTransientInput(source) { this._assertActive(); if (!this.transientResults.has(source))
           invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source).slice(); }
   }
+  function frameState(value) {
+      const state = interfaceBrands.frameValues.get(value);
+      if (!state)
+          throw new TypeError('Expected XRFrame.');
+      return state;
+  }
+  function allocateViewerPose(frame, reference) {
+      const session = frameState(frame).session;
+      const relative = relativePose(session._viewer, reference);
+      if (!relative)
+          return null;
+      const viewerWorld = session._viewer._update();
+      if (!viewerWorld)
+          return null;
+      const inverseViewer = invert(create$3(), viewerWorld);
+      const transform = XRRigidTransform._fromMatrix(relative.matrix);
+      const device = session._device;
+      const eyes = session._mode === 'inline' || device.handheld ? ['none'] : ['left', 'right'];
+      const views = eyes.map((eye, index) => {
+          const viewWorld = invert(create$3(), device.getBaseViewMatrix(eye));
+          return new XRView(frame, eye, XRRigidTransform._fromMatrix(multiply(create$3(), relative.matrix, multiply(create$3(), inverseViewer, viewWorld))), device.getProjectionMatrix(eye), viewWorld, index, geometryAllocation);
+      });
+      return new XRViewerPose(transform, views, relative.emulated, geometryAllocation);
+  }
+  enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose']);
   Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
   class XRInputSource extends interfaceBrands.InputSourceObject {
       constructor(session, raw, index) {
@@ -31513,7 +31687,7 @@ void main() {
           const inverse = coordinateSystem._inverseBaseMatrix;
           if (!inverse)
               return null;
-          return new XRPose(XRRigidTransform._fromMatrix(multiply(create$3(), inverse, matrix)));
+          return new XRPose(XRRigidTransform._fromMatrix(multiply(create$3(), inverse, matrix)), false, geometryAllocation);
       }
       onWindowResize() {
       }

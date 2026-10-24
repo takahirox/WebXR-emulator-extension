@@ -6,7 +6,7 @@ import type {XRFramebuffer} from '../xr-framebuffer';
  * attach a brand to a caller-supplied object or register a membership predicate. */
 export function createLayerAllocations(sessions: WeakSet<object>) {
   const webgl = new WeakSet<object>(), projection = new WeakSet<object>();
-  const gl1Attributes = WebGLRenderingContext.prototype.getContextAttributes;
+  const gl1Attributes = typeof WebGLRenderingContext === 'undefined' ? null : WebGLRenderingContext.prototype.getContextAttributes;
   const gl2Attributes = typeof WebGL2RenderingContext === 'undefined' ? null : WebGL2RenderingContext.prototype.getContextAttributes;
   class WebGLLayerAllocation extends EventTarget {
     readonly lost = () => (this as unknown as XRWebGLLayer)._dispose();
@@ -14,7 +14,7 @@ export function createLayerAllocations(sessions: WeakSet<object>) {
       super();
       if (!sessions.has(_session)) throw new TypeError('Expected XRSession.');
       // Native receiver checks also accept contexts from another injected realm.
-      try { gl1Attributes.call(context); }
+      try { if (!gl1Attributes) throw new TypeError('Expected WebGL context.'); gl1Attributes.call(context); }
       catch {
         if (!gl2Attributes) throw new TypeError('Expected WebGL context.');
         gl2Attributes.call(context as WebGL2RenderingContext);
