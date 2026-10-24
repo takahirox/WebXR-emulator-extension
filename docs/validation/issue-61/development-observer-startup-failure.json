@@ -1,0 +1,52 @@
+{
+  "issue": 61,
+  "browser": "chromium",
+  "status": "failed",
+  "startedAt": "2026-10-24T07:42:22.999Z",
+  "command": "npm run test:hand-applications:chromium",
+  "revisions": {
+    "samples": "fb41c3416496974672e2c766a41c6febcba2d07e",
+    "three": "9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8",
+    "wpt": "e1859580b5fcf74940a18d2f783296b4961035e3"
+  },
+  "failures": [
+    "Error: Debugger.evaluateOnCallFrame: Can only perform operation while paused."
+  ],
+  "skips": [],
+  "cycles": [],
+  "instrumentation": [
+    "Unchanged upstream handinput HTML and all Three.js modules served byte-for-byte at the pinned revision. No application/dependency logic changes.",
+    "Existing Three.js devtools observe event and original scene.onBeforeRender; request/frame/joint-pose wrappers preserve receivers, arguments, results and exceptions. Post-render inspection of both original hand joint groups, sphere instance transforms/radii and presentation canvas pixels projected separately in both eyes.",
+    "Genuine unpacked extension and DevTools panel. Panel reset, stereo/Quest VR selection, retained TransformControls movement and real panel trigger clicks. No synthetic XR adapter, clocks, GL or production test API."
+  ],
+  "coverage": "Quest VR immersive-vr only. Unchanged VRButton does not request Quest MR immersive-ar.",
+  "unperformed": [
+    "optional popup borrowing",
+    "additional hand consumer",
+    "physical hardware",
+    "full suites"
+  ],
+  "servedSources": [],
+  "sourceHashes": {
+    "src/polyfill/api/hand-allocation.ts": "799db40e5e92d30cc6208cf2f7883a2d4f81244c63c0f9516813723b6bc831c9",
+    "src/polyfill/api/sensing.ts": "c55de944ef6b553961ff644a37bb2164b5bdb491d14c380ddaa939c8fc182cf1",
+    "src/polyfill/api/runtime.ts": "5d63a5b85d75a6e485df59240a900af015a905187306ab4f422420f67704856c",
+    "src/polyfill/api/interface-brand.ts": "c195ba43e038531e6e9dded807dae375c459b480b6f75955e661eeba011d0326",
+    "src/polyfill/api/geometry.ts": "54167c9ce748026329354f572c1f3c8a645bc70f8a75bb5a2d77dd1ac3c0c462",
+    "src/polyfill/api/bulk-input.ts": "08d92beec8fb5f326a01f640026cb3795e62d3379d8f2bab21081d393997fb20",
+    "src/polyfill/api/session-init.ts": "35c74824e5cc3063ac42f4d54a70f47c71aa77bd60fc85cd62b78513cb2af46b",
+    "src/polyfill/ARScene.ts": "c37ae16c1e80c68f2e7139b8375cdce07c08fde2436511da8b7699a61ab04375",
+    "src/polyfill/EmulatedXRDevice.ts": "13904ecae552755caa263adea2aed370c1f71e4a121ae7340df6415fda22f552",
+    "src/polyfill/CustomWebXRPolyfill.ts": "c4b20e8f6c2f79febe452d706936556c2aa11e544a0e3fd2fb70b0438d27b04b",
+    "tests/hand-applications.ts": "e255f73e8387e56630abc1459b7fddb052019533243fed787396977b530a4090",
+    "tests/tracking-browser.ts": "381e49ea21632f14666b0953545344ece9f2b681367c6c4b6d03f4d9608aab19",
+    "tests/tracking-observation.ts": "69540030de1e98f710f30750172de74b96200d730bcdaeb68db8d7b73103f1cd",
+    "tests/firefox-upstream.ts": "b1a41945ca5d5d1fabf5ebfebcb04be10907df9570f134fbf2d24f0df555a818",
+    "tests/firefox-scenes.js": "375b5b68b93860fba25b79868ae19d315b7788bd60402c7d42855d8e85b595b4",
+    "polyfill/webxr-polyfill.js": "9cca2591b05ebe194ded043204ed4d82fcf93b5d1960f852c1d06e65b8c91e95",
+    "build/firefox/polyfill/webxr-polyfill.js": "9cca2591b05ebe194ded043204ed4d82fcf93b5d1960f852c1d06e65b8c91e95",
+    "package.json": "34d15f0b0b74356a31a58d239ac47cc9aaafa4d1b697ea9acf12f3344e865c8e",
+    "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307"
+  },
+  "completedAt": "2026-10-24T07:42:27.427Z"
+}

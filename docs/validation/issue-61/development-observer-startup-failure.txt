@@ -1,0 +1,21 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:hand-applications:chromium
+> tsx tests/hand-applications.ts chromium
+
+{"status":"failed","browser":"chromium","cycles":0,"failures":["Error: Debugger.evaluateOnCallFrame: Can only perform operation while paused."]}
+/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/tests/cdp-target.ts:25
+    if (message.error) callback.reject(new Error(`${callback.method}: ${message.error.message}`));
+                                       ^
+
+Error: Debugger.evaluateOnCallFrame: Can only perform operation while paused.
+    at CDPSession2.receive (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/tests/cdp-target.ts:25:40)
+    at CDPSession2._callHandler (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/node_modules/playwright-core/lib/coreBundle.js:11647:33)
+    at CDPSession2.emit (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/node_modules/playwright-core/lib/coreBundle.js:11642:18)
+    at Proxy.<anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/node_modules/playwright-core/lib/coreBundle.js:59009:16)
+    at Proxy._callHandler (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/node_modules/playwright-core/lib/coreBundle.js:11647:33)
+    at Proxy.emit (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/node_modules/playwright-core/lib/coreBundle.js:11637:16)
+    at Connection.dispatch (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/node_modules/playwright-core/lib/coreBundle.js:65476:25)
+    at Immediate.<anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/node_modules/playwright-core/lib/coreBundle.js:65537:85)
+    at process.processImmediate (node:internal/timers:504:21)
+
+Node.js v24.12.0

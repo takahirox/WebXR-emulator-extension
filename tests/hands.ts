@@ -100,6 +100,9 @@ export async function handCases(mode: SessionMode) {
       for(const [C,args] of [[realm.XRSession,[{},mode,1,new Set(['hand-tracking']),()=>{}]],[realm.XRSystem,[Promise.resolve({})]]] as const) {
         for(const token of [undefined,Symbol('geometry allocation')])for(const target of [C,class extends C{}])throws(()=>Reflect.construct(C,[...args,token],target),'TypeError','runtime construction requires private allocation permission');
       }
+      let superclassCalls=0;const untrustedSuperclass=function(){superclassCalls++;return {};};
+      for(const name of ['XREventTarget','XRSystem','XRSession','XRFrame','XRInputSource'])throws(()=>Object.setPrototypeOf(realm[name],untrustedSuperclass),'TypeError','runtime constructor cannot accept caller-owned superclass callback');
+      check(superclassCalls===0,'untrusted runtime superclass never invoked');
       await rejects(realm.XRSystem.prototype.requestSession.call({devicePromise:Promise.resolve({})},'inline'),'TypeError','borrowed request cannot substitute caller-owned backend promise');
       const binding=realm===w?other:w;
       check(await binding.XRSystem.prototype.isSessionSupported.call(realm.navigator.xr,'inline'),'borrowed system binding retains genuine backend permission');
@@ -118,6 +121,10 @@ export async function handCases(mode: SessionMode) {
     const remoteLists=await frame(remote.s,f=>{check(remote.s.inputSources.length===2,'populated child hand sources');return [...remote.s.inputSources].map((s:any)=>collection(s.hand,other));});
     let held:any,snapshot:any,heldRadius=0;const retained:any[]=[];
     for(const [own,foreign,ownLists,foreignLists,realm,borrowed] of [[parent,remote,lists,remoteLists,w,other],[remote,parent,remoteLists,lists,other,w]]) {
+      const overlayRoot=realm.document.createElement('div'),foreignOverlayRoot=borrowed.document.createElement('div');
+      realm.document.body.append(overlayRoot);borrowed.document.body.append(foreignOverlayRoot);
+      try {check(own.s._device.global===realm&&own.s._device.canPresentDOMOverlay(overlayRoot)&&!own.s._device.canPresentDOMOverlay(foreignOverlayRoot),'shared runtime device retains owning document eligibility');}
+      finally {overlayRoot.remove();foreignOverlayRoot.remove();}
       await frame(own.s,f=>{
         const method=borrowed.XRFrame.prototype.getJointPose;
         check(method.length===2&&Object.getOwnPropertyDescriptor(borrowed.XRFrame.prototype,'getJointPose')!.enumerable,'getJointPose descriptor and arity');
@@ -143,8 +150,22 @@ export async function handCases(mode: SessionMode) {
         const registry=w[Symbol.for('WebXR-emulator.interface-brands')];
         const shared=Reflect.construct(registry.SpaceObject,[true],realm.XRJointSpace);
         throws(()=>method.call(f,shared,own.base),'TypeError','shared allocation base cannot manufacture joint');
-        const tracker=new registry.handAllocations.HandTracker(own.s,{}, {}, {});
-        check(tracker.hand(own.s.inputSources[0])===own.s.inputSources[0].hand,'registry tracker retrieves canonical existing hand');
+        let prototypeReads=0;
+        const untrustedPrototype=new Proxy({},{get(){prototypeReads++;throw Error('untrusted prototype');}});
+        const frameRecord=registry.frameValues.get(f),callerPose=Object.create(realm.XRJointPose.prototype);let poseCallbacks=0;
+        try {
+          registry.frameValues.set(f,{...frameRecord,pose(){poseCallbacks++;return callerPose;}});
+          const protectedPose=f.getJointPose(joint,own.base);
+          check(protectedPose!==callerPose&&protectedPose.radius===p.radius&&poseCallbacks===0,'joint poses ignore substituted public frame allocation callbacks');
+          const copiedFrame=new registry.FrameObject();Object.assign(copiedFrame,{_active:true,_assertActive:realm.XRFrame.prototype._assertActive});
+          registry.frameValues.set(copiedFrame,{...frameRecord,pose(){poseCallbacks++;return callerPose;}});
+          try {throws(()=>realm.XRFrame.prototype.getJointPose.call(copiedFrame,joint,own.base),'TypeError','copied public frame records cannot register joint poses');}
+          finally{registry.frameValues.delete(copiedFrame);}
+          throws(()=>Object.getOwnPropertyDescriptor(realm.XRJointPose.prototype,'radius')!.get!.call(callerPose),'TypeError','caller-owned pose retains no accepted radius identity');
+          check(poseCallbacks===0,'untrusted frame allocation callbacks never invoked');
+        } finally {registry.frameValues.set(f,frameRecord);}
+        const tracker=new registry.handAllocations.HandTracker(own.s,untrustedPrototype,untrustedPrototype,untrustedPrototype);
+        check(tracker.hand(own.s.inputSources[0],untrustedPrototype)===own.s.inputSources[0].hand&&prototypeReads===0,'registry tracker retrieves canonical existing hand without reading supplied prototypes or records');
         throws(()=>new registry.handAllocations.HandTracker(new registry.SessionObject(),{},{},{}),'TypeError','shared superclass cannot manufacture a hand backend');
         // Regression: a branded superclass instance with a complete caller-owned
         // backend used to pass the sessions.has(_id) test and allocate 25 joints.
@@ -161,7 +182,49 @@ export async function handCases(mode: SessionMode) {
           for(const api of [realm,borrowed])throws(()=>Object.getOwnPropertyDescriptor(api.XRSession.prototype,'inputSources')!.get!.call(fakeSession),'TypeError','fake backend has no private session allocation');
         }
         check(!registry.handAllocations.sources.get(fakeSource)&&Object.getOwnPropertyDescriptor(realm.XRInputSource.prototype,'hand')!.get!.call(fakeSource)===null,'rejected fake source acquires no hand');
+        // about:blank is deliberately outside manifest injection. Keep the
+        // installed parent/child bindings intact while publishing a decoy getter.
+        const decoy=document.createElement('iframe');document.body.append(decoy);
+        const untrusted=decoy.contentWindow as any;let getterCalls=0,predicateCalls=0;
+        const installed=[realm.XRSession,borrowed.XRSession],originalDecoy=Object.getOwnPropertyDescriptor(untrusted,'XRSession');
+        try {
+          check(untrusted.location.href==='about:blank'&&!Object.prototype.hasOwnProperty.call(untrusted,Symbol.for('WebXR-emulator.interface-brands'))&&!untrusted.WebXRPolyfillInjection,'verified uninjected same-origin child');
+          untrusted.XRSession=function(){};
+          Object.defineProperty(untrusted.XRSession.prototype,'inputSources',{get(){getterCalls++;return [];}});
+          const fakePredicate=Object.freeze({has(){predicateCalls++;return true;}});
+          Object.defineProperty(untrusted,Symbol.for('WebXR-emulator.interface-brands'),{value:Object.freeze({...registry,sessions:fakePredicate,inputSources:fakePredicate})});
+          const attempts:any[]=[];
+          for(const phase of ['attached','removed']) {
+            if(phase==='removed')decoy.remove();
+            for(const target of [registry.handAllocations.HandTracker,class extends registry.handAllocations.HandTracker{}]) {
+              let error:any;
+              try {(Reflect.construct(registry.handAllocations.HandTracker,[fakeSession,realm.XRHand.prototype,realm.XRJointSpace.prototype,realm.XRJointPose.prototype],target) as any).hand(fakeSource,raw);}catch(caught){error=caught;}
+              const registered=registry.handAllocations.sources.get(fakeSource);
+              attempts.push({phase,error:error?.name??null,getterCalls,predicateCalls,registeredJoints:registered?.size??0});
+            }
+          }
+          // Capture both phases before asserting, so the baseline records whether
+          // authorization survives removal as well as the first allocation.
+          for(const phase of ['attached','removed']) {
+            for(const attempt of attempts.filter(a=>a.phase===phase))check(attempt.error==='TypeError',`${phase} untrusted getter cannot authorize allocation: ${JSON.stringify(attempts)}`);
+            check(attempts.filter(a=>a.phase===phase).every(a=>a.registeredJoints===0)&&!registry.handAllocations.sources.get(fakeSource),phase+' untrusted child attempt registers no hand or joints');
+            check(attempts.filter(a=>a.phase===phase).every(a=>a.getterCalls===0&&a.predicateCalls===0),phase+' authorization never invokes untrusted getter or copied predicates');
+          }
+          check(realm.XRSession===installed[0]&&borrowed.XRSession===installed[1],'genuine installed session bindings intact');
+          check(tracker.hand(own.s.inputSources[0])===own.s.inputSources[0].hand,'rejected authorization cannot poison genuine canonical hand');
+        } finally {decoy.remove();if(originalDecoy)Object.defineProperty(untrusted,'XRSession',originalDecoy);else delete untrusted.XRSession;}
+        for(const target of [realm.XRInputSource,class extends realm.XRInputSource{}])throws(()=>Reflect.construct(realm.XRInputSource,[own.s,raw],target),'TypeError','public source construction cannot allocate backend hands');
+        throws(()=>realm.XRInputSource.prototype._updatePose.call(fakeSource),'TypeError','shared source superclass cannot enter private allocation');
         const fake=new registry.InputSourceObject();throws(()=>tracker.hand(fake),'InvalidStateError','unattached source cannot acquire hand identity');
+        Object.assign(fake,{session:own.s,raw});
+        const savedInputs=Object.getOwnPropertyDescriptor(own.s,'inputSources');
+        try {
+          Object.defineProperty(own.s,'inputSources',{value:[fake],configurable:true});
+          throws(()=>tracker.hand(fake,raw),'InvalidStateError','caller-owned input collection cannot grant genuine backend allocation');
+          throws(()=>realm.XRInputSource.prototype._updatePose.call(fake),'TypeError','caller-owned source records cannot grant runtime provenance');
+          check(!registry.handAllocations.sources.get(fake),'spoofed connected source has no hand or joints');
+        } finally {if(savedInputs)Object.defineProperty(own.s,'inputSources',savedInputs);else delete own.s.inputSources;}
+
         const out=new Float32Array(402),radii=new Float32Array(28);out.fill(12345);radii.fill(12345);
         check(f.fillPoses([joint,joint],own.base,out.subarray(1,33))&&out[0]===12345&&out[33]===12345,'bulk offsets duplicates and untouched capacity');
         check(f.fillJointRadii([joint,joint],radii.subarray(1,3))&&radii[0]===12345&&radii[3]===12345&&radii[1]===radii[2],'bulk radius offsets duplicates and untouched capacity');
@@ -205,7 +268,8 @@ export async function handCases(mode: SessionMode) {
       await frame(s,f=>{const fresh=s.inputSources[0];check(fresh!==sources[0]&&fresh.hand!==sources[0].hand&&fresh.hand.get('wrist')!==lists[0][0],'reacquisition replaces source hand and joints');compare(f,s,parent.base,lists,[false,true]);compare(f,s,parent.base,[[...fresh.hand.values()]]);});
     } finally{device.gamepadInputSources.forEach((v:any,i:number)=>{v.active=savedActive[i];});savedPads.forEach((v:any,i:number)=>{device._updateInputPose(v.position,v.orientation,i);device._updateInputButtonPressed(v.pressed,i,0);});}
     for(const saved of retained)check(close(saved.matrix,Array.from(saved.pose.transform.matrix))&&close(saved.position,[saved.pose.transform.position.x,saved.pose.transform.position.y,saved.pose.transform.position.z])&&saved.radius===saved.pose.radius,'retained snapshot values survive movement curl and retirement');
-    const oldHands=[...s.inputSources].map((v:any)=>v.hand);await s.end();
+    const remoteEnd=remote.s.end();check(remoteEnd instanceof other.Promise,'child session end returns binding realm Promise');await remoteEnd;
+    const oldHands=[...s.inputSources].map((v:any)=>v.hand),parentEnd=s.end();check(parentEnd instanceof w.Promise,'parent session end returns binding realm Promise');await parentEnd;
     check(oldHands.every((h:any)=>[...h.values()].every((j:any)=>j._update()===null)),'shutdown makes all joints unavailable');
     throws(()=>held.getJointPose(remoteLists[0][0],remote.base),'InvalidStateError','held frame remains inactive after shutdown');
     const restart=await setup({requiredFeatures:['hand-tracking']});await frame(restart.s,f=>{const hands=[...restart.s.inputSources].map((v:any)=>v.hand);check(hands.every((h:any)=>!oldHands.includes(h)),'restart exposes fresh hands');compare(f,restart.s,restart.base,hands.map((h:any)=>[...h.values()]));check(oldHands.every((h:any)=>[...h.values()].every((j:any)=>j._update()===null)),'old joints remain unavailable after restart');});

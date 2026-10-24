@@ -1,35 +1,73 @@
 import {mat4} from 'gl-matrix';
-import type EmulatedXRDevice from '../EmulatedXRDevice';
+import EmulatedXRDevice from '../EmulatedXRDevice';
+import type {PolyfillGlobal} from '../../types/polyfill';
+import * as realmGeometry from './geometry';
+import * as realmSensing from './sensing';
+import * as realmLayers from './layers';
+import * as realmEnvironment from './environment';
+import type {EnvironmentTracker} from './environment';
+import * as realmEvents from './events';
+import * as realmSessionInit from './session-init';
 import type {SessionMode} from '../../types/contracts';
 import {convertHitTestOptions, convertTransientHitTestOptions, hitTestAllocation} from './hit-test-options';
 import {SourceGamepad, type DeviceInput, type InputSignal} from '../device-adapter';
-import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, transformMatrix, transformObjects, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, spaceObjects, relativePose, geometryAllocation, requireGeometryAllocation, enumerableMembers, viewState, invalidState, unsupported} from './geometry';
+import type {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView} from './geometry';
 import {HALL_PLAY_AREA} from '../virtual-play-area';
-import {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
-import {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation, jointObjects} from './sensing';
+import type {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
+import type {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation} from './sensing';
 import {interfaceValue, interfaceSequence, float32Output} from './bulk-input';
-import {interfaceBrands} from './interface-brand';
+import {interfaceBrands, brandHost, initializeHandBackend} from './interface-brand';
 import XRHitTestSource, {hitSourceState} from './XRHitTestSource';
 import XRTransientInputHitTestSource, {transientHitSourceState} from './XRTransientInputHitTestSource';
 import XRHitTestResult from './XRHitTestResult';
 import XRTransientInputHitTestResult from './XRTransientInputHitTestResult';
 import XRInputSourceArray from './XRInputSourceArray';
 import type DOMOverlay from '../DOMOverlay';
-import {convertSessionMode, convertSessionInit} from './session-init';
-import {EnvironmentTracker} from './environment';
 import {XRSessionEvent, XRInputSourceEvent, XRInputSourcesChangeEvent} from './events';
 import {installEventHandlers, type EventHandler} from './event-handlers';
 export {XRInputSourceArray, XRSessionEvent, XRInputSourceEvent, XRInputSourcesChangeEvent};
 
+// The registry publishes a fixed factory, never its captured backend writer.
+// Related injections execute this implementation with their own geometry. No
+// discovered window callback, getter or predicate participates in allocation.
+const documentWindow = Object.getOwnPropertyDescriptor(Document.prototype, 'defaultView')!.get!;
+type RuntimeBindings = {geometry: typeof realmGeometry; sensing: typeof realmSensing; layers: typeof realmLayers;
+  hitTests: {XRHitTestSource: typeof XRHitTestSource; hitSourceState: typeof hitSourceState; XRTransientInputHitTestSource: typeof XRTransientInputHitTestSource; transientHitSourceState: typeof transientHitSourceState; XRHitTestResult: typeof XRHitTestResult; XRTransientInputHitTestResult: typeof XRTransientInputHitTestResult; convertHitTestOptions: typeof convertHitTestOptions; convertTransientHitTestOptions: typeof convertTransientHitTestOptions; hitTestAllocation: typeof hitTestAllocation};
+  environment: typeof realmEnvironment; events: typeof realmEvents; sessionInit: typeof realmSessionInit; InputSourceArray: typeof XRInputSourceArray};
+function createRuntime(document: Document, bindings: RuntimeBindings) {
+  const window = documentWindow.call(document) as PolyfillGlobal;
+  if (!window) throw new globalThis.TypeError('Expected an active document.');
+  const {navigator, Event, EventTarget, ErrorEvent, DOMException, TypeError, Promise, Float32Array} = window;
+  const setTimeout = window.setTimeout.bind(window), clearTimeout = window.clearTimeout.bind(window), queueMicrotask = window.queueMicrotask.bind(window);
+  const {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, transformMatrix, transformObjects, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, spaceObjects, relativePose, geometryAllocation, enumerableMembers, viewState, invalidState, unsupported} = bindings.geometry;
+  const {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation, jointObjects} = bindings.sensing;
+  const {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} = bindings.layers;
+  const {EnvironmentTracker} = bindings.environment;
+  const {XRSessionEvent, XRInputSourceEvent, XRInputSourcesChangeEvent} = bindings.events;
+  const {XRHitTestSource, hitSourceState, XRTransientInputHitTestSource, transientHitSourceState, XRHitTestResult, XRTransientInputHitTestResult, convertHitTestOptions, convertTransientHitTestOptions, hitTestAllocation} = bindings.hitTests;
+  const XRInputSourceArray = bindings.InputSourceArray;
+  const {convertSessionMode, convertSessionInit} = bindings.sessionInit;
+  // Unlike the supplied geometry bindings, this permission and the hand writer
+  // never cross a caller callback or appear on any public object.
+  const runtimeAllocation = Symbol('runtime allocation');
+  const requireRuntimeAllocation = (token: symbol | undefined) => {
+    if (token !== runtimeAllocation) throw new TypeError('Illegal constructor.');
+  };
+  const SessionBase: new () => EventTarget = interfaceBrands.SessionObject;
+  const FrameBase: new () => object = interfaceBrands.FrameObject;
+  const InputSourceBase: new () => object = interfaceBrands.InputSourceObject;
+  const handBackends = new WeakMap<XRSession, ReturnType<NonNullable<typeof initializeHandBackend>>>();
+  const sourceBackends = new WeakMap<XRInputSource, {session: XRSession; raw: DeviceInput}>();
 // Backend permission is module-private, separate from the publicly reachable
 // shared interface constructors and from diagnostic properties on their objects.
 const systemDevices = new WeakMap<XRSystem, Promise<EmulatedXRDevice>>();
 const sessionInputs = new WeakMap<XRSession, XRInputSourceArray>();
 
-export class XREventTarget extends EventTarget {
+class XREventTarget extends EventTarget {
   _emit(event: Event) { this.dispatchEvent(event); }
 }
-export class XRRenderState {
+Object.freeze(XREventTarget);
+class XRRenderState {
   readonly depthNear: number; readonly depthFar: number; readonly inlineVerticalFieldOfView: number | null; readonly baseLayer: XRWebGLLayer | null;
   readonly layers: readonly XRCompositionLayer[] | null;
   constructor(init: Partial<XRRenderState> = {}) {
@@ -76,21 +114,23 @@ function convertRenderStateInit(value: unknown): RenderStateInit {
   }
   return init;
 }
-export class XRSystem extends XREventTarget {
+class XRSystem extends XREventTarget {
   declare ondevicechange: EventHandler;
   private immersive: XRSession | null = null;
   private requesting = false;
   private sessions = new Set<XRSession>();
   constructor(devicePromise: Promise<EmulatedXRDevice>, token: symbol | undefined = undefined) {
-    requireGeometryAllocation(token);
+    requireRuntimeAllocation(token);
     super();
     systemDevices.set(this, devicePromise);
     window.addEventListener('webxr-device', () => this._emit(new Event('devicechange')));
     window.addEventListener('webxr-exit-immersive', () => { void this.immersive?.end(); });
   }
-  async isSessionSupported(value?: unknown) {
-    const mode = convertSessionMode(value);
-    return this.supports(mode);
+  isSessionSupported(value?: unknown) {
+    return new Promise<boolean>((resolve) => {
+      const mode = convertSessionMode(value);
+      resolve(this.supports(mode));
+    });
   }
   // Bound operations keep backend permission with its system, even when the
   // public binding is borrowed from another injection or an internal operation
@@ -98,10 +138,12 @@ export class XRSystem extends XREventTarget {
   private supports = async (mode: SessionMode) => {
     return (await systemDevices.get(this)!).isSessionSupported(mode);
   };
-  async requestSession(value?: unknown, dictionary?: unknown) {
-    const mode = convertSessionMode(value);
-    const options = convertSessionInit(dictionary);
-    return this.request(mode, options);
+  requestSession(value?: unknown, dictionary?: unknown) {
+    return new Promise<XRSession>((resolve) => {
+      const mode = convertSessionMode(value);
+      const options = convertSessionInit(dictionary);
+      resolve(this.request(mode, options));
+    });
   }
   private request = async (mode: SessionMode, options: ReturnType<typeof convertSessionInit>) => {
     const overlayRoot = options.domOverlay?.root;
@@ -135,7 +177,7 @@ export class XRSystem extends XREventTarget {
           this.immersive = null;
           for (const inline of this.sessions) inline._setImmersiveSuppressed(false);
         }
-      }, geometryAllocation);
+      }, runtimeAllocation);
       session._depthFormat = depthFormat;
       if (enabled.has('dom-overlay')) {
         try { session._startDOMOverlay(overlayRoot as HTMLElement); }
@@ -159,9 +201,11 @@ export class XRSystem extends XREventTarget {
   };
 }
 
+Object.freeze(XRSystem);
+
 type Callback = (time: number, frame: XRFrame) => void;
 const inputEvents = ['select-start', 'select-end', 'squeeze-start', 'squeeze-end'] as const;
-export class XRSession extends interfaceBrands.SessionObject {
+class XRSession extends SessionBase {
   _emit(event: Event) { this.dispatchEvent(event); }
   private callbacks = new Map<number, Callback>();
   private nextCallback = 0;
@@ -183,7 +227,7 @@ export class XRSession extends interfaceBrands.SessionObject {
   private endListener: (id: number) => void;
   private immersiveSuppressed = false;
   private visibilityListener = () => this._setVisibility(document.visibilityState);
-  readonly _hands: InstanceType<typeof interfaceBrands.handAllocations.HandTracker>;
+  readonly _hands: {hand(source: XRInputSource, raw?: DeviceInput): XRHand};
   readonly _anchors = new Set<XRAnchor>();
   readonly _environment = new EnvironmentTracker(this);
   _depthFormat = 'float32';
@@ -214,9 +258,10 @@ export class XRSession extends interfaceBrands.SessionObject {
   declare onsqueeze: EventHandler;
   declare onsqueezeend: EventHandler;
   constructor(readonly _device: EmulatedXRDevice, readonly _mode: SessionMode, readonly _id: number, enabled: Set<string>, private onShutdown: () => void, token: symbol | undefined = undefined) {
-    requireGeometryAllocation(token);
+    requireRuntimeAllocation(token);
     super(); this.features = Object.freeze([...enabled]); this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
     sessionInputs.set(this, new XRInputSourceArray(() => this.sources));
+    handBackends.set(this, initializeHandBackend!(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype));
     this._hands = new interfaceBrands.handAllocations.HandTracker(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype);
     this.activeRenderState = new XRRenderState({inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null});
     const viewerMatrix = () => mat4.clone(_device.getBasePoseMatrix());
@@ -233,7 +278,7 @@ export class XRSession extends interfaceBrands.SessionObject {
     // operations must allocate in the session's relevant realm (Device §6.2).
     interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
       let settled = false;
-      let task: ReturnType<typeof setTimeout> | undefined;
+      let task: number | undefined;
       const settle = (action: () => void) => {
         if (settled) return;
         settled = true;
@@ -414,7 +459,7 @@ export class XRSession extends interfaceBrands.SessionObject {
     const source = new XRTransientInputHitTestSource(this, options, hitTestAllocation); this._transientSources.add(source); this._device.addHitTestSourceForTransientInput(source); return source;
   }
   private emitInput(type: string, inputSource: XRInputSource, time: number) {
-    const frame = new XRFrame(this, time, false, geometryAllocation); frame._active = true;
+    const frame = new XRFrame(this, time, false, runtimeAllocation); frame._active = true;
     try { this._emit(new XRInputSourceEvent(type, {frame, inputSource})); } finally { frame._active = false; }
   }
   private tick = (time: number) => {
@@ -443,7 +488,7 @@ export class XRSession extends interfaceBrands.SessionObject {
       const previous = this.inputWrappers.get(source);
       if (!previous || !previous._matches(source)) {
         if (previous) { previous._retire(); replaced.push(previous); }
-        this.inputWrappers.set(source, new XRInputSource(this, source));
+        this.inputWrappers.set(source, new XRInputSource(this, source, runtimeAllocation));
       }
       return this.inputWrappers.get(source)!;
     });
@@ -474,7 +519,7 @@ export class XRSession extends interfaceBrands.SessionObject {
     for (const [raw, wrapper] of this.inputWrappers) if (removed.includes(wrapper)) this.inputWrappers.delete(raw);
     this._device.computeHitTests(this._id);
     if (this.enabledFeatures.some(feature => feature === 'plane-detection' || feature === 'mesh-detection')) this._environment.update(time);
-    const frame = new XRFrame(this, time, true, geometryAllocation);
+    const frame = new XRFrame(this, time, true, runtimeAllocation);
     const layers = this.renderState.layers;
     if (layers?.length) layers[0]._binding._prepare(layers);
     const callbacks = this.currentCallbacks = this.callbacks; this.callbacks = new Map(); frame._active = true;
@@ -497,17 +542,22 @@ export class XRSession extends interfaceBrands.SessionObject {
   };
 }
 
-export class XRFrame extends interfaceBrands.FrameObject {
+// Freeze constructor ancestry before any realm binding callback sees it.
+// A caller-controlled superclass must not return an object to be registered.
+Object.freeze(XRSession);
+
+class XRFrame extends FrameBase {
   _active = false;
   private hitResults = new Map<XRHitTestSource, XRHitTestResult[]>();
   private anchorSnapshot: XRAnchorSet;
   private environmentSnapshot: ReturnType<EnvironmentTracker['snapshot']>;
   private transientResults = new Map<XRTransientInputHitTestSource, XRTransientInputHitTestResult[]>();
   constructor(session: XRSession, predictedDisplayTime: number, readonly _animation: boolean, token?: symbol) {
-    requireGeometryAllocation(token);
+    requireRuntimeAllocation(token);
     super();
     interfaceBrands.frameValues.set(this, {session, predictedDisplayTime,
       pose: (matrix, emulated) => new XRPose(XRRigidTransform._fromMatrix(matrix), emulated, geometryAllocation)});
+    handBackends.get(session)!.frame(this, (matrix, emulated) => new XRPose(XRRigidTransform._fromMatrix(matrix), emulated, geometryAllocation));
     this.anchorSnapshot = new XRAnchorSet(session._anchors);
     this.environmentSnapshot = session._environment.snapshot();
     if (_animation) {
@@ -626,6 +676,8 @@ function frameState(value: object) {
   if (!state) throw new TypeError('Expected XRFrame.');
   return state;
 }
+Object.freeze(XRFrame);
+
 // Invoked through the session's captured operation, even when the frame method
 // was borrowed from a separately injected same-origin document.
 function allocateViewerPose(frame: XRFrame, reference: XRReferenceSpace) {
@@ -650,7 +702,7 @@ enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPos
 Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
 
 /** Every exposed space and input identity is owned by exactly one session. */
-export class XRInputSource extends interfaceBrands.InputSourceObject {
+class XRInputSource extends InputSourceBase {
   private readonly targetSpace: XRSpace;
   private readonly grip: XRSpace | null;
   private readonly handednessValue: string;
@@ -661,8 +713,10 @@ export class XRInputSource extends interfaceBrands.InputSourceObject {
   private readonly gamepadState: SourceGamepad | null;
   private targetWorld: mat4 | null = null;
   private gripWorld: mat4 | null = null;
-  constructor(private session: XRSession, private raw: DeviceInput) {
+  constructor(private session: XRSession, private raw: DeviceInput, token?: symbol) {
+    requireRuntimeAllocation(token);
     super();
+    sourceBackends.set(this, {session, raw});
     const active = () => Array.from(session.inputSources).includes(this);
     this.handednessValue = raw.handedness;
     this.targetRayModeValue = raw.targetRayMode;
@@ -682,7 +736,14 @@ export class XRInputSource extends interfaceBrands.InputSourceObject {
   }
   _retire() { this.gamepadState?.retire(); }
   _updatePose() {
-    if (this.session.enabledFeatures.includes('hand-tracking')) this.session._hands.hand(this, this.raw);
+    const backend = sourceBackends.get(this);
+    if (!backend) throw new TypeError('Expected backend XRInputSource.');
+    const {session, raw} = backend;
+    if (session.enabledFeatures.includes('hand-tracking')) {
+      const controller = session._device.gamepadInputSources.findIndex(input => input.inputSource === raw);
+      if (controller < 0) throw new TypeError('Expected connected backend input.');
+      handBackends.get(session)!.hand(this, controller);
+    }
     if (this.gamepadState && this.raw.gamepad) this.gamepadState.sample(this.raw.gamepad);
     const world = new XRReferenceSpace(this.session, 'local-floor', () => mat4.create()); world._update();
     const target = this.session._device.getInputPose(this.raw, world, 'target-ray');
@@ -700,6 +761,7 @@ export class XRInputSource extends interfaceBrands.InputSourceObject {
   get skipRendering() { return false; }
 }
 
+Object.freeze(XRInputSource);
 enumerableMembers(XRInputSource.prototype, ['hand']);
 
 // WebIDL regular operations are enumerable, writable and configurable.
@@ -714,3 +776,47 @@ installEventHandlers(XRSession.prototype, [
 ], value => sessionObjects.has(value));
 
 enumerableMembers(XRSession.prototype, ['requestHitTestSource', 'requestHitTestSourceForTransientInput']);
+
+  // The factory creates the device and system itself. It cannot accept a caller
+  // backend promise, session, source record, allocator callback or permission.
+  const device = new Promise<EmulatedXRDevice>(resolve => {
+    const init = (event: WindowEventMap['webxr-device-init']) => {
+      window.removeEventListener('webxr-device-init', init);
+      resolve(new EmulatedXRDevice(window, {...event.detail.deviceDefinition, stereoEffect: event.detail.stereoEffect}));
+    };
+    window.addEventListener('webxr-device-init', init);
+  });
+  // Async function bodies belong to the factory's realm. Public operations
+  // still return a Promise from the binding realm, retaining descriptor/arity.
+  const promiseOperations: [object, string[]][] = [
+    [XRSession.prototype, ['restorePersistentAnchor', 'deletePersistentAnchor', 'requestLightProbe', 'end', 'requestHitTestSource', 'requestHitTestSourceForTransientInput']],
+    [XRFrame.prototype, ['createAnchor']],
+  ];
+  for (const [prototype, names] of promiseOperations) for (const name of names) {
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, name)!, original = descriptor.value;
+    const operation = function(this: unknown, ...args: unknown[]) {
+      return new Promise(resolve => { resolve(Reflect.apply(original, this, args)); });
+    };
+    Object.defineProperties(operation, {name: {value: original.name}, length: {value: original.length}});
+    Object.defineProperty(prototype, name, {...descriptor, value: operation});
+  }
+  const xr = new XRSystem(device, runtimeAllocation);
+  return {XREventTarget, XRRenderState, XRSystem, XRSession, XRFrame, XRInputSource, xr};
+}
+
+// Publish once during synchronous document_start installation. A copied registry
+// cannot replace this factory's closed-over allocation storage or hand writer.
+const runtimeKey = Symbol.for('WebXR-emulator.runtime-factory');
+const runtimeHost = brandHost as {[runtimeKey]: typeof createRuntime};
+if (!Object.prototype.hasOwnProperty.call(runtimeHost, runtimeKey)) {
+  Object.defineProperty(runtimeHost, runtimeKey, {value: Object.freeze(createRuntime)});
+}
+export const {XREventTarget, XRRenderState, XRSystem, XRSession, XRFrame, XRInputSource, xr} = runtimeHost[runtimeKey](document,
+  {geometry: realmGeometry, sensing: realmSensing, layers: realmLayers, environment: realmEnvironment, events: realmEvents, sessionInit: realmSessionInit, InputSourceArray: XRInputSourceArray,
+    hitTests: {XRHitTestSource, hitSourceState, XRTransientInputHitTestSource, transientHitSourceState, XRHitTestResult, XRTransientInputHitTestResult, convertHitTestOptions, convertTransientHitTestOptions, hitTestAllocation}});
+export type XREventTarget = InstanceType<typeof XREventTarget>;
+export type XRRenderState = InstanceType<typeof XRRenderState>;
+export type XRSystem = InstanceType<typeof XRSystem>;
+export type XRSession = InstanceType<typeof XRSession>;
+export type XRFrame = InstanceType<typeof XRFrame>;
+export type XRInputSource = InstanceType<typeof XRInputSource>;

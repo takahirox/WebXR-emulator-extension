@@ -1,0 +1,38 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:hands:chromium
+> tsx tests/reference-space-browser.ts chromium hands
+
+scenario chromium Meta Quest 3 immersive-vr
+{"status":"failed","browser":"chromium","scenarios":0,"assertions":0,"failures":["AssertionError [ERR_ASSERTION]: no application runtime errors\n+ actual - expected\n\n+ [\n+   'Expected session initialization sequence.',\n+   'Invalid session initialization enum.',\n+   'XR session request requires transient user activation.',\n+   'XR session request requires transient user activation.',\n+   'XR session request requires transient user activation.'\n+ ]\n- []\n"]}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: no application runtime errors
++ actual - expected
+
++ [
++   'Expected session initialization sequence.',
++   'Invalid session initialization enum.',
++   'XR session request requires transient user activation.',
++   'XR session request requires transient user activation.',
++   'XR session request requires transient user activation.'
++ ]
+- []
+
+    at <anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/tests/reference-space-browser.ts:197:14) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: [
+    'Expected session initialization sequence.',
+    'Invalid session initialization enum.',
+    'XR session request requires transient user activation.',
+    'XR session request requires transient user activation.',
+    'XR session request requires transient user activation.'
+  ],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.12.0
