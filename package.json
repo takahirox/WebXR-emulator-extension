@@ -17,7 +17,9 @@
     "test:reference-space:chromium": "tsx tests/reference-space-browser.ts chromium",
     "test:reference-space:firefox": "tsx tests/reference-space-browser.ts firefox",
     "test:tracking:chromium": "tsx tests/tracking.ts chromium",
-    "test:tracking:firefox": "tsx tests/tracking.ts firefox"
+    "test:tracking:firefox": "tsx tests/tracking.ts firefox",
+    "test:transform:chromium": "tsx tests/reference-space-browser.ts chromium transforms",
+    "test:transform:firefox": "tsx tests/reference-space-browser.ts firefox transforms"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",

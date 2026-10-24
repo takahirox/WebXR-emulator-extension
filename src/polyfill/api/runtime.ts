@@ -3,7 +3,7 @@ import type EmulatedXRDevice from '../EmulatedXRDevice';
 import type {SessionMode} from '../../types/contracts';
 import type {HitTestOptions, TransientHitTestOptions} from '../../types/polyfill';
 import {SourceGamepad, type DeviceInput, type InputSignal} from '../device-adapter';
-import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, spaceObjects, invalidState, unsupported} from './geometry';
+import {XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, transformMatrix, transformObjects, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, spaceObjects, invalidState, unsupported} from './geometry';
 import {HALL_PLAY_AREA} from '../virtual-play-area';
 import {XRCompositionLayer, XRProjectionLayer, XRWebGLLayer} from './layers';
 import {XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation, jointObjects} from './sensing';
@@ -504,9 +504,9 @@ export class XRFrame extends interfaceBrands.FrameObject {
   get trackedAnchors() { this._assertActive(); this.session._require('anchors'); return this.anchorSnapshot; }
   async createAnchor(pose: XRRigidTransform, space: XRSpace) {
     this._assertActive(); this.session._require('anchors');
-    if (!(pose instanceof XRRigidTransform)) throw new TypeError('Expected XRRigidTransform.');
+    if (!transformObjects.has(pose)) throw new TypeError('Expected XRRigidTransform.');
     const world = this._world(space); if (!world) throw new DOMException('Space is not tracked.', 'OperationError');
-    const anchor = new XRAnchor(this.session, mat4.multiply(mat4.create(), world, pose.matrix));
+    const anchor = new XRAnchor(this.session, mat4.multiply(mat4.create(), world, transformMatrix(pose)));
     return new Promise<XRAnchor>((resolve, reject) => queueMicrotask(() => {
       if (this.session.ended) { anchor.delete(); reject(new DOMException('Session ended before anchor tracking began.', 'InvalidStateError')); }
       else { this.session._anchors.add(anchor); resolve(anchor); }
@@ -549,7 +549,7 @@ export class XRFrame extends interfaceBrands.FrameObject {
     for (const [index, space] of list.entries()) {
       const pose = this.getPose(space, baseSpace);
       if (!pose) valid = false;
-      for (let component = 0; component < 16; component++) transforms[index * 16 + component] = pose ? pose.transform.matrix[component] : NaN;
+      for (let component = 0; component < 16; component++) transforms[index * 16 + component] = pose ? transformMatrix(pose.transform)[component] : NaN;
     }
     return valid;
   }
@@ -608,8 +608,8 @@ export class XRInputSource extends interfaceBrands.InputSourceObject {
     const world = new XRReferenceSpace(this.session, 'local-floor', () => mat4.create()); world._update();
     const target = this.session._device.getInputPose(this.raw, world, 'target-ray');
     const grip = this.session._device.getInputPose(this.raw, world, 'grip');
-    this.targetWorld = target ? mat4.clone(target.transform.matrix) : null;
-    this.gripWorld = grip ? mat4.clone(grip.transform.matrix) : null;
+    this.targetWorld = target ? mat4.clone(transformMatrix(target.transform)) : null;
+    this.gripWorld = grip ? mat4.clone(transformMatrix(grip.transform)) : null;
   }
   get hand() { return this.handValue; }
   get targetRaySpace() { return this.targetSpace; }

@@ -1,5 +1,5 @@
 export const PRIVATE = Symbol('@@webxr-polyfill/XRRay');
-import {XRRigidTransform} from './geometry';
+import {XRRigidTransform, transformMatrix, transformObjects} from './geometry';
 import {
   vec3,
   vec4,
@@ -13,9 +13,9 @@ export default class XRRay {
     const _origin = {x: 0, y: 0, z: 0, w: 1};
     const _direction = {x: 0, y: 0, z: -1, w: 0};
 
-    if (origin && origin instanceof XRRigidTransform) {
+    if (origin && transformObjects.has(origin)) {
       const transform = origin;
-      const matrix = transform.matrix;
+      const matrix = transformMatrix(transform as XRRigidTransform);
       const originVec4 = vec4.set(vec4.create(), _origin.x, _origin.y, _origin.z, _origin.w) ;
       const directionVec4 = vec4.set(vec4.create(), _direction.x, _direction.y, _direction.z, _direction.w);
       vec4.transformMat4(originVec4, originVec4, matrix);
@@ -30,6 +30,7 @@ export default class XRRay {
       _direction.w = directionVec4[3];
     } else {
       if (origin) {
+        origin = origin as DOMPointInit;
         _origin.x = origin.x ?? _origin.x;
         _origin.y = origin.y ?? _origin.y;
         _origin.z = origin.z ?? _origin.z;

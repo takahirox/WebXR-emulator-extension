@@ -9,19 +9,29 @@ import {launchFirefox, eventually} from './firefox-driver';
 import {activate, configure} from './firefox-contract';
 import {attachTarget, getTargets} from './cdp-target';
 import {referenceSpaceCases} from './reference-space';
+import {rigidTransformCases} from './rigid-transform';
 
 const browser = process.argv[2];
+const transforms = process.argv[3] === 'transforms';
+const cases = transforms ? rigidTransformCases : referenceSpaceCases;
 assert(['chromium', 'firefox'].includes(browser), 'Select chromium or firefox');
 const {origin, server} = await serveFirefoxFixtures();
-const report: any = {issue: 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: [
+const report: any = {issue: transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: transforms ? ['Real injected iframe/popup realms; application-visible matrix transfers, pose queries and WebGL triangle pixels.', 'Inspect _session ownership, callbacks.size and the real layer _presentationCanvas for presented pixels/captures; no adapter, GL or timer replacements.'] : [
   'Inspect session pendingReferenceRequests sizes for release; access _device/_id only for targeted races.',
   'Temporarily replace adapter transform method with controlled Promises; restore in finally.',
   'Capture real timer callbacks through calling-task microtasks; restore timers, shut down, then replay cancelled callbacks.',
   'Proxy transform matrix counts numeric allocation reads; count timer calls from late adapter continuations.',
   'Call real device endSession; inline additionally emits its presentation-end notification because it has no presentation.',
 ]};
-const filename = `test-results/reference-space-${browser}.json`;
+const filename = `test-results/${transforms ? "rigid-transform" : "reference-space"}-${browser}.json`;
 await mkdir('test-results', {recursive: true});
+async function saveRendering(result: any, device: string) {
+  for (const render of result.rendering ?? []) {
+    const file = `test-results/rigid-transform-${browser}-${device.startsWith('Meta') ? 'quest' : 'android'}-${result.mode}-${render.label}.png`;
+    await writeFile(file, Buffer.from(render.png.replace(/^data:image\/png;base64,/, ''), 'base64'));
+    delete render.png; render.capture = file;
+  }
+}
 let close: (() => Promise<void>) | undefined;
 try {
   const scenarios = [
@@ -33,7 +43,7 @@ try {
   ] as const;
   // tsx preserves function names with __name; supply only that identity helper.
   const expression = `const __name=value=>value;window.referenceSpaceOutcome={state:'running'};
-    (${referenceSpaceCases.toString()})(arguments[0]).then(value=>{window.referenceSpaceOutcome={state:'passed',value}},error=>{window.referenceSpaceOutcome={state:'failed',failure:String(error),stack:error.stack}});return true;`;
+    (${cases.toString()})(arguments[0]).then(value=>{window.referenceSpaceOutcome={state:'passed',value}},error=>{window.referenceSpaceOutcome={state:'failed',failure:String(error),stack:error.stack}});return true;`;
   if (browser === 'firefox') {
     const firefox = await launchFirefox(); close = () => firefox.close();
     report.versions = firefox.versions;
@@ -48,10 +58,11 @@ try {
           const element = await firefox.request<Record<string,string>>('POST', '/element', {using:'css selector', value:'#reference-space-session'});
           await firefox.request('POST', `/element/${element['element-6066-11e4-a52e-4f735466cecf']}/click`, {});
         }
-        return firefox.evaluate<any>('return window.referenceSpaceOutcome');
+        return firefox.evaluate<any>('return {...window.referenceSpaceOutcome,progress:window.rigidTransformProgress,visibility:document.visibilityState}');
       }, value => value?.state !== 'running', 'focused reference-space outcome', 60000);
       assert.equal(outcome.state, 'passed', outcome.failure + '\n' + outcome.stack);
       const result = outcome.value;
+      await saveRendering(result, device);
       const errors = firefox.logs.slice(start).filter(log => log.level === 'error');
       assert.deepEqual(errors, [], 'no application runtime errors');
       report.results.push({device, selected, ...result as object, errors});
@@ -101,10 +112,11 @@ try {
       await page.evaluate(`(function(){${expression}})(${JSON.stringify(mode)})`);
       const outcome = await eventually(async () => {
         if (await page.locator('#reference-space-session').count()) await page.locator('#reference-space-session').click();
-        return page.evaluate(() => (window as any).referenceSpaceOutcome);
+        return page.evaluate(() => ({...(window as any).referenceSpaceOutcome, progress:(window as any).rigidTransformProgress, visibility:document.visibilityState}));
       }, value => value?.state !== 'running', 'focused reference-space outcome', 60000);
       assert.equal(outcome.state, 'passed', outcome.failure + '\n' + outcome.stack);
       const result = outcome.value;
+      await saveRendering(result, device);
       assert.deepEqual(errors, [], 'no application runtime errors');
       report.results.push({device, selected, ...result, errors: [...errors]});
       await writeFile(filename, JSON.stringify(report, null, 2));
@@ -117,7 +129,7 @@ finally {
   await close?.(); server.close();
   report.completedAt = new Date().toISOString();
   report.provenance = {};
-  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'tests/reference-space.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
+  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
     report.provenance[file] = createHash('sha256').update(await readFile(file)).digest('hex');
   }
   await writeFile(filename, JSON.stringify(report, null, 2));

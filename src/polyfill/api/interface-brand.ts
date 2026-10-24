@@ -1,5 +1,6 @@
 import type {XRSession, XRFrame, XRInputSource} from './runtime';
-import type {XRReferenceSpace} from './geometry';
+import type {XRReferenceSpace, XRRigidTransform} from './geometry';
+import type {mat4} from 'gl-matrix';
 import type {EventHandler} from './event-handlers';
 import {createLayerAllocations} from './layer-allocation';
 
@@ -28,6 +29,11 @@ function createBrands() {
   return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
     layerAllocations: createLayerAllocations(sessions),
     // Invoke the session realm's operation without consulting public properties.
+    transforms: new WeakMap<object, {
+      position: DOMPointReadOnly; orientation: DOMPointReadOnly; geometry: mat4;
+      matrix: () => Float32Array; inverse: () => XRRigidTransform;
+    }>(),
+    referenceOffsets: new WeakMap<object, (transform: mat4) => XRReferenceSpace>(),
     referenceSpaceRequests: new WeakMap<object, (type: string) => Promise<XRReferenceSpace>>(),
     // Dispatch and declared event attributes belong to the object, even when an
     // accessor from another injection is borrowed. Weak keys reject proxies and

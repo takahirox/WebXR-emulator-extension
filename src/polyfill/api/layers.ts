@@ -1,7 +1,7 @@
 import {XRFramebuffer, convertWebGLLayerOptions} from '../xr-framebuffer';
 import {compositorOperation} from '../opaque-framebuffer';
 import {mat4} from 'gl-matrix';
-import {XRSpace, XRRigidTransform, XRView, XRViewport, sessionObjects, frameObjects, compatibleContexts, invalidState, unsupported} from './geometry';
+import {XRSpace, XRRigidTransform, transformMatrix, transformObjects, XRView, XRViewport, sessionObjects, frameObjects, compatibleContexts, invalidState, unsupported} from './geometry';
 import type {XRSession, XRFrame} from './runtime';
 import type {BaseLayer} from '../../types/polyfill';
 import type {XRLightProbe} from './sensing';
@@ -218,7 +218,7 @@ export class XRWebGLBinding {
     this._session._require('layers'); this.validate(init); validateLayerSpace(this._session, init.space);
     if (init.layout && init.layout !== 'mono') unsupported('Only mono quad layers are implemented.');
     for (const value of [init.viewPixelWidth, init.viewPixelHeight]) if (value === undefined || !Number.isInteger(value) || value <= 0) throw new TypeError('Quad pixel dimensions must be positive integers.');
-    if (init.transform && !(init.transform instanceof XRRigidTransform)) throw new TypeError('Expected XRRigidTransform.');
+    if (init.transform && !transformObjects.has(init.transform)) throw new TypeError('Expected XRRigidTransform.');
     if ((init.width ?? 1) <= 0 || (init.height ?? 1) <= 0) throw new TypeError('Quad physical dimensions must be positive.');
     const layer = new XRQuadLayer(this, init); this.initialize(layer); return layer;
   }
@@ -313,7 +313,7 @@ export class XRWebGLBinding {
             } else if (layer instanceof XRQuadLayer) {
               gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.frontFace(gl.CCW);
               const world = frame._world(layer.space); if (!world) continue;
-              matrix = mat4.multiply(matrix, world, layer.transform.matrix);
+              matrix = mat4.multiply(matrix, world, transformMatrix(layer.transform));
               mat4.scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
               mat4.multiply(matrix, mat4.invert(mat4.create(), view._worldMatrix)!, matrix);
               mat4.multiply(matrix, view.projectionMatrix, matrix);
