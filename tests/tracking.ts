@@ -10,7 +10,7 @@ import {observeSample, trackingPixels, trackingLifetime} from './tracking-observ
 const browser = process.argv[2];
 assert(['chromium', 'firefox'].includes(browser), 'Select chromium or firefox');
 const {origin, server, provenance, upstream} = await serveFirefoxFixtures();
-const report: any = {issue: 45, browser, status: 'running', startedAt: new Date().toISOString(), command: `${browser==='firefox'?'WEBXR_FIREFOX_EXECUTABLE="$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox" WEBXR_GECKODRIVER="$PWD/test-results/browser-tools/geckodriver" ':''}npm run test:tracking:${browser}`, revisions, results: [], failures: [], blockers: ['Pinned Input Tracking computes NaN cursors and does not apply grip transforms to its registered generic meshes; see docs/webxr-tracking.md'], skips: [], unperformed: ['Full WPT suite; other applications, devices and browser versions'], units: {position: 'metres', rotation: 'radians', matrixTolerance: 0.0001, releaseTolerance: 0.00001}};
+const report: any = {issue: 45, browser, status: 'running', startedAt: new Date().toISOString(), command: `${browser==='firefox'?'WEBXR_FIREFOX_EXECUTABLE="$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox" WEBXR_GECKODRIVER="$PWD/test-results/browser-tools/geckodriver" ':''}npm run test:tracking:${browser}`, revisions, results: [], failures: [], blockers: [], reconciliation: 'Input Selection replaces broken Input Tracking at the same Samples pin; see docs/webxr-tracking.md', skips: [], unperformed: ['Full WPT suite; other applications, devices and browser versions'], units: {position: 'metres', rotation: 'radians', matrixTolerance: 0.0001, releaseTolerance: 0.00001}};
 await mkdir('test-results', {recursive: true});
 report.tools = {};
 for (const name of ['tsx','typescript','playwright','three']) report.tools[name] = JSON.parse(await readFile(`node_modules/${name}/package.json`,'utf8')).version;
@@ -24,27 +24,35 @@ try {
   for (const name of ['xrInputSource_sameObject.https.html', 'xrFrame_lifetime.https.html']) await upstream(`https://raw.githubusercontent.com/web-platform-tests/wpt/${revisions.wpt}/webxr/${name}`);
   b = await trackingBrowser(browser, origin); report.versions = b.versions;
   console.log('browser', report.versions);
-  for (const app of ['input-tracking', 'dragging']) {
+  for (const app of ['input-selection', 'dragging']) {
     console.log('scenario', browser, app);
-    const result: any = {app, status: app === 'input-tracking' ? 'blocked-upstream' : 'running', cycles: []}; report.results.push(result);
+    const result: any = {app, status: 'running', cycles: []}; report.results.push(result);
     const logStart = b.logs.length;
     await b.panel(`document.querySelector('#resetPoseButton').click();`);
     const settings: any = result.settings = await b.panel(`return {device:document.querySelector('#deviceSelect').value,mode:document.querySelector('#questModeSelect').value,stereo:document.querySelector('#stereoCheckbox').checked,overlay:document.querySelector('#domOverlayPreviewCheckbox').checked};`);
     assert.deepEqual(settings, {device: 'Meta Quest 3', mode: 'immersive-vr', stereo: true, overlay: false});
-    await b.navigate(origin + (app === 'input-tracking' ? '/samples/input-tracking.html' : '/three/examples/webxr_xr_dragging.html'));
+    await b.navigate(origin + (app === 'input-selection' ? '/samples/input-selection.html' : '/three/examples/webxr_xr_dragging.html'));
     await eventually(() => b!.evaluate(`return !!window.tracking`), Boolean, 'XR observation installed');
-    if (app === 'input-tracking') await b.realm(`(${observeSample.toString()})();`);
-    const positions: Record<string, number[]> = {viewer: [0, 1.6, 0], right: [0.5, 1.5, -1], left: [-0.5, 1.5, -1]};
+    if (app === 'input-selection') await b.realm(`(function(){${expression(observeSample)}})();`);
+    // Resolve once while reset poses are distinct, then retain object identities.
+    // Current coordinates cannot identify handedness after controls overlap.
+    const controls: Record<string, number> = await b.panel(`const initial={viewer:[0,1.6,0],right:[.5,1.5,-1],left:[-.5,1.5,-1]},all=[];window.firefoxScenes[0].scene.traverse(o=>{if(o.controls?.object&&o.controls.getHelper()===o)all.push(o.controls)});window.trackingControls={};return Object.fromEntries(Object.entries(initial).map(([hand,p])=>{const matches=all.filter(c=>c.object.position.toArray().every((v,i)=>Math.abs(v-p[i])<.001));if(matches.length===1)window.trackingControls[hand]=matches[0];return [hand,matches.length]}));`);
+    assert.deepEqual(controls, {viewer: 1, right: 1, left: 1}, 'unique reset panel controls');
     async function pose(hand: string, position: number[], yaw = 0, pitch = 0) {
-      const count = await b!.panel<number>(`let n=0;window.firefoxScenes[0].scene.traverse(o=>{const c=o.controls;if(!c?.object||c.getHelper()!==o)return;if(c.object.position.toArray().some((v,i)=>Math.abs(v-arguments[0][i])>0.001))return;c.object.position.fromArray(arguments[1]);c.object.rotation.set(arguments[3],arguments[2],0);c.dispatchEvent({type:'change'});n++;});return n;`, [positions[hand], position, yaw, pitch]);
-      assert.equal(count, 1, hand + ' real panel TransformControls'); positions[hand] = position;
-      await eventually(() => b!.evaluate<any>(`const r=window.tracking.sessions.filter(s=>s.mode==='immersive-vr').at(-1);return arguments[0]==='viewer'?r.viewer?.slice(12,15):r.poses[arguments[0]+'-ray']?.slice(12,15);`, [hand]), p => p?.every((v: number, i: number) => Math.abs(v - position[i]) < 1e-4), 'application consumes panel pose');
+      const other = hand === 'right' ? 'left' : hand === 'left' ? 'right' : null;
+      const before = other ? await current() : null;
+      await b!.panel(`const c=window.trackingControls[arguments[0]];if(!c?.object||!c.getHelper().parent)throw Error('retained panel control detached');c.object.position.fromArray(arguments[1]);c.object.rotation.set(arguments[3],arguments[2],0);c.dispatchEvent({type:'change'});`, [hand, position, yaw, pitch]);
+      const after = await eventually(current, r => {
+        const matrix = hand === 'viewer' ? r?.viewer : r?.poses[hand+'-ray'];
+        return matrix?.length === 16 && matrixDifference(matrix, expectedMatrix(position, yaw, pitch)) < 1e-4;
+      }, 'application consumes panel translation and rotation');
+      if (other) closeMatrix(before.poses[other+'-ray'], after.poses[other+'-ray'], 'retained control moves only '+hand);
     }
     const expectedMatrix = (position: number[], yaw: number, pitch: number) => new Matrix4().compose(new Vector3(...position), new Quaternion().setFromEuler(new Euler(pitch,yaw,0)), new Vector3(1,1,1)).elements;
     const current = () => b!.evaluate<any>(`return window.tracking.sessions.filter(s=>s.mode==='immersive-vr').at(-1)`);
     const pixels = async () => {
       const value = await b!.evaluate<any>(expression(trackingPixels));
-      assert.equal(value.layer, app === 'input-tracking' ? 'base' : 'projection');
+      assert.equal(value.layer, app === 'input-selection' ? 'base' : 'projection');
       assert(value.width > 0 && value.height > 0 && value.presented, 'positive connected presented output');
       assert(value.regions.every((r: any) => r.foreground > 100 && r.colors > 100), 'identifiable non-background application pixels in both eyes');
       return value;
@@ -61,8 +69,9 @@ try {
         const fresh = await b.evaluate(`const lives=window.trackingLive.filter(v=>v.record.mode==='immersive-vr'),a=lives[0],z=lives.at(-1);return {sources:[...z.session.inputSources].every(s=>!a.sources.some(old=>old.source===s||old.ray===s.targetRaySpace||old.grip===s.gripSpace)&&s.gamepad.buttons.every(b=>!b.pressed)),layers:a.session.renderState.baseLayer!==z.session.renderState.baseLayer||a.session.renderState.layers?.[0]!==z.session.renderState.layers?.[0],oldDisconnected:a.sources.every(v=>!v.source.gamepad.connected),oldCanvasDetached:!a.finalCanvas?.isConnected};`);
         assert(fresh.sources && fresh.layers && fresh.oldDisconnected && fresh.oldCanvasDetached, 'restart uses fresh sources/spaces/resources and reset input'); c.fresh = fresh;
       }
+      if (app === 'input-selection') await eventually(() => b!.evaluate<any>(`return window.sampleConsumed`), v => ['right','left'].every(h => v?.[h+'-addController']?.rendered), 'profile controller geometry loaded', 60000);
       c.pixelsBefore = await pixels();
-      if (app === 'input-tracking') {
+      if (app === 'input-selection') {
         c.tracking = [];
         for (const [hand, p, yaw, pitch] of [
           ['right', [0.35, 1.35, -0.65], 0.35, -0.2],
@@ -88,17 +97,18 @@ try {
             const ray = after.poses[h + '-ray'], grip = after.poses[h + '-grip'];
             closeMatrix(consumed[h + '-addLaserPointer'].matrix, ray, h + ' application ray');
             closeMatrix(consumed[h + '-addController'].matrix, grip, h + ' application grip');
-            assert(!consumed[h + '-addCursor'].finite, 'record pinned upstream non-finite cursor defect');
-            assert(!consumed[h + '-addController'].rendered, 'record pinned upstream grip profile lookup defect');
-            assert(consumed[h + '-addLaserPointer'].rendered && consumed[h + '-addCursor'].rendered, 'ray and cursor nodes visible');
+            const cursor = consumed[h + '-addCursor'];
+            assert(cursor.finite, h + ' finite application cursor');
+            const expectedCursor = cursor.hit ?? [0,1,2].map(i => ray[12+i] - ray[8+i]);
+            closeMatrix(cursor.matrix, expectedCursor, h + ' cursor at actual hit or one metre down ray');
+            closeMatrix(cursor.nodeMatrix.slice(12,15), cursor.matrix, h + ' rendered cursor translation');
+            closeMatrix(consumed[h+'-addLaserPointer'].nodeMatrix, ray, h+' rendered ray matrix');
+            closeMatrix(consumed[h+'-addController'].nodeMatrix, grip, h+' rendered grip matrix');
+            assert(['addLaserPointer','addCursor','addController'].every(method => consumed[h+'-'+method].rendered), h + ' ray, cursor and loaded grip geometry visible');
           }
           c.tracking.push({hand, commanded: {position, yaw: yaw + cycle * 0.05, pitch}, after, consumed, beforePixels, pixels: afterPixels, screenshot: await screenshot(`${cycle}-${hand}-moved`)});
         }
         assert.deepEqual((await current()).events, [], 'Sample deliberately has no button interactions');
-        // The pinned Sample registers generic meshes but indexes by profiles[0].
-        // Record its upstream rendering mismatch without modifying valid profiles.
-        c.upstreamLimitations = ['Cursor coordinates are NaN: Sample passes a transform object to matrix-array Ray and reads typed-array .x/.y/.z', 'Grip model lookup misses: registered _right/_left, requested meta-quest-touch-plus_right/left'];
-        c.gripMeshObservation = await b.evaluate(`return Object.fromEntries(Object.entries(window.sampleConsumed).filter(([k])=>k.endsWith('addController')))`);
       } else {
         c.drags = [];
         await pose('viewer', [0, 1.6, 0]);
@@ -131,6 +141,12 @@ try {
         assert.deepEqual(events.map((e: any) => e.type + ':' + e.hand), ['right','left'].flatMap(hand => ['selectstart','select','selectend'].map(type => type + ':' + hand)));
         assert(events.every((e: any) => e.sameSource && e.pose?.length === 16), 'event identity and active event-frame poses');
       }
+      if (app === 'dragging' && cycle === 0) {
+        // Deterministic regression: leave both controls coincident across restart.
+        const shared = [0.25, 1.35, -0.8];
+        await pose('right', shared); await pose('left', shared);
+        c.coincidentControls = {position: shared, poses: (await current()).poses};
+      }
       c.lifetime = await b.evaluate(expression(trackingLifetime));
       assert(c.lifetime.identityChecks > 60);
       assert(c.lifetime.inactive.every((name: string) => name === 'InvalidStateError'));
@@ -148,7 +164,7 @@ try {
       const stopped = await current();
       await new Promise(resolve => setTimeout(resolve, 250));
       assert.equal((await current()).frames, stopped.frames, 'ended immersive session has no callbacks');
-      if (app === 'input-tracking') {
+      if (app === 'input-selection') {
         const inline = await b.evaluate(`return window.tracking.sessions.find(s=>s.mode==='inline')`);
         assert(inline && inline.ends === 0 && inline.frames > inlineBefore, 'original separate inline session resumes');
         c.inlineResumed = {before: inlineBefore, after: inline.frames};
@@ -159,12 +175,11 @@ try {
     result.logs = b.logs.slice(logStart);
     assert.deepEqual(result.logs.filter((l: any) => l.level === 'error'), [], 'no application runtime errors');
     assert.deepEqual(await b.evaluate(`return window.tracking.failures`), []);
-    if(app==='dragging')result.status='passed';
+    result.status='passed';
     await save();
   }
   report.extensionChecks = 'passed';
-  report.status = 'blocked-upstream';
-  process.exitCode = 1;
+  report.status = 'passed';
 } catch (error) {
   report.status = 'failed'; report.failures.push(String(error));
   if (b) {report.diagnostic = await b.evaluate(`return {tracking:window.tracking,consumed:window.sampleConsumed,buttons:[...document.querySelectorAll('button')].map(b=>b.textContent)}`).catch(String);report.logs = b.logs;}

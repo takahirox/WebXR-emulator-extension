@@ -82,6 +82,13 @@ export async function observeSample() {
   const w = window as any;
   const moduleURL = new URL('/samples/js/render/nodes/input-renderer.js', location.href).href;
   const {InputRenderer} = await import(moduleURL);
+  const {Scene} = await import(new URL('/samples/js/render/scenes/scene.js', location.href).href);
+  const hitTest = Scene.prototype.hitTest;
+  Scene.prototype.hitTest = function (...args: any[]) {
+    const result: any = Reflect.apply(hitTest, this, args);
+    w.sampleHit = result ? Array.from(result.intersection) : null;
+    return result;
+  };
   w.sampleConsumed = {};
   for (const method of ['addLaserPointer', 'addCursor', 'addController']) {
     const original = InputRenderer.prototype[method];
@@ -91,10 +98,11 @@ export async function observeSample() {
       if (live && !live.session.ended) {
         const hand = method === 'addController' ? args[1] : [...live.session.inputSources][(method === 'addCursor' ? this._activeCursors : this._activeLasers) - 1]?.handedness;
         const matrix = Array.from(args[0].matrix ?? args[0]);
-        let rendered;
-        if (method === 'addController') rendered = this._controllers?.[args[2] + '_' + hand]?.nodes.some((n: any) => n.visible) ?? false;
-        else rendered = (method === 'addCursor' ? this._cursors[this._activeCursors - 1] : this._lasers[this._activeLasers - 1]).visible;
-        w.sampleConsumed[hand + '-' + method] = {matrix, finite: matrix.every(Number.isFinite), rendered, registeredMeshes: method === 'addController' ? Object.keys(this._controllers) : undefined, requestedProfile: args[2]};
+        const controller = method === 'addController' ? this._controllers?.[args[2] + '_' + hand] : null;
+        const node = method === 'addController' ? controller?.nodes[(controller.activeCount + this._maxInputElements - 1) % this._maxInputElements] : (method === 'addCursor' ? this._cursors[this._activeCursors - 1] : this._lasers[this._activeLasers - 1]);
+        const primitives = (n: any): number => !n?.visible ? 0 : (n._renderPrimitives?.length ?? 0) + n.children.reduce((sum: number,c: any)=>sum+primitives(c),0);
+        const primitiveCount = primitives(node);
+        w.sampleConsumed[hand + '-' + method] = {matrix, finite: matrix.every(Number.isFinite), rendered: !!node?.visible && primitiveCount > 0, nodeMatrix: node ? Array.from(node.matrix) : null, primitiveCount, hit: method === 'addCursor' ? w.sampleHit : undefined, registeredMeshes: method === 'addController' ? Object.keys(this._controllers) : undefined, requestedProfile: args[2]};
       }
       return result;
     };
@@ -114,10 +122,10 @@ export function trackingPixels() {
     for (let y = 0; y < canvas.height; y++) for (let x = Math.floor(eye * canvas.width / 2); x < Math.floor((eye + 1) * canvas.width / 2); x++) {
       const i = (y * canvas.width + x) * 4, r = data[i], g = data[i + 1], b = data[i + 2];
       colors.add((r << 16) + (g << 8) + b);
-      // Colored cave/controllers/objects, excluding uniform gray background.
+      // Colored room/controllers/objects, excluding uniform gray background.
       if (Math.max(r, g, b) - Math.min(r, g, b) > 20) foreground++;
       const eyeX = x - Math.floor(eye * canvas.width / 2);
-      // The cave is static; omit the middle third containing animated stats.
+      // Omit the middle third containing animated stats.
       if (previous?.width === canvas.width && previous.height === canvas.height && y > canvas.height / 2 && (eyeX < canvas.width / 6 || eyeX > canvas.width / 3) && Math.max(Math.abs(r-previous.data[i]),Math.abs(g-previous.data[i+1]),Math.abs(b-previous.data[i+2])) > 8) changedOutsideStats++;
       hash = Math.imul(hash ^ ((r << 16) + (g << 8) + b), 16777619) >>> 0;
     }
