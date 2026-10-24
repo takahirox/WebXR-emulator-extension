@@ -1,6 +1,6 @@
 # Virtual room plane detection
 
-Issue [#51](https://github.com/takahirox/WebXR-emulator-extension/issues/51) replaces per-triangle planes with deterministic, useful planar regions and completes the XRPlane/XRPlaneSet bindings. Support remains limited to Quest MR and Android AR `immersive-ar`; Quest VR and inline reject required plane detection and omit optional requests. Mesh detection remains the existing triangle representation. Semantic labels are null; there is no physical camera, recognition, manual capture, or sensor feed.
+Issue [#51](https://github.com/takahirox/WebXR-emulator-extension/issues/51) replaces per-triangle planes with deterministic, useful planar regions and implements ordinary XRPlane/XRPlaneSet bindings. Its original claim that the bindings were complete was too broad: #51/#52 did not protect shared registry entries or test registry mutation. Issue [#57](https://github.com/takahirox/WebXR-emulator-extension/issues/57) closes those exposed paths with private allocation/tracking and protected readers; this remains a bounded virtual-room implementation, not complete WebIDL or native security isolation. Support remains limited to Quest MR and Android AR `immersive-ar`; Quest VR and inline reject required plane detection and omit optional requests. Inline exclusion follows the Plane Detection module; the AR-only restriction is emulator policy. Mesh detection remains the existing triangle representation. Semantic labels are null; there is no physical camera, recognition, manual capture, or sensor feed.
 
 ## Representation and measurements
 
@@ -28,6 +28,8 @@ Coverage and overlap use independent convex clipping against the original world-
 
 XRPlane and XRPlaneSet are nonconstructible. Plane metadata and set size are branded readonly prototype getters. Polygon arrays and their DOMPointReadOnly values are frozen; unchanged polygons and planeSpace retain identity. Sets provide insertion-order values, paired entries, exact `keys === values === Symbol.iterator` aliases, and callback `(value, value, set)` with the supplied receiver. Every operation checks its receiver, `has` requires a genuine XRPlane, and `forEach` checks callability even on empty sets. Genuine nonmembers return false. Forged prototypes and proxies fail; operations borrowed from independently injected realms work with genuine objects from either realm.
 
+The same-origin registry retains `planeValues.get` and `planeSets.get` as frozen readers. It exposes no registration, replacement or deletion methods. Plane views contain only the space and readonly published metadata; pose matrices and comparison signatures stay private. Collection views contain a fixed size and read operations, with no backing Set access. Freezing the outer registry alone would not protect a WeakMap's entries. A shared `PlaneTracker` allocates fresh state from the virtual backend and requires a session allocation brand; its factory never accepts plane records, membership iterables or reader callbacks. Public interface constructors always throw, including reflective construction, and internal allocation bypasses mutable public superclass chains. Space providers return matrix copies. These protections address the exposed registry paths; arbitrary page monkey-patching of emulator internals is outside this claim.
+
 Frame membership is a snapshot, while tracked plane attributes can change. Shape/orientation changes advance lastChangedTime, and pose-only changes do not. Numerical shape comparison uses the last published polygon, so accumulated sub-tolerance changes eventually publish rather than disappearing frame by frame. Removal clears poses but retains readable metadata; reacquisition allocates fresh identities. A tracked plane can temporarily have unavailable pose information without losing membership. Valid active owning-frame pose queries return null for removed spaces. Foreign-session spaces and inactive frames reject InvalidStateError; invalid plane-frame getter receivers reject TypeError first. Shutdown clears tracking, callbacks and presentation resources.
 
 The [pinned plane draft 394f13e](https://github.com/immersive-web/plane-detection/blob/394f13ee76d31f3885eb1237777cf2ecb1b87cbc/index.bs) conflicts internally: its attribute-change prose excludes pose-only changes, but its update algorithm assigns lastChangedTime unconditionally. This implementation explicitly follows the attribute-change interpretation, corroborated by the pinned WPT unchanged-frame assertion. It does not claim the conflicting algorithm was removed from the source.
@@ -36,7 +38,31 @@ The [pinned plane draft 394f13e](https://github.com/immersive-web/plane-detectio
 
 Primary contracts also include [Device CRD, 9 June 2026](https://www.w3.org/TR/2026/CRD-webxr-20260609/), [Anchors d9c6266](https://github.com/immersive-web/anchors/blob/d9c6266d5e28caf98bff046dcbba31abd0b6d3f1/index.bs), and [WebIDL 622910c](https://github.com/whatwg/webidl/blob/622910c67c724e362f71e8255a0380bade261acb/index.bs).
 
-## Reproduce
+## Issue #57 execution
+
+The [current execution record](webxr-plane-registry-validation-2026-10-24.json) and [retained logs/report summaries](validation/issue-57) cover the registry fix separately from historical #51/#53/#55 results. Both Chromium 156.0.8078.4 and Firefox 157.0 execute five plane scenarios through fresh unpacked-extension profiles and the genuine DevTools panel: Quest VR, Quest MR, Android AR, Quest inline and Android inline. Each browser executes 21,111 assertions, including independently injected populated parent/child AR sessions (85 planes and 100 meshes per child), borrowed bindings, rejected forgeries, foreign-session spaces, inactive frames, all registry mutation paths, empty and populated collections, reflective allocation, lifecycle, restart, anchors and mesh interoperability. The focused mesh checks also exercise populated child sessions. No application rerun or independent AI review is part of #57.
+
+Eight independent environment regressions fail against the original source: registration, replacement, deletion, returned-record mutation, pose-buffer mutation, geometry-signature mutation, populated-Set clearing and empty-Set insertion. The baseline browser run also fails on registry registration. The corrected environment suite passes 29 tests, including existing geometry measurements and a superclass interception probe. One intermediate run failed because allocator extraction changed ES module initialization order; preserving geometry initialization before allocator setup corrected it. Build output retains the existing mesh allocation cycle warning and reports the analogous deferred plane allocation cycle; source-module initialization, bundled startup and both browsers are exercised successfully.
+
+Run the current checks with the locked dependencies and official browser tools:
+
+```sh
+npm ci
+npm run build:firefox
+npm run test:environment
+npx tsx tests/reference-space-browser.ts chromium planes
+WEBXR_FIREFOX_EXECUTABLE=/absolute/path/Firefox.app/Contents/MacOS/firefox \
+WEBXR_GECKODRIVER=/absolute/path/geckodriver \
+npx tsx tests/reference-space-browser.ts firefox planes
+npm run test:meshes:chromium
+WEBXR_FIREFOX_EXECUTABLE=/absolute/path/Firefox.app/Contents/MacOS/firefox \
+WEBXR_GECKODRIVER=/absolute/path/geckodriver \
+npm run test:meshes:firefox
+```
+
+Report summaries retain assertion labels with occurrence counts, measurements, browser/tool versions, source/bundle SHA-256 hashes, instrumentation, failures, skips and cleanup results. Full repeated assertion lists remain in ignored `test-results/`; no historical application result is counted as current execution. Optional popup/consumer scenarios, broad application/browser suites, unmodified native WPT and physical devices were not run for #57. No specification requirement was changed and no post-merge check is required. Other incomplete modules in the inventory remain unfinished.
+
+## Historical #51 reproduction
 
 Install the locked dependencies and the current Playwright desktop Chromium. Use the official Firefox/geckodriver setup in [Firefox reproduction](firefox-runtime.md#reproduce), then run:
 
@@ -59,7 +85,7 @@ WEBXR_GECKODRIVER="$PWD/test-results/browser-tools/geckodriver" \
 npm run test:pose-view:firefox
 ```
 
-The focused selections extend the existing Chromium/Firefox driver and pinned upstream server. They load the actual extension in fresh profiles and configure devices through the genuine DevTools panel. JSON measurements and PNG captures go to `test-results/`. The versioned [execution record](webxr-planes-validation-2026-10-24.json) identifies exact tested hashes, commands, versions, source/dependency provenance, captures, resolved failures and unperformed checks. The generated Firefox package remains untracked; the tracked polyfill bundle is rebuilt.
+The focused selections extend the existing Chromium/Firefox driver and pinned upstream server. They load the actual extension in fresh profiles and configure devices through the genuine DevTools panel. JSON measurements and PNG captures go to `test-results/`. The historical #51 [execution record](webxr-planes-validation-2026-10-24.json) identifies exact tested hashes, commands, versions, source/dependency provenance, captures, resolved failures and unperformed checks. The generated Firefox package remains untracked; the tracked polyfill bundle is rebuilt.
 
 ## Pinned applications and observation
 

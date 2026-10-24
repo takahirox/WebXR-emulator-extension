@@ -1,0 +1,6 @@
+scenario chromium Meta Quest 3 immersive-vr
+scenario chromium Meta Quest 3 immersive-ar
+scenario chromium Generic Android Phone (ARCore) immersive-ar
+scenario chromium Meta Quest 3 inline
+scenario chromium Generic Android Phone (ARCore) inline
+{"status":"passed","browser":"chromium","scenarios":5,"assertions":21111,"failures":[]}
