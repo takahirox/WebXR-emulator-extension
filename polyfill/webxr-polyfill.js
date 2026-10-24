@@ -1108,6 +1108,9 @@ function WebXRPolyfillInjection() {
       Object.freeze(InputSourceObject);
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
           layerAllocations: createLayerAllocations(sessions),
+          planeValues: new WeakMap(),
+          planeSets: new WeakMap(),
+          roomCaptures: new WeakMap(),
           transforms: new WeakMap(),
           referenceOffsets: new WeakMap(),
           referenceSpaceRequests: new WeakMap(),
@@ -25604,6 +25607,102 @@ void main() {
   	}
   }
 
+  const epsilon = 1e-5;
+  const canonical = (e) => { var _a; const first = (_a = e.toArray().find(v => Math.abs(v) > epsilon)) !== null && _a !== void 0 ? _a : 1; return first < 0 ? e.negate() : e; };
+  const edgeKey = (a, b) => [a, b].map(p => p.toArray().map(v => Math.round(v / epsilon)).join(',')).sort().join(':');
+  function planeRegions(mesh) {
+      var _a;
+      const attribute = mesh.geometry.getAttribute('position');
+      if (!attribute)
+          return [];
+      const indices = mesh.geometry.index, triangles = [];
+      for (let i = 0; i + 2 < ((_a = indices === null || indices === void 0 ? void 0 : indices.count) !== null && _a !== void 0 ? _a : attribute.count); i += 3) {
+          const points = [0, 1, 2].map(j => new Vector3().fromBufferAttribute(attribute, indices ? indices.getX(i + j) : i + j));
+          if (!points.every(p => p.toArray().every(Number.isFinite)))
+              continue;
+          const normal = points[1].clone().sub(points[0]).cross(points[2].clone().sub(points[0]));
+          const area = normal.length() / 2;
+          if (area < 1e-10)
+              continue;
+          triangles.push({ ids: [i], points, normal: normal.normalize(), area });
+      }
+      const groups = [];
+      const pending = new Set(triangles);
+      for (const seed of triangles) {
+          if (!pending.delete(seed))
+              continue;
+          const group = [seed], edges = new Set();
+          const addEdges = (r) => r.points.forEach((p, i) => edges.add(edgeKey(p, r.points[(i + 1) % 3])));
+          addEdges(seed);
+          for (let changed = true; changed;) {
+              changed = false;
+              for (const candidate of pending) {
+                  if (seed.normal.dot(candidate.normal) < 1 - 1e-8 || candidate.points.some(p => Math.abs(p.clone().sub(seed.points[0]).dot(seed.normal)) > epsilon))
+                      continue;
+                  if (!candidate.points.some((p, i) => edges.has(edgeKey(p, candidate.points[(i + 1) % 3]))))
+                      continue;
+                  pending.delete(candidate);
+                  group.push(candidate);
+                  addEdges(candidate);
+                  changed = true;
+              }
+          }
+          groups.push(group);
+      }
+      const regions = [];
+      for (const group of groups) {
+          const edges = new Map();
+          for (const triangle of group)
+              triangle.points.forEach((p, i) => {
+                  const q = triangle.points[(i + 1) % 3], key = edgeKey(p, q), edge = edges.get(key);
+                  if (edge)
+                      edge.count++;
+                  else
+                      edges.set(key, { a: p, b: q, count: 1 });
+              });
+          const boundary = [...edges.values()].filter(e => e.count === 1);
+          const directions = boundary.map(e => canonical(e.b.clone().sub(e.a)));
+          directions.sort((a, b) => Math.abs(b.lengthSq() - a.lengthSq()) > epsilon ? b.lengthSq() - a.lengthSq() : b.x - a.x || b.y - a.y || b.z - a.z);
+          if (!directions.length)
+              continue;
+          const x = directions[0].normalize(), normal = group[0].normal, z = x.clone().cross(normal);
+          const projected = boundary.map(e => ({ a: [e.a.dot(x), e.a.dot(z)], b: [e.b.dot(x), e.b.dot(z)] }));
+          const coordinates = projected.flatMap(e => [e.a[0], e.b[0]]).sort((a, b) => a - b);
+          const cuts = coordinates.filter((v, i) => !i || v - coordinates[i - 1] > epsilon);
+          const distance = group[0].points[0].dot(normal);
+          const point = (u, v) => x.clone().multiplyScalar(u).addScaledVector(z, v).addScaledVector(normal, distance);
+          const at = (e, u) => e.a[1] + (e.b[1] - e.a[1]) * (u - e.a[0]) / (e.b[0] - e.a[0]);
+          let part = 0;
+          for (let i = 0; i + 1 < cuts.length; i++) {
+              const left = cuts[i], right = cuts[i + 1], mid = (left + right) / 2;
+              const hits = projected.filter(e => mid > Math.min(e.a[0], e.b[0]) && mid < Math.max(e.a[0], e.b[0])).sort((a, b) => at(a, mid) - at(b, mid));
+              for (let j = 0; j + 1 < hits.length; j += 2) {
+                  const a = hits[j], b = hits[j + 1];
+                  const points = [point(left, at(a, left)), point(right, at(a, right)), point(right, at(b, right)), point(left, at(b, left))];
+                  const unique = points.filter((p, k) => p.distanceTo(points[(k + 1) % 4]) > epsilon);
+                  if (unique.length < 3)
+                      continue;
+                  regions.push({ ids: [group[0].ids[0], part++], points: unique, normal, area: 0, axis: x });
+              }
+          }
+      }
+      return regions.map(region => {
+          const axis = region.axis;
+          const origin = region.points[0].clone().applyMatrix4(mesh.matrixWorld);
+          const x = region.points[0].clone().add(axis).applyMatrix4(mesh.matrixWorld).sub(origin).normalize();
+          const normalMatrix = new Matrix4().copy(mesh.matrixWorld).invert().transpose();
+          const y = region.normal.clone().transformDirection(normalMatrix);
+          const z = x.clone().cross(y).normalize();
+          const points = region.points.map(p => p.clone().applyMatrix4(mesh.matrixWorld).sub(origin));
+          const xs = points.map(p => p.dot(x)), zs = points.map(p => p.dot(z));
+          const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+          const center = origin.addScaledVector(x, cx).addScaledVector(z, cz);
+          return { key: `${mesh.uuid}:${region.ids.join(',')}`, matrix: new Float32Array(new Matrix4().makeBasis(x, y, z).setPosition(center).elements),
+              vertices: points.flatMap((p, i) => [xs[i] - cx, 0, zs[i] - cz]),
+              orientation: Math.abs(y.y) > 0.999 ? 'horizontal' : Math.abs(y.y) < 0.001 ? 'vertical' : null };
+      });
+  }
+
   function roomMeshes(room) {
       const meshes = [];
       room === null || room === void 0 ? void 0 : room.traverse(object => { if (object instanceof Mesh && object.name !== 'sky')
@@ -25650,8 +25749,50 @@ void main() {
           callback.call(thisArg, value, value, this); }
       [Symbol.iterator]() { return this.values(); }
   }
-  class XRPlaneSet extends ReadonlyDetectionSet {
+  const planeAllocation = Symbol('plane allocation');
+  function planeState(value) {
+      const state = interfaceBrands.planeValues.get(value);
+      if (!state)
+          throw new TypeError('Expected XRPlane.');
+      return state;
   }
+  function planeSetState(value) {
+      const state = interfaceBrands.planeSets.get(value);
+      if (!state)
+          throw new TypeError('Expected XRPlaneSet.');
+      return state;
+  }
+  class XRPlaneSet {
+      constructor(values, token) {
+          if (token !== planeAllocation)
+              throw new TypeError('Illegal constructor.');
+          interfaceBrands.planeSets.set(this, new Set(values));
+      }
+      get size() { return planeSetState(this).size; }
+      has(value) {
+          const set = planeSetState(this);
+          if (!arguments.length)
+              throw new TypeError('XRPlane is required.');
+          planeState(value);
+          return set.has(value);
+      }
+      values() { return planeSetState(this).values(); }
+      keys() { return this.values(); }
+      entries() { return planeSetState(this).entries(); }
+      forEach(callback, thisArg = undefined) {
+          const set = planeSetState(this);
+          if (typeof callback !== 'function')
+              throw new TypeError('Expected callable callback.');
+          for (const value of set)
+              Reflect.apply(callback, thisArg, [value, value, this]);
+      }
+      [Symbol.iterator]() { return this.values(); }
+  }
+  Object.defineProperties(XRPlaneSet.prototype, {
+      keys: { value: XRPlaneSet.prototype.values, writable: true, configurable: true, enumerable: true },
+      [Symbol.iterator]: { value: XRPlaneSet.prototype.values, writable: true, configurable: true },
+      [Symbol.toStringTag]: { value: 'XRPlaneSet', configurable: true },
+  });
   class XRMeshSet extends ReadonlyDetectionSet {
   }
   class TrackedSurface {
@@ -25673,18 +25814,39 @@ void main() {
           this.matrix = surface.matrix;
       }
   }
-  class XRPlane extends TrackedSurface {
-      constructor() {
-          super(...arguments);
-          this.polygonValue = Object.freeze([]);
+  class XRPlane {
+      constructor(session, token) {
+          if (token !== planeAllocation)
+              throw new TypeError('Illegal constructor.');
+          const state = { space: null, polygon: Object.freeze([]),
+              orientation: null, changed: 0, matrix: null, signature: [] };
+          state.space = new XRSpace(session, () => session.ended ? null : state.matrix);
+          interfaceBrands.planeValues.set(this, state);
       }
-      get planeSpace() { return this.space; }
-      get polygon() { return this.polygonValue; }
-      get orientation() { return this.orientationValue; }
-      _update(surface, time) {
-          super._update(surface, time);
-          this.polygonValue = Object.freeze([0, 3, 6].map(i => new DOMPointReadOnly(surface.vertices[i], 0, surface.vertices[i + 2], 1)));
+      get planeSpace() { return planeState(this).space; }
+      get polygon() { return planeState(this).polygon; }
+      get orientation() { return planeState(this).orientation; }
+      get lastChangedTime() { return planeState(this).changed; }
+      get semanticLabel() { planeState(this); return null; }
+  }
+  Object.defineProperty(XRPlane, 'length', { value: 0 });
+  Object.defineProperty(XRPlaneSet, 'length', { value: 0 });
+  Object.defineProperty(XRPlane.prototype, Symbol.toStringTag, { value: 'XRPlane', configurable: true });
+  for (const prototype of [XRPlane.prototype, XRPlaneSet.prototype]) {
+      for (const name of Object.getOwnPropertyNames(prototype)) {
+          if (name !== 'constructor')
+              Object.defineProperty(prototype, name, { enumerable: true });
       }
+  }
+  function updatePlane(plane, surface, time) {
+      const state = planeState(plane);
+      if (state.signature.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - state.signature[i]) > 1e-5) || state.orientation !== surface.orientation) {
+          state.changed = time;
+          state.signature = surface.vertices.slice();
+          state.polygon = Object.freeze(Array.from({ length: surface.vertices.length / 3 }, (_, i) => Object.freeze(new DOMPointReadOnly(surface.vertices[i * 3], 0, surface.vertices[i * 3 + 2], 1))));
+      }
+      state.orientation = surface.orientation;
+      state.matrix = surface.matrix;
   }
   class XRMesh extends TrackedSurface {
       constructor() {
@@ -25708,18 +25870,24 @@ void main() {
           this.meshes = new Map();
       }
       update(time) {
-          var _a, _b;
+          var _a, _b, _c, _d;
           const surfaces = roomSurfaces((_b = (_a = this.session._device.arScene) === null || _a === void 0 ? void 0 : _a.room) !== null && _b !== void 0 ? _b : null);
-          const keys = new Set(surfaces.map(surface => surface.key));
-          this.reconcile(this.planes, keys);
-          this.reconcile(this.meshes, keys);
-          for (const surface of surfaces) {
-              if (this.session.enabledFeatures.includes('plane-detection')) {
+          const planeSurfaces = roomMeshes((_d = (_c = this.session._device.arScene) === null || _c === void 0 ? void 0 : _c.room) !== null && _d !== void 0 ? _d : null).flatMap(planeRegions);
+          const planeKeys = new Set(planeSurfaces.map(surface => surface.key));
+          for (const [key, plane] of this.planes)
+              if (!planeKeys.has(key)) {
+                  planeState(plane).matrix = null;
+                  this.planes.delete(key);
+              }
+          this.reconcile(this.meshes, new Set(surfaces.map(surface => surface.key)));
+          if (this.session.enabledFeatures.includes('plane-detection'))
+              for (const surface of planeSurfaces) {
                   let plane = this.planes.get(surface.key);
                   if (!plane)
-                      this.planes.set(surface.key, plane = new XRPlane(this.session));
-                  plane._update(surface, time);
+                      this.planes.set(surface.key, plane = new XRPlane(this.session, planeAllocation));
+                  updatePlane(plane, surface, time);
               }
+          for (const surface of surfaces) {
               if (this.session.enabledFeatures.includes('mesh-detection')) {
                   let mesh = this.meshes.get(surface.key);
                   if (!mesh)
@@ -25735,8 +25903,9 @@ void main() {
                   map.delete(key);
               }
       }
-      snapshot() { return { planes: new XRPlaneSet(this.planes.values()), meshes: new XRMeshSet(this.meshes.values()) }; }
-      clear() { this.reconcile(this.planes, new Set()); this.reconcile(this.meshes, new Set()); }
+      snapshot() { return { planes: new XRPlaneSet(this.planes.values(), planeAllocation), meshes: new XRMeshSet(this.meshes.values()) }; }
+      clear() { for (const plane of this.planes.values())
+          planeState(plane).matrix = null; this.planes.clear(); this.reconcile(this.meshes, new Set()); }
   }
 
   var environment = /*#__PURE__*/Object.freeze({
@@ -26628,6 +26797,13 @@ void main() {
           this.activeRenderState = new XRRenderState({ inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null });
           const viewerMatrix = () => clone$1(_device.getBasePoseMatrix());
           this._viewer = new XRReferenceSpace(this, 'viewer', viewerMatrix);
+          interfaceBrands.roomCaptures.set(this, async () => {
+              this._assertLive();
+              if (this.roomCaptureCompleted)
+                  invalidState('Room capture already completed.');
+              this._require('plane-detection');
+              this.roomCaptureCompleted = true;
+          });
           interfaceBrands.viewerPoses.set(this, (frame, reference) => allocateViewerPose(frame, reference));
           interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
               let settled = false;
@@ -26743,12 +26919,16 @@ void main() {
       _setImmersiveSuppressed(value) {
           this.immersiveSuppressed = value;
       }
-      async initiateRoomCapture() {
-          this._assertLive();
-          if (this.roomCaptureCompleted)
-              invalidState('Room capture already completed.');
-          this._require('plane-detection');
-          this.roomCaptureCompleted = true;
+      initiateRoomCapture() {
+          try {
+              const capture = interfaceBrands.roomCaptures.get(this);
+              if (!capture)
+                  throw new TypeError('Expected XRSession receiver.');
+              return capture();
+          }
+          catch (error) {
+              return Promise.reject(error);
+          }
       }
       requestReferenceSpace(type) {
           try {
@@ -26924,7 +27104,7 @@ void main() {
           state.session._owns(referenceSpace);
           return interfaceBrands.viewerPoses.get(state.session)(this, referenceSpace);
       }
-      get detectedPlanes() { this._assertActive(); return this.environmentSnapshot.planes; }
+      get detectedPlanes() { frameState(this); this._assertActive(); return this.environmentSnapshot.planes; }
       get detectedMeshes() { this._assertActive(); return this.environmentSnapshot.meshes; }
       get trackedAnchors() { this._assertActive(); this.session._require('anchors'); return this.anchorSnapshot; }
       async createAnchor(pose, space) {

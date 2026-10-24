@@ -493,9 +493,11 @@ export async function runConformance(page: Page, mode: SessionMode, handheld: bo
             check(plane instanceof xr.XRPlane && plane.polygon.length >= 3 && Object.isFrozen(plane.polygon) && plane.polygon.every(p => p.y === 0 && p.w === 1), 'plane polygon is frozen, planar and nonempty');
             const matrix = new three.Matrix4().fromArray(frame.getPose(plane.planeSpace, reference)!.transform.matrix);
             const points = plane.polygon.map(p => new three.Vector3(p.x, p.y, p.z).applyMatrix4(matrix));
-            const triangle = new three.Triangle(points[0], points[1], points[2]);
             const point = new three.Vector3(hitPoint.x, hitPoint.y, hitPoint.z);
-            if (triangle.closestPointToPoint(point, new three.Vector3()).distanceTo(point) < 1e-4) matchesHit = true;
+            for (let i = 1; i + 1 < points.length; i++) {
+              const triangle = new three.Triangle(points[0], points[i], points[i + 1]);
+              if (triangle.closestPointToPoint(point, new three.Vector3()).distanceTo(point) < 1e-4) matchesHit = true;
+            }
           }
           check(matchesHit, 'detected geometry contains the actual room hit-test point');
           for (const mesh of meshes) check(mesh instanceof xr.XRMesh && mesh.vertices instanceof Float32Array && mesh.indices instanceof Uint32Array && mesh.vertices.length >= 9 && mesh.indices.every(index => index < mesh.vertices.length / 3) && !!frame.getPose(mesh.meshSpace, reference), 'mesh indexed triangles have a tracked pose');
