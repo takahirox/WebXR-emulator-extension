@@ -18,7 +18,27 @@ export async function meshCases(mode: SessionMode) {
   async function layer(s:any,realm:any=w) {const c=realm.document.createElement('canvas'); const g=c.getContext('webgl2')!;await g.makeXRCompatible();const l=new realm.XRWebGLLayer(s,g);s.updateRenderState({baseLayer:l});return l;}
   let session:any,room:any;
   try {
+    check(w.XRMesh!==other.XRMesh && w.XRMeshSet!==other.XRMeshSet,'realm-local mesh interface objects');
     for(const realm of [w,other]) for(const name of ['XRMesh','XRMeshSet']) {throws(()=>new realm[name](),'TypeError',`${name} illegal constructor`);check(realm[name].length===0,'nonconstructible interface length');}
+    for(const realm of [w,other]) {
+      const registry=w[Symbol.for('WebXR-emulator.interface-brands')].meshAllocations;
+      let reads=0,iterations=0;
+      const shape=()=>{reads++;return {vertices:new Float32Array([1,2,3]),indices:new Uint32Array([0]),changed:42};};
+      const values={*[Symbol.iterator](){iterations++;yield {};}};
+      for(const [C,args,Interface] of [
+        [Object.getPrototypeOf(realm.XRMesh),[{},shape],realm.XRMesh],
+        [Object.getPrototypeOf(realm.XRMeshSet),[values],realm.XRMeshSet],
+        [realm.XRMesh,[{},shape],realm.XRMesh],
+        [realm.XRMeshSet,[[]],realm.XRMeshSet],
+      ]) for(const token of [undefined,Symbol('mesh allocation'),registry]) {
+        const input=[...args,token];
+        throws(()=>Reflect.construct(C,input),'TypeError','direct mesh allocation rejected');
+        for(const Target of [Interface,class extends Interface {}])
+          throws(()=>Reflect.construct(C,input,Target),'TypeError','reflective mesh allocation cannot acquire brand');
+      }
+      check(reads===0 && iterations===0,'unauthorized allocations reject before caller callbacks');
+      throws(()=>new registry.MeshTracker({}),'TypeError','tracker requires session allocation brand');
+    }
     if(mode!=='immersive-ar') {
       await rejects(request({requiredFeatures:['mesh-detection']}),'NotSupportedError','unsupported required mesh negotiation');
       session=await request({optionalFeatures:['mesh-detection']});sessions.push(session);await layer(session);

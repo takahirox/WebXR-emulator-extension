@@ -1,48 +1,10 @@
-import {Matrix4, Mesh, Object3D, Vector3} from 'three';
 import {mat4} from 'gl-matrix';
 import {XRSpace} from './geometry';
 import type {XRSession} from './runtime';
 import {interfaceBrands} from './interface-brand';
 import {planeRegions} from './plane-regions';
-
-/** Detection, hit testing and depth share these sensed room meshes. Plane
- * regions have a separate partition; mesh sensing keeps the source triangles.
- * The decorative sky is excluded. No camera/recognition is used. */
-export function roomMeshes(room: Object3D | null) {
-  const meshes: Mesh[] = [];
-  room?.traverse(object => { if (object instanceof Mesh && object.name !== 'sky') meshes.push(object); });
-  return meshes;
-}
-export interface Surface {
-  key: string;
-  matrix: mat4;
-  vertices: number[];
-  orientation: 'horizontal' | 'vertical' | null;
-}
-export function roomSurfaces(room: Object3D | null): Surface[] {
-  room?.updateWorldMatrix(true, true);
-  const surfaces: Surface[] = [];
-  for (const mesh of roomMeshes(room)) {
-    const positions = mesh.geometry.getAttribute('position');
-    if (!positions) continue;
-    const indices = mesh.geometry.index;
-    const count = indices?.count ?? positions.count;
-    for (let i = 0; i + 2 < count; i += 3) {
-      const points = [0, 1, 2].map(j => new Vector3().fromBufferAttribute(positions, indices ? indices.getX(i + j) : i + j).applyMatrix4(mesh.matrixWorld));
-      const x = points[1].clone().sub(points[0]);
-      const edge = points[2].clone().sub(points[0]);
-      const y = x.clone().cross(edge);
-      if (y.lengthSq() < 1e-12) continue;
-      x.normalize(); y.normalize(); const z = x.clone().cross(y);
-      const center = points[0].clone().add(points[1]).add(points[2]).multiplyScalar(1 / 3);
-      const matrix = new Matrix4().makeBasis(x, y, z).setPosition(center);
-      const vertices = points.flatMap(point => { const delta = point.clone().sub(center); return [delta.dot(x), 0, delta.dot(z)]; });
-      surfaces.push({key: `${mesh.uuid}:${i}`, matrix: new Float32Array(matrix.elements), vertices,
-        orientation: Math.abs(y.y) > 0.999 ? 'horizontal' : Math.abs(y.y) < 0.001 ? 'vertical' : null});
-    }
-  }
-  return surfaces;
-}
+import {roomMeshes, type Surface} from './room-surfaces';
+export {roomMeshes, roomSurfaces, type Surface} from './room-surfaces';
 
 const planeAllocation = Symbol('plane allocation');
 function planeState(value: XRPlane) {
@@ -82,7 +44,6 @@ Object.defineProperties(XRPlaneSet.prototype, {
   [Symbol.iterator]: {value: XRPlaneSet.prototype.values, writable: true, configurable: true},
   [Symbol.toStringTag]: {value: 'XRPlaneSet', configurable: true},
 });
-const meshAllocation = Symbol('mesh allocation');
 const meshBindings = interfaceBrands.meshAllocations;
 function meshState(value: XRMesh) {
   const state = meshBindings.meshes.get(value);
@@ -94,11 +55,8 @@ function meshSetState(value: XRMeshSet) {
   if (!state) throw new TypeError('Expected XRMeshSet.');
   return state;
 }
-export class XRMeshSet extends meshBindings.MeshSetAllocation implements Iterable<XRMesh> {
-  constructor(values: Iterable<XRMesh>, token?: symbol) {
-    if (token !== meshAllocation) throw new TypeError('Illegal constructor.');
-    super(values);
-  }
+export class XRMeshSet implements Iterable<XRMesh> {
+  constructor(_values?: Iterable<XRMesh>) { throw new TypeError('Illegal constructor.'); }
   get size() { return meshSetState(this).size; }
   has(value: XRMesh) {
     const set = meshSetState(this);
@@ -156,16 +114,9 @@ function updatePlane(plane: XRPlane, surface: Surface, time: number) {
   }
   state.orientation = surface.orientation; state.matrix = surface.matrix;
 }
-type MeshTracking = {matrix: mat4 | null; vertices: Float32Array; indices: Uint32Array; changed: number};
-const meshTracking = new WeakMap<XRMesh, MeshTracking>();
-export class XRMesh extends meshBindings.MeshAllocation {
-  constructor(session: XRSession, token?: symbol) {
-    if (token !== meshAllocation) throw new TypeError('Illegal constructor.');
-    const state: MeshTracking = {matrix: null, vertices: new Float32Array(), indices: new Uint32Array(), changed: 0};
-    const space = new XRSpace(session, () => session.ended ? null : state.matrix);
-    super(space, () => state);
-    meshTracking.set(this, state);
-  }
+
+export class XRMesh {
+  constructor(_session?: XRSession) { throw new TypeError('Illegal constructor.'); }
   get meshSpace() { return meshState(this).space; }
   get vertices() { return meshState(this).vertices(); }
   get indices() { return meshState(this).indices(); }
@@ -179,45 +130,25 @@ for (const C of [XRMesh, XRMeshSet]) {
     if (name !== 'constructor') Object.defineProperty(C.prototype, name, {enumerable: true});
   }
 }
-function updateMesh(mesh: XRMesh, surface: Surface, time: number) {
-  const state = meshTracking.get(mesh)!;
-  // Mesh 5397685's attribute-change prose excludes pose-only changes, despite
-  // its update algorithm assigning timestamps unconditionally. Orientation is
-  // not an XRMesh attribute. Compare with the last published Float32 shape at
-  // 10 micrometres, retaining it until a change exceeds that tolerance.
-  if (state.vertices.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - state.vertices[i]) > 1e-5)) {
-    state.vertices = new Float32Array(surface.vertices);
-    state.indices = new Uint32Array([0, 1, 2]);
-    state.changed = time;
-  }
-  state.matrix = surface.matrix;
-}
 
 /** Session-owned identities; frame sets copy membership, never the mutable map. */
 export class EnvironmentTracker {
   private planes = new Map<string, XRPlane>();
-  private meshes = new Map<string, XRMesh>();
-  constructor(private session: XRSession) {}
+  private meshes: InstanceType<typeof interfaceBrands.meshAllocations.MeshTracker>;
+  constructor(private session: XRSession) {
+    this.meshes = new interfaceBrands.meshAllocations.MeshTracker(session, XRMesh.prototype, XRMeshSet.prototype);
+  }
   update(time: number) {
-    const surfaces = roomSurfaces(this.session._device.arScene?.room ?? null);
+    this.meshes.update(time);
     const planeSurfaces = roomMeshes(this.session._device.arScene?.room ?? null).flatMap(planeRegions);
     const planeKeys = new Set(planeSurfaces.map(surface=>surface.key));
     for (const [key, plane] of this.planes) if (!planeKeys.has(key)) { planeState(plane).matrix=null; this.planes.delete(key); }
-    const meshKeys = new Set(surfaces.map(surface => surface.key));
-    for (const [key, mesh] of this.meshes) if (!meshKeys.has(key)) { meshTracking.get(mesh)!.matrix = null; this.meshes.delete(key); }
     if (this.session.enabledFeatures.includes('plane-detection')) for (const surface of planeSurfaces) {
       let plane = this.planes.get(surface.key);
       if (!plane) this.planes.set(surface.key, plane = new XRPlane(this.session, planeAllocation));
       updatePlane(plane, surface, time);
     }
-    for (const surface of surfaces) {
-      if (this.session.enabledFeatures.includes('mesh-detection')) {
-        let mesh = this.meshes.get(surface.key);
-        if (!mesh) this.meshes.set(surface.key, mesh = new XRMesh(this.session, meshAllocation));
-        updateMesh(mesh, surface, time);
-      }
-    }
   }
-  snapshot() { return {planes: new XRPlaneSet(this.planes.values(), planeAllocation), meshes: new XRMeshSet(this.meshes.values(), meshAllocation)}; }
-  clear() { for (const plane of this.planes.values()) planeState(plane).matrix=null; this.planes.clear(); for (const mesh of this.meshes.values()) meshTracking.get(mesh)!.matrix = null; this.meshes.clear(); }
+  snapshot() { return {planes: new XRPlaneSet(this.planes.values(), planeAllocation), meshes: this.meshes.snapshot()}; }
+  clear() { for (const plane of this.planes.values()) planeState(plane).matrix=null; this.planes.clear(); this.meshes.clear(); }
 }

@@ -35,7 +35,7 @@ function createBrands() {
   const hitTestAllocations = createHitTestAllocations({sessions, spaces, frames, inputSources, transforms});
   return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
     layerAllocations: createLayerAllocations(sessions),
-    meshAllocations: createMeshAllocations(),
+    meshAllocations: createMeshAllocations(sessions),
     planeValues: new WeakMap<object, {
       space: import('./geometry').XRSpace; polygon: readonly DOMPointReadOnly[];
       orientation: 'horizontal' | 'vertical' | null; changed: number;

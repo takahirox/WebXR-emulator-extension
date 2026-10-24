@@ -1045,1472 +1045,6 @@ function WebXRPolyfillInjection() {
       });
   }
 
-  function createMeshAllocations() {
-      const meshes = new WeakMap();
-      const sets = new WeakMap();
-      class MeshAllocation {
-          constructor(space, read) {
-              meshes.set(this, Object.freeze({ space,
-                  vertices: () => new Float32Array(read().vertices),
-                  indices: () => new Uint32Array(read().indices), changed: () => read().changed }));
-          }
-      }
-      class MeshSetAllocation {
-          constructor(values) {
-              const snapshot = [...new Set(values)];
-              if (snapshot.some(value => !meshes.has(value)))
-                  throw new TypeError('Expected XRMesh.');
-              const set = new Set(snapshot);
-              sets.set(this, Object.freeze({ size: set.size, has: (value) => set.has(value),
-                  values: () => set.values(), entries: () => set.entries() }));
-          }
-      }
-      for (const C of [MeshAllocation, MeshSetAllocation]) {
-          Object.freeze(C.prototype);
-          Object.freeze(C);
-      }
-      return Object.freeze({ MeshAllocation, MeshSetAllocation,
-          meshes: Object.freeze({ get: (value) => meshes.get(value) }),
-          sets: Object.freeze({ get: (value) => sets.get(value) }) });
-  }
-
-  function createHitTestAllocations(brands) {
-      const rays = new WeakMap();
-      const hitSources = new WeakMap();
-      const transientHitSources = new WeakMap();
-      const hitResults = new WeakMap();
-      const transientHitResults = new WeakMap();
-      function sourceRecord(session, options, extra, membership, source) {
-          const offsetRay = options.offsetRay;
-          if (!brands.sessions.has(session) || !rays.has(offsetRay))
-              throw new TypeError('Expected session and ray.');
-          const entityTypes = Object.freeze([...options.entityTypes]);
-          if (entityTypes.some(type => !['plane', 'mesh', 'point'].includes(type)))
-              throw new TypeError('Invalid entity type.');
-          return Object.freeze({ ...extra, session, offsetRay, entityTypes,
-              get active() { return membership.has(source); } });
-      }
-      class RayAllocation {
-          constructor(p, d) {
-              p = { x: +p.x, y: +p.y, z: +p.z, w: +p.w };
-              d = { x: +d.x, y: +d.y, z: +d.z, w: +d.w };
-              if (p.w !== 1 || d.w !== 0 || ![d.x, d.y, d.z].every(Number.isFinite) || (d.x === 0 && d.y === 0 && d.z === 0))
-                  throw new TypeError('Invalid ray.');
-              const scale = Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
-              const length = Math.hypot(d.x / scale, d.y / scale, d.z / scale);
-              d.x = d.x / scale / length;
-              d.y = d.y / scale / length;
-              d.z = d.z / scale / length;
-              const origin = Object.freeze(new DOMPointReadOnly(p.x, p.y, p.z, p.w));
-              const direction = Object.freeze(new DOMPointReadOnly(d.x, d.y, d.z, d.w));
-              let matrix;
-              rays.set(this, Object.freeze({ origin, direction, matrix: () => {
-                      if (!matrix || matrix.buffer.byteLength === 0) {
-                          const rotation = create$3();
-                          const sine = Math.hypot(d.x, d.y);
-                          if (sine > 0) {
-                              fromRotation(rotation, Math.atan2(sine, -d.z), [d.y / sine, -d.x / sine, 0]);
-                          }
-                          else if (d.z > 0)
-                              fromRotation(rotation, Math.PI, [1, 0, 0]);
-                          rotation[12] = p.x;
-                          rotation[13] = p.y;
-                          rotation[14] = p.z;
-                          matrix = new Float32Array(rotation);
-                      }
-                      return matrix;
-                  } }));
-          }
-      }
-      class HitSourceAllocation {
-          constructor(session, options) {
-              const space = options.space;
-              if (!brands.spaces.has(space))
-                  throw new TypeError('Expected XRSpace.');
-              hitSources.set(this, sourceRecord(session, options, { space }, session._hitSources, this));
-          }
-      }
-      class TransientHitSourceAllocation {
-          constructor(session, options) {
-              const profile = `${options.profile}`;
-              transientHitSources.set(this, sourceRecord(session, options, { profile }, session._transientSources, this));
-          }
-      }
-      class HitResultAllocation {
-          constructor(frame, transform) {
-              if (!brands.frames.has(frame) || !brands.transforms.has(transform))
-                  throw new TypeError('Expected frame and transform.');
-              hitResults.set(this, Object.freeze({ frame, transform }));
-          }
-      }
-      class TransientHitResultAllocation {
-          constructor(frame, results, inputSource) {
-              if (!brands.frames.has(frame) || !brands.inputSources.has(inputSource))
-                  throw new TypeError('Expected frame and input source.');
-              const snapshot = [...results];
-              if (snapshot.some(result => { var _a; return ((_a = hitResults.get(result)) === null || _a === void 0 ? void 0 : _a.frame) !== frame; }))
-                  throw new TypeError('Expected frame hit results.');
-              transientHitResults.set(this, Object.freeze({ inputSource, results: Object.freeze(snapshot) }));
-          }
-      }
-      function reader(map) {
-          return Object.freeze({ get: (value) => map.get(value), has: (value) => map.has(value) });
-      }
-      for (const C of [RayAllocation, HitSourceAllocation, TransientHitSourceAllocation, HitResultAllocation, TransientHitResultAllocation]) {
-          Object.freeze(C.prototype);
-          Object.freeze(C);
-      }
-      return Object.freeze({ RayAllocation, HitSourceAllocation, TransientHitSourceAllocation, HitResultAllocation, TransientHitResultAllocation,
-          rays: reader(rays), hitSources: reader(hitSources), transientHitSources: reader(transientHitSources),
-          hitResults: reader(hitResults), transientHitResults: reader(transientHitResults) });
-  }
-
-  function createBrands() {
-      const frames = new WeakSet(), spaces = new WeakSet(), joints = new WeakSet();
-      const sessions = new WeakSet(), inputSources = new WeakSet();
-      class SessionObject extends EventTarget {
-          constructor() { super(); sessions.add(this); }
-      }
-      class InputSourceObject {
-          constructor() { inputSources.add(this); }
-      }
-      class FrameObject {
-          constructor() { frames.add(this); }
-      }
-      class SpaceObject extends EventTarget {
-          constructor(joint = false) { super(); spaces.add(this); if (joint)
-              joints.add(this); }
-      }
-      Object.freeze(FrameObject.prototype);
-      Object.freeze(FrameObject);
-      Object.freeze(SpaceObject.prototype);
-      Object.freeze(SpaceObject);
-      Object.freeze(SessionObject.prototype);
-      Object.freeze(SessionObject);
-      Object.freeze(InputSourceObject.prototype);
-      Object.freeze(InputSourceObject);
-      const transforms = new WeakMap();
-      const hitTestAllocations = createHitTestAllocations({ sessions, spaces, frames, inputSources, transforms });
-      return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
-          layerAllocations: createLayerAllocations(sessions),
-          meshAllocations: createMeshAllocations(),
-          planeValues: new WeakMap(),
-          planeSets: new WeakMap(),
-          roomCaptures: new WeakMap(),
-          hitTestAllocations,
-          rays: hitTestAllocations.rays,
-          hitSources: hitTestAllocations.hitSources,
-          transientHitSources: hitTestAllocations.transientHitSources,
-          hitResults: hitTestAllocations.hitResults,
-          transientHitResults: hitTestAllocations.transientHitResults,
-          transforms,
-          referenceOffsets: new WeakMap(),
-          referenceSpaceRequests: new WeakMap(),
-          frameValues: new WeakMap(),
-          viewerPoses: new WeakMap(),
-          poses: new WeakMap(),
-          viewerViews: new WeakMap(),
-          views: new WeakMap(),
-          viewGeometry: new WeakMap(),
-          depthGeometry: new WeakSet(),
-          spaceRelations: new WeakMap(),
-          trackingOrigins: new WeakMap(),
-          bindingSubImages: new WeakMap(),
-          viewports: new WeakMap(),
-          layerViewports: new WeakMap(),
-          eventSessions: new WeakMap(),
-          eventInputs: new WeakMap(),
-          eventChanges: new WeakMap(),
-          eventHandlers: new WeakMap(),
-          sessions: Object.freeze({ has: (value) => sessions.has(value) }),
-          inputSources: Object.freeze({ has: (value) => inputSources.has(value) }),
-          frames: Object.freeze({ has: (value) => frames.has(value) }),
-          spaces: Object.freeze({ has: (value) => spaces.has(value) }),
-          joints: Object.freeze({ has: (value) => joints.has(value) }),
-      });
-  }
-  const key = Symbol.for('WebXR-emulator.interface-brands');
-  let host = globalThis;
-  if (typeof window !== 'undefined') {
-      const pending = [window], visited = new Set();
-      while (pending.length) {
-          const candidate = pending.pop();
-          if (visited.has(candidate))
-              continue;
-          visited.add(candidate);
-          try {
-              void candidate.document;
-              host = candidate;
-              if (Object.prototype.hasOwnProperty.call(candidate, key))
-                  break;
-          }
-          catch ( _a) {  }
-          try {
-              if (candidate.opener)
-                  pending.push(candidate.opener);
-          }
-          catch ( _b) {  }
-          try {
-              pending.push(candidate.parent);
-          }
-          catch ( _c) {  }
-      }
-  }
-  const shared = host;
-  if (!Object.prototype.hasOwnProperty.call(shared, key)) {
-      Object.defineProperty(shared, key, { value: createBrands() });
-  }
-  const interfaceBrands = shared[key];
-  const layerBrands = interfaceBrands.layerAllocations;
-
-  const sessionObjects = interfaceBrands.sessions;
-  const frameObjects = interfaceBrands.frames;
-  const spaceObjects = interfaceBrands.spaces;
-  const compatibleContexts = new WeakSet();
-  const invalidState = (message) => { throw new DOMException(message, 'InvalidStateError'); };
-  const unsupported = (message) => { throw new DOMException(message, 'NotSupportedError'); };
-  function convertPoint(value) {
-      const empty = value === null || value === undefined;
-      if (!empty && Object(value) !== value)
-          throw new TypeError('Expected DOMPointInit.');
-      const result = { w: 1, x: 0, y: 0, z: 0 };
-      for (const key of ['w', 'x', 'y', 'z']) {
-          const component = empty ? undefined : value[key];
-          if (component !== undefined)
-              result[key] = +component;
-      }
-      return [result.x, result.y, result.z, result.w];
-  }
-  function transformState(value) {
-      const state = interfaceBrands.transforms.get(value);
-      if (!state)
-          throw new TypeError('Expected XRRigidTransform.');
-      return state;
-  }
-  const transformObjects = Object.freeze({ has: (value) => interfaceBrands.transforms.has(value) });
-  const transformMatrix = (value) => transformState(value).geometry;
-  class XRRigidTransform {
-      constructor(position = {}, orientation = {}) {
-          const p = convertPoint(position), q = convertPoint(orientation);
-          if (p[3] !== 1)
-              throw new TypeError('Position w must equal 1.');
-          if (![...p, ...q].every(Number.isFinite))
-              throw new TypeError('Transform components must be finite.');
-          const lengthSquared = q.reduce((sum, value) => sum + value * value, 0);
-          if (!lengthSquared || !Number.isFinite(lengthSquared))
-              throw new DOMException('Orientation cannot be normalized.', 'InvalidStateError');
-          const length = Math.sqrt(lengthSquared);
-          for (let i = 0; i < 4; i++)
-              q[i] /= length;
-          const geometry = fromRotationTranslation(new Array(16), q, p);
-          let matrix, inverse;
-          interfaceBrands.transforms.set(this, {
-              position: new DOMPointReadOnly(...p), orientation: new DOMPointReadOnly(...q), geometry,
-              matrix: () => {
-                  if (!matrix || matrix.buffer.byteLength === 0)
-                      matrix = new Float32Array(geometry);
-                  return matrix;
-              },
-              inverse: () => {
-                  if (!inverse) {
-                      inverse = XRRigidTransform._fromMatrix(invert(new Array(16), geometry));
-                      interfaceBrands.transforms.get(inverse).inverse = () => this;
-                  }
-                  return inverse;
-              },
-          });
-      }
-      static _fromMatrix(matrix) {
-          const p = getTranslation([0, 0, 0], matrix);
-          const q = getRotation([0, 0, 0, 1], matrix);
-          return new XRRigidTransform({ x: p[0], y: p[1], z: p[2] }, { x: q[0], y: q[1], z: q[2], w: q[3] });
-      }
-      get position() { return transformState(this).position; }
-      get orientation() { return transformState(this).orientation; }
-      get matrix() { return transformState(this).matrix(); }
-      get inverse() { return transformState(this).inverse(); }
-  }
-  for (const name of ['position', 'orientation', 'matrix', 'inverse']) {
-      Object.defineProperty(XRRigidTransform.prototype, name, { ...Object.getOwnPropertyDescriptor(XRRigidTransform.prototype, name), enumerable: true });
-  }
-  function initializeSpaceRelation(space, origin, offset) {
-      let tracking = interfaceBrands.trackingOrigins.get(origin);
-      if (!tracking) {
-          tracking = { emulatedPosition: false };
-          interfaceBrands.trackingOrigins.set(origin, tracking);
-      }
-      interfaceBrands.spaceRelations.set(space, { origin, offset, tracking });
-  }
-  class XRSpace extends interfaceBrands.SpaceObject {
-      get _emulatedPosition() { return interfaceBrands.spaceRelations.get(this).tracking.emulatedPosition; }
-      set _emulatedPosition(value) { interfaceBrands.spaceRelations.get(this).tracking.emulatedPosition = value; }
-      constructor(_session, matrixProvider, joint = false) {
-          super(joint);
-          this._session = _session;
-          this.matrixProvider = matrixProvider;
-          this._baseMatrix = null;
-          initializeSpaceRelation(this, matrixProvider, create$3());
-      }
-      get _inverseBaseMatrix() { return this._baseMatrix && invert(create$3(), this._baseMatrix); }
-      _update() { this._baseMatrix = this.matrixProvider(); return this._baseMatrix; }
-      _adjustForOriginOffset(_matrix) { }
-  }
-  Object.setPrototypeOf(XRSpace.prototype, EventTarget.prototype);
-  class XRReferenceSpace extends XRSpace {
-      constructor(session, _type, nativeMatrix, offset = create$3()) {
-          super(session, () => {
-              const matrix = nativeMatrix();
-              return matrix && multiply(create$3(), matrix, offset);
-          });
-          this._type = _type;
-          this.nativeMatrix = nativeMatrix;
-          this.offset = offset;
-          this.onreset = null;
-          initializeSpaceRelation(this, nativeMatrix, offset);
-          const allocate = this.createOffsetSpace.bind(this);
-          interfaceBrands.referenceOffsets.set(this, transform => allocate(multiply(create$3(), offset, transform)));
-      }
-      getOffsetReferenceSpace(transform) {
-          const allocate = interfaceBrands.referenceOffsets.get(this);
-          if (!allocate)
-              throw new TypeError('Expected XRReferenceSpace.');
-          return allocate(transformMatrix(transform));
-      }
-      createOffsetSpace(offset) {
-          return new XRReferenceSpace(this._session, this._type, this.nativeMatrix, offset);
-      }
-  }
-  Object.defineProperty(XRReferenceSpace.prototype, 'getOffsetReferenceSpace', { enumerable: true });
-  class XRBoundedReferenceSpace extends XRReferenceSpace {
-      constructor(session, nativeMatrix, nativeBounds, offset = create$3()) {
-          super(session, 'bounded-floor', nativeMatrix, offset);
-          this.nativeBounds = nativeBounds;
-          const inverse = invert(create$3(), offset);
-          this.boundsValue = Object.freeze(nativeBounds.map(point => {
-              const p = transformMat4(create$2(), point, inverse);
-              return Object.freeze(new DOMPointReadOnly(p[0], p[1], p[2], 1));
-          }));
-      }
-      get boundsGeometry() { return this.boundsValue; }
-      getOffsetReferenceSpace(transform) {
-          return super.getOffsetReferenceSpace(transform);
-      }
-      createOffsetSpace(offset) {
-          return new XRBoundedReferenceSpace(this._session, this.nativeMatrix, this.nativeBounds, offset);
-      }
-  }
-  const geometryAllocation = Symbol('geometry allocation');
-  function requireGeometryAllocation(token) {
-      if (token !== geometryAllocation)
-          throw new TypeError('Illegal constructor.');
-  }
-  function poseState(value) {
-      const state = interfaceBrands.poses.get(value);
-      if (!state)
-          throw new TypeError('Expected XRPose.');
-      return state;
-  }
-  function relativePose(space, base) {
-      const source = interfaceBrands.spaceRelations.get(space), target = interfaceBrands.spaceRelations.get(base);
-      if (source.origin === target.origin)
-          return {
-              matrix: multiply(create$3(), invert(create$3(), target.offset), source.offset), emulated: false,
-          };
-      const world = space._update(), baseWorld = base._update();
-      return world && baseWorld ? {
-          matrix: multiply(create$3(), invert(create$3(), baseWorld), world),
-          emulated: source.tracking.emulatedPosition || target.tracking.emulatedPosition,
-      } : null;
-  }
-  class XRPose {
-      constructor(transform, emulatedPosition, token) {
-          requireGeometryAllocation(token);
-          interfaceBrands.poses.set(this, { transform, emulatedPosition });
-      }
-      get transform() { return poseState(this).transform; }
-      get emulatedPosition() { return poseState(this).emulatedPosition; }
-      get linearVelocity() { poseState(this); return null; }
-      get angularVelocity() { poseState(this); return null; }
-  }
-  class XRViewerPose extends XRPose {
-      constructor(transform, views, emulatedPosition, token) {
-          super(transform, emulatedPosition, token);
-          interfaceBrands.viewerViews.set(this, Object.freeze([...views]));
-      }
-      get views() {
-          const views = interfaceBrands.viewerViews.get(this);
-          if (!views)
-              throw new TypeError('Expected XRViewerPose.');
-          return views;
-      }
-  }
-  function viewportState(value) {
-      const state = interfaceBrands.viewports.get(value);
-      if (!state)
-          throw new TypeError('Expected XRViewport.');
-      return state;
-  }
-  class XRViewport {
-      constructor(x, y, width, height, token) {
-          requireGeometryAllocation(token);
-          interfaceBrands.viewports.set(this, { x, y, width, height });
-      }
-      get x() { return viewportState(this).x; }
-      get y() { return viewportState(this).y; }
-      get width() { return viewportState(this).width; }
-      get height() { return viewportState(this).height; }
-  }
-  function initializeViewGeometry(value, transform, projection) {
-      const geometry = Array.from(projection);
-      let array;
-      interfaceBrands.viewGeometry.set(value, { transform, projection: geometry, array: () => {
-              if (!array || array.buffer.byteLength === 0)
-                  array = new Float32Array(geometry);
-              return array;
-          } });
-  }
-  function installViewGeometry(prototype, has) {
-      for (const name of ['transform', 'projectionMatrix']) {
-          Object.defineProperty(prototype, name, { enumerable: true, configurable: true, get() {
-                  if (!has(this))
-                      throw new TypeError('Expected a view geometry receiver.');
-                  const state = interfaceBrands.viewGeometry.get(this);
-                  return name === 'transform' ? state.transform : state.array();
-              } });
-      }
-  }
-  const projectionData = (value) => {
-      const state = interfaceBrands.viewGeometry.get(value);
-      if (!state)
-          throw new TypeError('Expected view geometry.');
-      return state.projection;
-  };
-  function viewState(value) {
-      const state = interfaceBrands.views.get(value);
-      if (!state)
-          throw new TypeError('Expected XRView.');
-      return state;
-  }
-  class XRView {
-      constructor(frame, eye, transform, projection, world, index, token) {
-          requireGeometryAllocation(token);
-          interfaceBrands.views.set(this, { frame, eye, index, world });
-          initializeViewGeometry(this, transform, projection);
-      }
-      get eye() { return viewState(this).eye; }
-      get index() { return viewState(this).index; }
-      get recommendedViewportScale() { viewState(this); return null; }
-      get isFirstPersonObserver() { viewState(this); return false; }
-      get _frame() { return viewState(this).frame; }
-      get _worldMatrix() { return viewState(this).world; }
-      requestViewportScale(scale) {
-          viewState(this);
-          if (arguments.length < 1)
-              throw new TypeError('Expected scale.');
-          if (scale !== null && scale !== undefined && !Number.isFinite(+scale))
-              throw new TypeError('Expected a finite double.');
-      }
-  }
-  installViewGeometry(XRView.prototype, value => interfaceBrands.views.has(value));
-  function enumerableMembers(prototype, names) {
-      for (const name of names)
-          Object.defineProperty(prototype, name, { ...Object.getOwnPropertyDescriptor(prototype, name), enumerable: true });
-  }
-  enumerableMembers(XRPose.prototype, ['transform', 'emulatedPosition', 'linearVelocity', 'angularVelocity']);
-  enumerableMembers(XRViewerPose.prototype, ['views']);
-  enumerableMembers(XRViewport.prototype, ['x', 'y', 'width', 'height']);
-  enumerableMembers(XRView.prototype, ['eye', 'index', 'recommendedViewportScale', 'isFirstPersonObserver', 'requestViewportScale']);
-
-  var geometry = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    XRBoundedReferenceSpace: XRBoundedReferenceSpace,
-    XRPose: XRPose,
-    XRReferenceSpace: XRReferenceSpace,
-    XRRigidTransform: XRRigidTransform,
-    XRSpace: XRSpace,
-    XRView: XRView,
-    XRViewerPose: XRViewerPose,
-    XRViewport: XRViewport,
-    compatibleContexts: compatibleContexts,
-    enumerableMembers: enumerableMembers,
-    frameObjects: frameObjects,
-    geometryAllocation: geometryAllocation,
-    initializeViewGeometry: initializeViewGeometry,
-    installViewGeometry: installViewGeometry,
-    invalidState: invalidState,
-    projectionData: projectionData,
-    relativePose: relativePose,
-    requireGeometryAllocation: requireGeometryAllocation,
-    sessionObjects: sessionObjects,
-    spaceObjects: spaceObjects,
-    transformMatrix: transformMatrix,
-    transformObjects: transformObjects,
-    unsupported: unsupported,
-    viewState: viewState
-  });
-
-  function installWebGLCompatibility() {
-      for (const Context of [globalThis.WebGLRenderingContext, globalThis.WebGL2RenderingContext]) {
-          if (!Context)
-              continue;
-          installOpaqueFramebufferGuards(Context);
-          Context.prototype.makeXRCompatible = function () {
-              if (this.isContextLost())
-                  return Promise.reject(new DOMException('WebGL context is lost.', 'InvalidStateError'));
-              compatibleContexts.add(this);
-              return Promise.resolve();
-          };
-      }
-      const patchCanvas = (prototype) => {
-          const original = prototype.getContext;
-          Object.defineProperty(prototype, 'getContext', { configurable: true, writable: true,
-              value(type, options) {
-                  const webgl = type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl';
-                  const requested = webgl && !!(options === null || options === void 0 ? void 0 : options.xrCompatible);
-                  const context = original.call(this, type, requested ? { ...options, xrCompatible: false } : options);
-                  if (requested && (context instanceof WebGLRenderingContext || (typeof WebGL2RenderingContext !== 'undefined' && context instanceof WebGL2RenderingContext)))
-                      compatibleContexts.add(context);
-                  return context;
-              },
-          });
-      };
-      patchCanvas(HTMLCanvasElement.prototype);
-      if (typeof OffscreenCanvas !== 'undefined')
-          patchCanvas(OffscreenCanvas.prototype);
-  }
-
-  function convertWebGLLayerOptions(value) {
-      if (value != null && typeof value !== 'object' && typeof value !== 'function')
-          throw new TypeError('Expected XRWebGLLayerInit dictionary.');
-      const dictionary = (value !== null && value !== void 0 ? value : {});
-      const result = {};
-      for (const key of ['alpha', 'antialias', 'depth', 'framebufferScaleFactor', 'ignoreDepthValues', 'stencil']) {
-          const member = dictionary[key];
-          if (key === 'framebufferScaleFactor') {
-              const number = member === undefined ? 1 : +member;
-              if (!Number.isFinite(number))
-                  throw new TypeError('framebufferScaleFactor must be a finite double.');
-              result[key] = number;
-          }
-          else
-              result[key] = member === undefined ? ['alpha', 'antialias', 'depth'].includes(key) : Boolean(member);
-      }
-      return result;
-  }
-  function preserve(gl, action) {
-      return compositorOperation(() => {
-          const gl2 = gl instanceof WebGL2RenderingContext ? gl : null;
-          const draw = gl.getParameter(gl.FRAMEBUFFER_BINDING);
-          const read = gl2 === null || gl2 === void 0 ? void 0 : gl2.getParameter(gl2.READ_FRAMEBUFFER_BINDING);
-          const renderbuffer = gl.getParameter(gl.RENDERBUFFER_BINDING);
-          const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
-          const unpack = gl2 === null || gl2 === void 0 ? void 0 : gl2.getParameter(gl2.PIXEL_UNPACK_BUFFER_BINDING);
-          const pack = gl2 === null || gl2 === void 0 ? void 0 : gl2.getParameter(gl2.PIXEL_PACK_BUFFER_BINDING);
-          const pixelStore = [gl.PACK_ALIGNMENT, gl.UNPACK_ALIGNMENT, ...(gl2 ? [gl2.PACK_ROW_LENGTH, gl2.PACK_SKIP_PIXELS, gl2.PACK_SKIP_ROWS, gl2.UNPACK_ROW_LENGTH, gl2.UNPACK_SKIP_PIXELS, gl2.UNPACK_SKIP_ROWS] : [])].map(key => [key, gl.getParameter(key)]);
-          const mask = gl.getParameter(gl.COLOR_WRITEMASK);
-          const depthMask = gl.getParameter(gl.DEPTH_WRITEMASK);
-          const front = gl.getParameter(gl.STENCIL_WRITEMASK), back = gl.getParameter(gl.STENCIL_BACK_WRITEMASK);
-          const color = gl.getParameter(gl.COLOR_CLEAR_VALUE);
-          const depth = gl.getParameter(gl.DEPTH_CLEAR_VALUE), stencil = gl.getParameter(gl.STENCIL_CLEAR_VALUE);
-          const enabled = [gl.SCISSOR_TEST, ...(gl2 ? [gl2.RASTERIZER_DISCARD] : [])].map(cap => [cap, gl.isEnabled(cap)]);
-          try {
-              if (gl2) {
-                  gl2.bindBuffer(gl2.PIXEL_PACK_BUFFER, null);
-                  gl2.bindBuffer(gl2.PIXEL_UNPACK_BUFFER, null);
-              }
-              for (const [key] of pixelStore)
-                  gl.pixelStorei(key, key === gl.PACK_ALIGNMENT || key === gl.UNPACK_ALIGNMENT ? 1 : 0);
-              return action();
-          }
-          finally {
-              for (const [key, value] of pixelStore)
-                  gl.pixelStorei(key, value);
-              if (gl2) {
-                  gl2.bindBuffer(gl2.PIXEL_PACK_BUFFER, pack);
-                  gl2.bindBuffer(gl2.PIXEL_UNPACK_BUFFER, unpack);
-                  gl2.bindFramebuffer(gl2.READ_FRAMEBUFFER, read);
-              }
-              gl.bindFramebuffer(gl2 ? gl2.DRAW_FRAMEBUFFER : gl.FRAMEBUFFER, draw);
-              gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
-              gl.bindTexture(gl.TEXTURE_2D, texture);
-              gl.colorMask(mask[0], mask[1], mask[2], mask[3]);
-              gl.depthMask(depthMask);
-              gl.stencilMaskSeparate(gl.FRONT, front);
-              gl.stencilMaskSeparate(gl.BACK, back);
-              gl.clearColor(color[0], color[1], color[2], color[3]);
-              gl.clearDepth(depth);
-              gl.clearStencil(stencil);
-              for (const [cap, value] of enabled)
-                  value ? gl.enable(cap) : gl.disable(cap);
-          }
-      });
-  }
-  class XRFramebuffer {
-      constructor(gl, size, options, stereo) {
-          var _a;
-          this.gl = gl;
-          this.options = options;
-          this.active = false;
-          this.alive = true;
-          this.dirty = false;
-          this.canvas = document.createElement('canvas');
-          this.resolve = null;
-          this.texture = null;
-          this.buffers = [];
-          this.lastStereo = null;
-          const scale = Math.max(1 / 16, Math.min(2, options.framebufferScaleFactor));
-          const maximum = Math.min(4096, gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
-          let width = Math.max(stereo ? 2 : 1, Math.min(maximum, Math.floor(size.width * scale)));
-          let height = Math.max(1, Math.min(maximum, Math.floor(size.height * scale)));
-          const reduction = Math.min(1, Math.sqrt(4194304 / (width * height)));
-          this.width = width = Math.max(stereo ? 2 : 1, Math.floor(width * reduction));
-          this.height = height = Math.max(1, Math.floor(height * reduction));
-          this.canvas.width = width;
-          this.canvas.height = height;
-          this.canvas.style.width = '100%';
-          this.canvas.style.height = '100%';
-          try {
-              const output = this.canvas.getContext('2d', { colorSpace: 'srgb' });
-              if (!output)
-                  throw new Error('Unable to create presentation context.');
-              this.output = output;
-              this.image = output.createImageData(width, height);
-              this.pixels = new Uint8Array(width * height * 4);
-          }
-          catch (_b) {
-              throw new DOMException('Unable to allocate XR presentation storage.', 'OperationError');
-          }
-          const gl2 = gl instanceof WebGL2RenderingContext ? gl : null;
-          const colorFormat = options.alpha ? (gl2 ? gl2.RGBA8 : gl.RGBA) : (gl2 ? gl2.RGB8 : gl.RGB);
-          const depthFormat = options.stencil ? (gl2 ? gl2.DEPTH24_STENCIL8 : gl.DEPTH_STENCIL) : gl.DEPTH_COMPONENT16;
-          let samples = 0;
-          if (gl2 && options.antialias) {
-              const counts = gl2.getInternalformatParameter(gl2.RENDERBUFFER, colorFormat, gl2.SAMPLES);
-              const depthCounts = options.depth || options.stencil ? gl2.getInternalformatParameter(gl2.RENDERBUFFER, depthFormat, gl2.SAMPLES) : counts;
-              samples = (_a = Array.from(counts).find(count => count > 1 && count <= 4 && Array.from(depthCounts).includes(count))) !== null && _a !== void 0 ? _a : 0;
-          }
-          this.antialias = samples > 1;
-          const created = gl.createFramebuffer();
-          if (!created)
-              throw new DOMException('Unable to create XR framebuffer.', 'OperationError');
-          this.framebuffer = created;
-          try {
-              preserve(gl, () => {
-                  gl.bindFramebuffer(gl.FRAMEBUFFER, created);
-                  this.texture = gl.createTexture();
-                  if (!this.texture)
-                      throw new Error('Unable to create color texture.');
-                  gl.bindTexture(gl.TEXTURE_2D, this.texture);
-                  gl.texImage2D(gl.TEXTURE_2D, 0, colorFormat, width, height, 0, options.alpha ? gl.RGBA : gl.RGB, gl.UNSIGNED_BYTE, null);
-                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                  if (gl2 && samples) {
-                      this.resolve = gl.createFramebuffer();
-                      if (!this.resolve)
-                          throw new Error('Unable to create resolve framebuffer.');
-                      gl.bindFramebuffer(gl.FRAMEBUFFER, this.resolve);
-                      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
-                      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
-                          throw new Error('Incomplete XR resolve framebuffer.');
-                      gl.bindFramebuffer(gl.FRAMEBUFFER, created);
-                      this.attach(gl.COLOR_ATTACHMENT0, colorFormat, samples);
-                  }
-                  else
-                      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
-                  if (options.depth || options.stencil)
-                      this.attach(options.stencil ? gl.DEPTH_STENCIL_ATTACHMENT : gl.DEPTH_ATTACHMENT, depthFormat, samples);
-                  if (gl.isContextLost() || gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
-                      throw new Error('Incomplete XR framebuffer.');
-              });
-              ownFramebuffer(created, this);
-              this.clear();
-          }
-          catch (error) {
-              this.dispose();
-              throw new DOMException(`Unable to allocate XR framebuffer: ${String(error)}`, 'OperationError');
-          }
-      }
-      attach(attachment, format, samples) {
-          const gl = this.gl;
-          const buffer = gl.createRenderbuffer();
-          if (!buffer)
-              throw new Error('Unable to create XR renderbuffer.');
-          this.buffers.push(buffer);
-          gl.bindRenderbuffer(gl.RENDERBUFFER, buffer);
-          if (samples && gl instanceof WebGL2RenderingContext)
-              gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, format, this.width, this.height);
-          else
-              gl.renderbufferStorage(gl.RENDERBUFFER, format, this.width, this.height);
-          gl.framebufferRenderbuffer(gl.FRAMEBUFFER, attachment, gl.RENDERBUFFER, buffer);
-      }
-      get colorTexture() { return this.texture; }
-      clear() {
-          if (!this.alive || this.gl.isContextLost())
-              return;
-          const gl = this.gl;
-          preserve(gl, () => {
-              gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-              const drawBuffer = gl instanceof WebGL2RenderingContext ? gl.getParameter(gl.DRAW_BUFFER0) : 0;
-              gl.disable(gl.SCISSOR_TEST);
-              if (gl instanceof WebGL2RenderingContext) {
-                  gl.disable(gl.RASTERIZER_DISCARD);
-                  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-              }
-              gl.colorMask(true, true, true, true);
-              gl.depthMask(true);
-              gl.stencilMaskSeparate(gl.FRONT, 0xffffffff);
-              gl.stencilMaskSeparate(gl.BACK, 0xffffffff);
-              gl.clearColor(0, 0, 0, 0);
-              gl.clearDepth(1);
-              gl.clearStencil(0);
-              gl.clear(gl.COLOR_BUFFER_BIT | (this.options.depth || this.options.stencil ? gl.DEPTH_BUFFER_BIT : 0) | (this.options.stencil ? gl.STENCIL_BUFFER_BIT : 0));
-              if (gl instanceof WebGL2RenderingContext)
-                  gl.drawBuffers([drawBuffer]);
-          });
-      }
-      present(stereo, force = false) {
-          const gl = this.gl;
-          if (!this.alive || gl.isContextLost())
-              return;
-          const update = force || this.dirty;
-          if (!update && stereo === this.lastStereo)
-              return;
-          this.lastStereo = stereo;
-          this.dirty = false;
-          if (update) {
-              preserve(gl, () => {
-                  var _a;
-                  gl.disable(gl.SCISSOR_TEST);
-                  if (gl instanceof WebGL2RenderingContext && this.resolve) {
-                      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.framebuffer);
-                      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.resolve);
-                      const sourceReadBuffer = gl.getParameter(gl.READ_BUFFER);
-                      gl.readBuffer(gl.COLOR_ATTACHMENT0);
-                      gl.blitFramebuffer(0, 0, this.width, this.height, 0, 0, this.width, this.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
-                      gl.readBuffer(sourceReadBuffer);
-                  }
-                  gl.bindFramebuffer(gl.FRAMEBUFFER, (_a = this.resolve) !== null && _a !== void 0 ? _a : this.framebuffer);
-                  const readBuffer = gl instanceof WebGL2RenderingContext ? gl.getParameter(gl.READ_BUFFER) : 0;
-                  if (gl instanceof WebGL2RenderingContext)
-                      gl.readBuffer(gl.COLOR_ATTACHMENT0);
-                  gl.flush();
-                  gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.UNSIGNED_BYTE, this.pixels);
-                  if (gl instanceof WebGL2RenderingContext)
-                      gl.readBuffer(readBuffer);
-              });
-              const data = this.image.data, width = this.width, height = this.height;
-              for (let y = 0; y < height; y++)
-                  for (let x = 0; x < width; x++) {
-                      const source = ((height - 1 - y) * width + x) * 4, target = (y * width + x) * 4;
-                      const alpha = this.options.alpha ? this.pixels[source + 3] : 255;
-                      for (let c = 0; c < 3; c++)
-                          data[target + c] = alpha ? Math.min(255, Math.round(this.pixels[source + c] * 255 / alpha)) : 0;
-                      data[target + 3] = alpha;
-                  }
-          }
-          const width = this.width, height = this.height;
-          this.output.putImageData(this.image, 0, 0);
-          if (!stereo) {
-              this.output.globalCompositeOperation = 'copy';
-              this.output.drawImage(this.canvas, 0, 0, Math.floor(width / 2), height, 0, 0, width, height);
-              this.output.globalCompositeOperation = 'source-over';
-          }
-      }
-      dispose() {
-          if (!this.alive)
-              return;
-          this.active = false;
-          this.alive = false;
-          compositorOperation(() => {
-              this.gl.deleteFramebuffer(this.framebuffer);
-              this.gl.deleteFramebuffer(this.resolve);
-              this.gl.deleteTexture(this.texture);
-              for (const buffer of this.buffers)
-                  this.gl.deleteRenderbuffer(buffer);
-          });
-          this.buffers = [];
-          this.canvas.width = this.canvas.height = 1;
-          this.pixels = new Uint8Array(0);
-          this.image = new ImageData(1, 1);
-          this.texture = null;
-          this.resolve = null;
-      }
-  }
-
-  function convertNullableFloat(value) {
-      if (value === null || value === undefined)
-          return;
-      if (!Number.isFinite(Math.fround(+value)))
-          throw new TypeError('Expected a finite float.');
-  }
-  class XRLayer extends EventTarget {
-  }
-  const webglStorage = new WeakMap();
-  let XRWebGLLayer$1 = class XRWebGLLayer extends XRLayer {
-      constructor(_session, context, init) {
-          var _a;
-          super();
-          if (!sessionObjects.has(_session))
-              throw new TypeError('Expected XRSession.');
-          if (!(context instanceof WebGLRenderingContext) && !(typeof WebGL2RenderingContext !== 'undefined' && context instanceof WebGL2RenderingContext))
-              throw new TypeError('Expected WebGL context.');
-          const options = convertWebGLLayerOptions(init);
-          _session._assertLive();
-          if (context.isContextLost() || (_session._mode !== 'inline' && !compatibleContexts.has(context) && !((_a = context.getContextAttributes()) === null || _a === void 0 ? void 0 : _a.xrCompatible)))
-              invalidState('WebGL context is lost or not XR compatible.');
-          const storage = _session._mode === 'inline' ? null : new XRFramebuffer(context, _session._device.getRecommendedFramebufferSize(_session._id), options, !_session._device.handheld);
-          const layer = Reflect.construct(layerBrands.WebGLLayerAllocation, [_session, context, storage], new.target);
-          if (storage)
-              webglStorage.set(layer, storage);
-          const viewports = new Map();
-          interfaceBrands.layerViewports.set(layer, view => {
-              const { eye, frame } = viewState(view);
-              const cached = viewports.get(eye);
-              if ((cached === null || cached === void 0 ? void 0 : cached.frame) === frame)
-                  return cached.viewport;
-              const target = { x: 0, y: 0, width: 0, height: 0 };
-              _session._device.getViewport(_session._id, eye, layer, target);
-              let viewport = cached === null || cached === void 0 ? void 0 : cached.viewport;
-              if (!viewport || ['x', 'y', 'width', 'height'].some(key => viewport[key] !== target[key])) {
-                  viewport = new XRViewport(target.x, target.y, target.width, target.height, geometryAllocation);
-              }
-              viewports.set(eye, { viewport, frame });
-              return viewport;
-          });
-          return layer;
-      }
-      get antialias() { var _a, _b, _c, _d; return (_d = (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.antialias) !== null && _b !== void 0 ? _b : (_c = this.context.getContextAttributes()) === null || _c === void 0 ? void 0 : _c.antialias) !== null && _d !== void 0 ? _d : false; }
-      get ignoreDepthValues() { return true; }
-      get framebuffer() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.framebuffer) !== null && _b !== void 0 ? _b : null; }
-      get fixedFoveation() {
-          if (!layerBrands.webgl.has(this))
-              throw new TypeError('Expected XRWebGLLayer.');
-          return null;
-      }
-      set fixedFoveation(value) {
-          if (!layerBrands.webgl.has(this))
-              throw new TypeError('Expected XRWebGLLayer.');
-          convertNullableFloat(value);
-      }
-      get framebufferWidth() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.width) !== null && _b !== void 0 ? _b : this.context.drawingBufferWidth; }
-      get framebufferHeight() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.height) !== null && _b !== void 0 ? _b : this.context.drawingBufferHeight; }
-      get _presentationCanvas() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.canvas) !== null && _b !== void 0 ? _b : this.context.canvas; }
-      _clear() { var _a; (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.clear(); }
-      _activate(active) { const storage = webglStorage.get(this); if (storage)
-          storage.active = active && storage.alive; }
-      _present(force = false) { var _a; (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.present(this._session._device.handheld || this._session._device.stereoEffectEnabled, force); }
-      _dispose() {
-          var _a;
-          (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.dispose();
-          this._session._webglLayers.delete(this);
-          this.context.canvas.removeEventListener('webglcontextlost', this.lost);
-      }
-      getViewport(view) {
-          const allocate = interfaceBrands.layerViewports.get(this);
-          if (!allocate)
-              throw new TypeError('Expected XRWebGLLayer.');
-          if (arguments.length < 1)
-              throw new TypeError('Expected XRView.');
-          const { frame } = viewState(view);
-          frame._assertActive(true);
-          if (frame.session !== this._session || this._session._currentAnimationFrame !== frame)
-              invalidState('View does not belong to the current animation frame of this session.');
-          return allocate(view);
-      }
-      static getNativeFramebufferScaleFactor(session) { if (!sessionObjects.has(session))
-          throw new TypeError('Expected XRSession.'); return session.ended ? 0 : 1; }
-  };
-  enumerableMembers(XRWebGLLayer$1.prototype, ['getViewport']);
-  function validateLayerSpace(session, space) {
-      if (!(space instanceof XRSpace) || space._session !== session)
-          throw new TypeError('Layer space must belong to the same session.');
-      return space;
-  }
-  const projectionAllocation = Symbol();
-  class XRCompositionLayer extends XRLayer {
-      constructor(binding, init, allocation) {
-          super();
-          const C = allocation === projectionAllocation ? layerBrands.ProjectionLayerAllocation : layerBrands.CompositionLayerAllocation;
-          return Reflect.construct(C, [binding, init], new.target);
-      }
-      get needsRedraw() { return this._needsRedraw; }
-      get textureWidth() { return this._width; }
-      get textureHeight() { return this._height; }
-      get textureArrayLength() { return 1; }
-      get textureType() { return 'texture'; }
-      destroy() {
-          if (this._destroyed)
-              return;
-          this._destroyed = true;
-          const gl = this._binding._gl2();
-          gl.deleteTexture(this._color);
-          gl.deleteTexture(this._depth);
-          this._binding._session._removeLayer(this);
-      }
-      _allocate(width, height) {
-          const gl = this._binding._gl2();
-          if (width === this._width && height === this._height)
-              return;
-          this._width = width;
-          this._height = height;
-          this._needsRedraw = true;
-          this._needsClear = true;
-          const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
-          const unpackBuffer = gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING);
-          gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
-          try {
-              gl.bindTexture(gl.TEXTURE_2D, this._color);
-              gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-              for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER])
-                  gl.texParameteri(gl.TEXTURE_2D, parameter, gl.LINEAR);
-              for (const parameter of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T])
-                  gl.texParameteri(gl.TEXTURE_2D, parameter, gl.CLAMP_TO_EDGE);
-              if (this._depth) {
-                  gl.bindTexture(gl.TEXTURE_2D, this._depth);
-                  gl.texImage2D(gl.TEXTURE_2D, 0, this._hasStencil ? gl.DEPTH24_STENCIL8 : gl.DEPTH_COMPONENT24, width, height, 0, this._hasStencil ? gl.DEPTH_STENCIL : gl.DEPTH_COMPONENT, this._hasStencil ? gl.UNSIGNED_INT_24_8 : gl.UNSIGNED_INT, null);
-                  for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER])
-                      gl.texParameteri(gl.TEXTURE_2D, parameter, gl.NEAREST);
-              }
-          }
-          finally {
-              gl.bindTexture(gl.TEXTURE_2D, texture);
-              gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, unpackBuffer);
-          }
-      }
-  }
-  class XRProjectionLayer extends XRCompositionLayer {
-      constructor(binding, init) { super(binding, init, projectionAllocation); }
-      get fixedFoveation() {
-          if (!layerBrands.projection.has(this))
-              throw new TypeError('Expected XRProjectionLayer.');
-          return null;
-      }
-      set fixedFoveation(value) {
-          if (!layerBrands.projection.has(this))
-              throw new TypeError('Expected XRProjectionLayer.');
-          convertNullableFloat(value);
-      }
-  }
-  for (const prototype of [XRWebGLLayer$1.prototype, XRProjectionLayer.prototype]) {
-      Object.defineProperty(prototype, 'fixedFoveation', { ...Object.getOwnPropertyDescriptor(prototype, 'fixedFoveation'), enumerable: true });
-  }
-  class XRQuadLayer extends XRCompositionLayer {
-      get space() { return this.spaceValue; }
-      set space(value) { this.spaceValue = validateLayerSpace(this._binding._session, value); }
-      constructor(binding, init) {
-          var _a, _b, _c;
-          super(binding, init);
-          this.spaceValue = validateLayerSpace(binding._session, init.space);
-          this.transform = (_a = init.transform) !== null && _a !== void 0 ? _a : new XRRigidTransform();
-          this.width = (_b = init.width) !== null && _b !== void 0 ? _b : 1;
-          this.height = (_c = init.height) !== null && _c !== void 0 ? _c : 1;
-      }
-  }
-  class XRSubImage {
-      constructor(viewport) {
-          this.viewport = viewport;
-      }
-  }
-  class XRWebGLSubImage extends XRSubImage {
-      constructor(viewport, colorTexture, depthStencilTexture, colorTextureWidth, colorTextureHeight) {
-          super(viewport);
-          this.colorTexture = colorTexture;
-          this.depthStencilTexture = depthStencilTexture;
-          this.colorTextureWidth = colorTextureWidth;
-          this.colorTextureHeight = colorTextureHeight;
-          this.imageIndex = 0;
-          this.motionVectorTexture = null;
-          this.depthStencilTextureWidth = depthStencilTexture ? colorTextureWidth : null;
-          this.depthStencilTextureHeight = depthStencilTexture ? colorTextureHeight : null;
-      }
-  }
-  let XRWebGLBinding$1 = class XRWebGLBinding {
-      constructor(_session, _context) {
-          this._session = _session;
-          this._context = _context;
-          this.nativeProjectionScaleFactor = 1;
-          this.layers = new Set();
-          this.framebuffer = null;
-          this.program = null;
-          this.vao = null;
-          if (!sessionObjects.has(_session))
-              throw new TypeError('Expected XRSession.');
-          _session._assertLive();
-          if (_session._mode === 'inline')
-              invalidState('XRWebGLBinding requires an immersive session.');
-          interfaceBrands.bindingSubImages.set(this, this.allocateViewSubImage.bind(this));
-          this._presentation = new XRWebGLLayer$1(_session, _context, { antialias: false });
-          _session.addEventListener('end', () => {
-              for (const layer of this.layers)
-                  layer.destroy();
-              if (_context instanceof WebGL2RenderingContext) {
-                  _context.deleteFramebuffer(this.framebuffer);
-                  _context.deleteProgram(this.program);
-                  _context.deleteVertexArray(this.vao);
-              }
-              this.layers.clear();
-          }, { once: true });
-      }
-      _gl2() { if (!(this._context instanceof WebGL2RenderingContext))
-          unsupported('Simulated composition layers require WebGL2.'); return this._context; }
-      assert() { this._session._assertLive(); if (this._context.isContextLost())
-          invalidState('WebGL context is lost.'); }
-      validate(init) {
-          this.assert();
-          const gl = this._gl2();
-          if (init.textureType && !['texture', 'texture-array'].includes(init.textureType))
-              throw new TypeError('Invalid XRTextureType.');
-          if (init.textureType === 'texture-array')
-              unsupported('Only 2D textures are implemented.');
-          if (init.colorFormat !== undefined && ![gl.RGBA, gl.RGBA8].includes(init.colorFormat))
-              unsupported('Only RGBA8 color textures are implemented.');
-          if (init.depthFormat != null && ![0, gl.DEPTH_COMPONENT, gl.DEPTH_COMPONENT24, gl.DEPTH_STENCIL, gl.DEPTH24_STENCIL8].includes(init.depthFormat))
-              unsupported('Only DEPTH_COMPONENT24 and DEPTH24_STENCIL8 depth textures are implemented.');
-          if (init.mipLevels !== undefined && init.mipLevels !== 1)
-              unsupported('Mipmapped layers are not implemented.');
-          if (init.isStatic)
-              unsupported('Static layers are not implemented.');
-      }
-      createProjectionLayer(init = {}) {
-          init = { ...init, depthFormat: init.depthFormat === undefined ? 0x1902 : Number(init.depthFormat) };
-          this.validate(init);
-          if (init.scaleFactor !== undefined && (!Number.isFinite(init.scaleFactor) || init.scaleFactor <= 0))
-              throw new TypeError('scaleFactor must be positive.');
-          const layer = new XRProjectionLayer(this, { ...init, layout: this._session._device.handheld ? 'mono' : 'stereo-left-right' });
-          this.initialize(layer);
-          return layer;
-      }
-      createQuadLayer(init) {
-          var _a, _b, _c;
-          init = { ...init, depthFormat: Number((_a = init.depthFormat) !== null && _a !== void 0 ? _a : 0) };
-          this._session._require('layers');
-          this.validate(init);
-          validateLayerSpace(this._session, init.space);
-          if (init.layout && init.layout !== 'mono')
-              unsupported('Only mono quad layers are implemented.');
-          for (const value of [init.viewPixelWidth, init.viewPixelHeight])
-              if (value === undefined || !Number.isInteger(value) || value <= 0)
-                  throw new TypeError('Quad pixel dimensions must be positive integers.');
-          if (init.transform && !transformObjects.has(init.transform))
-              throw new TypeError('Expected XRRigidTransform.');
-          if (((_b = init.width) !== null && _b !== void 0 ? _b : 1) <= 0 || ((_c = init.height) !== null && _c !== void 0 ? _c : 1) <= 0)
-              throw new TypeError('Quad physical dimensions must be positive.');
-          const layer = new XRQuadLayer(this, init);
-          this.initialize(layer);
-          return layer;
-      }
-      initialize(layer) {
-          try {
-              this.allocate(layer);
-              this.layers.add(layer);
-          }
-          catch (error) {
-              layer.destroy();
-              throw error;
-          }
-      }
-      createCylinderLayer() { return unsupported('Cylinder layers are not implemented.'); }
-      createEquirectLayer() { return unsupported('Equirectangular layers are not implemented.'); }
-      createCubeLayer() { return unsupported('Cube layers are not implemented.'); }
-      check(layer, frame) {
-          var _a;
-          this.assert();
-          frame._assertActive(true);
-          if (this._session._currentAnimationFrame !== frame)
-              invalidState('Frame is not current for this session.');
-          if (layer._binding._session !== this._session || layer._binding._context !== this._context || frame.session !== this._session || layer._destroyed)
-              invalidState('Layer/frame is not usable with this binding.');
-          if (!((_a = this._session.renderState.layers) === null || _a === void 0 ? void 0 : _a.includes(layer)))
-              invalidState('Layer is not in the active render state.');
-          this.allocate(layer);
-          if (layer._needsClear || (layer._clearOnAccess && layer._lastClearFrame !== frame)) {
-              this.clear(layer);
-              layer._needsClear = false;
-              layer._lastClearFrame = frame;
-          }
-      }
-      allocate(layer) {
-          var _a;
-          const gl = this._gl2();
-          const scale = Math.min(1, (_a = layer._init.scaleFactor) !== null && _a !== void 0 ? _a : 1);
-          const maximum = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-          const size = { width: this._presentation.framebufferWidth, height: this._presentation.framebufferHeight };
-          const width = layer instanceof XRProjectionLayer ? Math.max(2, Math.floor(size.width * scale)) : layer._init.viewPixelWidth;
-          const height = layer instanceof XRProjectionLayer ? Math.max(1, Math.floor(size.height * scale)) : layer._init.viewPixelHeight;
-          if (width > maximum || height > maximum)
-              unsupported('Layer exceeds MAX_TEXTURE_SIZE.');
-          layer._allocate(width, height);
-      }
-      getViewSubImage(layer, view) {
-          const allocate = interfaceBrands.bindingSubImages.get(this);
-          if (!allocate)
-              throw new TypeError('Expected XRWebGLBinding.');
-          if (arguments.length < 2)
-              throw new TypeError('Expected projection layer and view.');
-          if (!layerBrands.projection.has(layer))
-              throw new TypeError('Expected projection layer.');
-          viewState(view);
-          return allocate(layer, view);
-      }
-      allocateViewSubImage(layer, view) {
-          this.check(layer, view._frame);
-          const stereo = view.eye !== 'none';
-          const half = Math.floor(layer._width / 2);
-          const viewport = new XRViewport(view.eye === 'right' ? half : 0, 0, stereo ? (view.eye === 'right' ? layer._width - half : half) : layer._width, layer._height, geometryAllocation);
-          layer._needsRedraw = false;
-          return new XRWebGLSubImage(viewport, layer._color, layer._depth, layer._width, layer._height);
-      }
-      getSubImage(layer, frame, eye = 'none') {
-          if (!(layer instanceof XRQuadLayer) || !frameObjects.has(frame))
-              throw new TypeError('Expected quad layer and XRFrame.');
-          if (!['none', 'left', 'right'].includes(eye))
-              throw new TypeError('Invalid XREye.');
-          this.check(layer, frame);
-          setTimeout(() => { layer._needsRedraw = false; }, 0);
-          return new XRWebGLSubImage(new XRViewport(0, 0, layer._width, layer._height, geometryAllocation), layer._color, layer._depth, layer._width, layer._height);
-      }
-      getDepthInformation(view) { this.assert(); view._frame._assertActive(true); return unsupported('GPU depth is not supported; request cpu-optimized depth.'); }
-      getReflectionCubeMap(probe) { this.assert(); if (probe._session !== this._session)
-          invalidState('Probe belongs to a different session.'); return null; }
-      _prepare(layers) {
-          for (const layer of layers)
-              if (!layer._destroyed)
-                  this.allocate(layer);
-      }
-      clear(layer) {
-          const gl = this._gl2();
-          this.preserve(() => {
-              var _a;
-              (_a = this.framebuffer) !== null && _a !== void 0 ? _a : (this.framebuffer = gl.createFramebuffer());
-              gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-              gl.disable(gl.RASTERIZER_DISCARD);
-              gl.disable(gl.SCISSOR_TEST);
-              gl.colorMask(true, true, true, true);
-              gl.depthMask(true);
-              gl.clearColor(0, 0, 0, 0);
-              gl.clearDepth(1);
-              gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, layer._color, 0);
-              gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, null, 0);
-              gl.framebufferTexture2D(gl.FRAMEBUFFER, layer._hasStencil ? gl.DEPTH_STENCIL_ATTACHMENT : gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, layer._depth, 0);
-              gl.stencilMaskSeparate(gl.FRONT, 0xffffffff);
-              gl.stencilMaskSeparate(gl.BACK, 0xffffffff);
-              gl.clearStencil(0);
-              gl.clear(gl.COLOR_BUFFER_BIT | (layer._depth ? gl.DEPTH_BUFFER_BIT : 0) | (layer._hasStencil ? gl.STENCIL_BUFFER_BIT : 0));
-          });
-      }
-      _compose(frame, layers) {
-          const gl = this._gl2();
-          webglStorage.get(this._presentation).dirty = true;
-          this.preserve(() => {
-              this.setupProgram();
-              gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this._presentation.framebuffer);
-              const drawBuffer = gl.getParameter(gl.DRAW_BUFFER0);
-              gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-              try {
-                  gl.useProgram(this.program);
-                  gl.bindVertexArray(this.vao);
-                  gl.disable(gl.DEPTH_TEST);
-                  gl.disable(gl.SCISSOR_TEST);
-                  gl.disable(gl.CULL_FACE);
-                  gl.colorMask(true, true, true, true);
-                  for (const cap of [gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE])
-                      gl.disable(cap);
-                  gl.enable(gl.BLEND);
-                  gl.blendEquation(gl.FUNC_ADD);
-                  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-                  gl.activeTexture(gl.TEXTURE0);
-                  gl.bindSampler(0, null);
-                  gl.uniform1i(gl.getUniformLocation(this.program, 'image'), 0);
-                  const pose = frame.getViewerPose(this._session._viewer);
-                  for (const layer of layers) {
-                      if (layer._destroyed)
-                          continue;
-                      gl.bindTexture(gl.TEXTURE_2D, layer._color);
-                      for (const view of pose.views) {
-                          const viewport = this._presentation.getViewport(view);
-                          gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-                          let matrix = create$3();
-                          let uv = [0, 1];
-                          if (layer instanceof XRProjectionLayer) {
-                              gl.disable(gl.CULL_FACE);
-                              if (view.eye !== 'none') {
-                                  const left = Math.floor(layer._width / 2) / layer._width;
-                                  const right = view.eye === 'right' && !layer.forceMonoPresentation;
-                                  uv = [right ? left : 0, right ? 1 - left : left];
-                              }
-                          }
-                          else if (layer instanceof XRQuadLayer) {
-                              gl.enable(gl.CULL_FACE);
-                              gl.cullFace(gl.BACK);
-                              gl.frontFace(gl.CCW);
-                              const world = frame._world(layer.space);
-                              if (!world)
-                                  continue;
-                              matrix = multiply(matrix, world, transformMatrix(layer.transform));
-                              scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
-                              multiply(matrix, invert(create$3(), view._worldMatrix), matrix);
-                              multiply(matrix, projectionData(view), matrix);
-                          }
-                          gl.uniform2f(gl.getUniformLocation(this.program, 'alphaOptions'), layer.opacity, layer.blendTextureSourceAlpha ? 1 : 0);
-                          gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'matrix'), false, matrix);
-                          gl.uniform2fv(gl.getUniformLocation(this.program, 'uvRange'), uv);
-                          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-                      }
-                  }
-              }
-              finally {
-                  gl.drawBuffers([drawBuffer]);
-              }
-              gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
-              const output = gl.getParameter(gl.DRAW_BUFFER0);
-              gl.drawBuffers([gl.BACK]);
-              gl.disable(gl.BLEND);
-              gl.disable(gl.CULL_FACE);
-              gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-              gl.bindTexture(gl.TEXTURE_2D, webglStorage.get(this._presentation).colorTexture);
-              gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'matrix'), false, create$3());
-              gl.uniform2f(gl.getUniformLocation(this.program, 'uvRange'), 0, 1);
-              gl.uniform2f(gl.getUniformLocation(this.program, 'alphaOptions'), 1, 1);
-              gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-              gl.drawBuffers([output]);
-          });
-      }
-      setupProgram() {
-          if (this.program)
-              return;
-          const gl = this._gl2();
-          const compile = (type, source) => { const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader); if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-              throw new Error(gl.getShaderInfoLog(shader)); return shader; };
-          const vertex = compile(gl.VERTEX_SHADER, `#version 300 es
-      uniform mat4 matrix; uniform vec2 uvRange; out vec2 uv;
-      void main() { vec2 p = vec2((gl_VertexID & 1) == 1 ? 1.0 : -1.0, gl_VertexID >= 2 ? 1.0 : -1.0);
-        uv = (p + 1.0) * 0.5; uv.x = uvRange.x + uv.x * uvRange.y; gl_Position = matrix * vec4(p,0,1); }`);
-          const fragment = compile(gl.FRAGMENT_SHADER, `#version 300 es
-      precision mediump float; uniform sampler2D image; uniform vec2 alphaOptions; in vec2 uv; out vec4 color; void main() { color = texture(image,uv); if (alphaOptions.y < 0.5) color.a = 1.0; color *= clamp(alphaOptions.x,0.0,1.0); }`);
-          this.program = gl.createProgram();
-          gl.attachShader(this.program, vertex);
-          gl.attachShader(this.program, fragment);
-          gl.linkProgram(this.program);
-          gl.deleteShader(vertex);
-          gl.deleteShader(fragment);
-          if (!gl.getProgramParameter(this.program, gl.LINK_STATUS))
-              throw new Error(gl.getProgramInfoLog(this.program));
-          this.vao = gl.createVertexArray();
-      }
-      preserve(action) {
-          const gl = this._gl2();
-          const saved = new Map();
-          for (const parameter of [gl.DRAW_FRAMEBUFFER_BINDING, gl.READ_FRAMEBUFFER_BINDING, gl.CURRENT_PROGRAM, gl.VERTEX_ARRAY_BINDING, gl.ACTIVE_TEXTURE,
-              gl.VIEWPORT, gl.SCISSOR_BOX, gl.COLOR_WRITEMASK, gl.DEPTH_WRITEMASK, gl.COLOR_CLEAR_VALUE, gl.DEPTH_CLEAR_VALUE,
-              gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB, gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA, gl.BLEND_EQUATION_RGB, gl.BLEND_EQUATION_ALPHA,
-              gl.CULL_FACE_MODE, gl.FRONT_FACE, gl.STENCIL_WRITEMASK, gl.STENCIL_BACK_WRITEMASK, gl.STENCIL_CLEAR_VALUE])
-              saved.set(parameter, gl.getParameter(parameter));
-          const enabled = [gl.BLEND, gl.DEPTH_TEST, gl.SCISSOR_TEST, gl.CULL_FACE, gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE].map(cap => [cap, gl.isEnabled(cap)]);
-          gl.activeTexture(gl.TEXTURE0);
-          const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
-          const sampler = gl.getParameter(gl.SAMPLER_BINDING);
-          try {
-              compositorOperation(action);
-          }
-          finally {
-              gl.bindSampler(0, sampler);
-              gl.bindTexture(gl.TEXTURE_2D, texture);
-              gl.activeTexture(saved.get(gl.ACTIVE_TEXTURE));
-              gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, saved.get(gl.DRAW_FRAMEBUFFER_BINDING));
-              gl.bindFramebuffer(gl.READ_FRAMEBUFFER, saved.get(gl.READ_FRAMEBUFFER_BINDING));
-              gl.useProgram(saved.get(gl.CURRENT_PROGRAM));
-              gl.bindVertexArray(saved.get(gl.VERTEX_ARRAY_BINDING));
-              const viewport = saved.get(gl.VIEWPORT);
-              gl.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-              const scissor = saved.get(gl.SCISSOR_BOX);
-              gl.scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
-              const mask = saved.get(gl.COLOR_WRITEMASK);
-              gl.colorMask(mask[0], mask[1], mask[2], mask[3]);
-              gl.depthMask(saved.get(gl.DEPTH_WRITEMASK));
-              const color = saved.get(gl.COLOR_CLEAR_VALUE);
-              gl.clearColor(color[0], color[1], color[2], color[3]);
-              gl.clearDepth(saved.get(gl.DEPTH_CLEAR_VALUE));
-              gl.blendFuncSeparate(saved.get(gl.BLEND_SRC_RGB), saved.get(gl.BLEND_DST_RGB), saved.get(gl.BLEND_SRC_ALPHA), saved.get(gl.BLEND_DST_ALPHA));
-              gl.blendEquationSeparate(saved.get(gl.BLEND_EQUATION_RGB), saved.get(gl.BLEND_EQUATION_ALPHA));
-              gl.stencilMaskSeparate(gl.FRONT, saved.get(gl.STENCIL_WRITEMASK));
-              gl.stencilMaskSeparate(gl.BACK, saved.get(gl.STENCIL_BACK_WRITEMASK));
-              gl.clearStencil(saved.get(gl.STENCIL_CLEAR_VALUE));
-              gl.cullFace(saved.get(gl.CULL_FACE_MODE));
-              gl.frontFace(saved.get(gl.FRONT_FACE));
-              for (const [cap, value] of enabled)
-                  value ? gl.enable(cap) : gl.disable(cap);
-          }
-      }
-  };
-
-  var layers = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    XRCompositionLayer: XRCompositionLayer,
-    XRLayer: XRLayer,
-    XRProjectionLayer: XRProjectionLayer,
-    XRQuadLayer: XRQuadLayer,
-    XRSubImage: XRSubImage,
-    XRWebGLBinding: XRWebGLBinding$1,
-    XRWebGLLayer: XRWebGLLayer$1,
-    XRWebGLSubImage: XRWebGLSubImage
-  });
-
-  class XRAnchorSet {
-      constructor(anchors) { this.valuesSet = new Set(anchors); }
-      get size() { return this.valuesSet.size; }
-      has(anchor) { return this.valuesSet.has(anchor); }
-      values() { return this.valuesSet.values(); }
-      keys() { return this.valuesSet.keys(); }
-      entries() { return this.valuesSet.entries(); }
-      forEach(callback, thisArg) { for (const anchor of this)
-          callback.call(thisArg, anchor, anchor, this); }
-      [Symbol.iterator]() { return this.values(); }
-  }
-  class XRAnchor {
-      constructor(_session, _matrix) {
-          this._session = _session;
-          this._matrix = _matrix;
-          this.deleted = false;
-          this.space = new XRSpace(_session, () => this.deleted ? null : _matrix);
-      }
-      get anchorSpace() { if (this.deleted)
-          invalidState('Anchor was deleted.'); this._session._assertLive(); return this.space; }
-      delete() { this.deleted = true; this._session._anchors.delete(this); }
-      async requestPersistentHandle() { this._session._assertLive(); if (this.deleted)
-          invalidState('Anchor was deleted.'); return unsupported('Persistent anchors are not simulated.'); }
-  }
-  const names = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
-      ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))];
-  const jointObjects = interfaceBrands.joints;
-  class XRJointSpace extends XRSpace {
-      constructor(session, jointName, _radius, provider) {
-          super(session, provider, true);
-          this.jointName = jointName;
-          this._radius = _radius;
-      }
-  }
-  class XRJointPose extends XRPose {
-      constructor(transform, radius, emulatedPosition, token) {
-          super(transform, emulatedPosition, token);
-          this.radius = radius;
-      }
-  }
-  class XRHand {
-      constructor(session, controller, active) {
-          this.joints = new Map();
-          for (const [index, name] of names.entries()) {
-              const radius = index === 0 ? 0.018 : name.endsWith('tip') ? 0.007 : 0.009;
-              this.joints.set(name, new XRJointSpace(session, name, radius, () => {
-                  if (!active())
-                      return null;
-                  const gamepad = session._device.gamepads[controller];
-                  if (!gamepad)
-                      return null;
-                  const matrix = fromRotationTranslation(create$3(), gamepad.pose.orientation, gamepad.pose.position);
-                  if (index === 0)
-                      return matrix;
-                  const finger = index <= 4 ? 0 : 1 + Math.floor((index - 5) / 5);
-                  const joint = index <= 4 ? index : 1 + (index - 5) % 5;
-                  const side = gamepad.hand === 'left' ? -1 : 1;
-                  const curled = gamepad.buttons[0].pressed;
-                  const position = (bone) => fromValues((finger - 2) * 0.019 * side, curled ? -bone * 0.009 : 0, -0.025 - bone * (curled ? 0.008 : 0.025));
-                  const origin = position(joint);
-                  const target = name.endsWith('tip') ? add$1(create$2(), origin, subtract(create$2(), origin, position(joint - 1))) : position(joint + 1);
-                  return multiply(matrix, matrix, targetTo(create$3(), origin, target, [0, 1, 0]));
-              }));
-          }
-      }
-      get size() { return this.joints.size; }
-      get(key) { if (!names.includes(key))
-          throw new TypeError('Invalid XRHandJoint.'); return this.joints.get(key); }
-      keys() { return this.joints.keys(); }
-      values() { return this.joints.values(); }
-      entries() { return this.joints.entries(); }
-      forEach(callback, thisArg) { for (const [name, joint] of this)
-          callback.call(thisArg, joint, name, this); }
-      [Symbol.iterator]() { return this.entries(); }
-  }
-  class XRLightProbe extends EventTarget {
-      constructor(_session) {
-          super();
-          this._session = _session;
-          this.onreflectionchange = null;
-          this.probeSpace = new XRSpace(_session, () => create$3());
-      }
-  }
-  class XRLightEstimate {
-      constructor() {
-          this.primaryLightDirection = new DOMPointReadOnly(-1 / Math.sqrt(3), 1 / Math.sqrt(3), -1 / Math.sqrt(3), 0);
-          this.primaryLightIntensity = new DOMPointReadOnly(4 * Math.PI, 4 * Math.PI, 4 * Math.PI, 1);
-          const light = 4 * Math.PI;
-          const { x, y, z } = this.primaryLightDirection;
-          const basis = [0.282095, 0.488603 * y, 0.488603 * z, 0.488603 * x,
-              1.092548 * x * y, 1.092548 * y * z, 0.315392 * (3 * z * z - 1), 1.092548 * x * z, 0.546274 * (x * x - y * y)];
-          this.sphericalHarmonicsCoefficients = new Float32Array(basis.flatMap(value => [value * light, value * light, value * light]));
-      }
-  }
-  class XRDepthInformation {
-      constructor(_frame, view) {
-          this._frame = _frame;
-          this.view = view;
-          this.width = 32;
-          this.height = 32;
-          this.normDepthBufferFromNormView = new XRRigidTransform();
-          interfaceBrands.depthGeometry.add(this);
-          initializeViewGeometry(this, view.transform, projectionData(view));
-          this.rawValueToMeters = _frame.session.depthDataFormat === 'float32' ? 1 : 0.001;
-      }
-  }
-  installViewGeometry(XRDepthInformation.prototype, value => interfaceBrands.depthGeometry.has(value));
-  class XRCPUDepthInformation extends XRDepthInformation {
-      constructor(frame, view) {
-          super(frame, view);
-          this.samples = this.rawValueToMeters === 1 ? new Float32Array(this.width * this.height) : new Uint16Array(this.width * this.height);
-          const origin = getTranslation(create$2(), view._worldMatrix);
-          const inverseProjection = invert(create$3(), projectionData(view));
-          const local = create$2();
-          const world = create$2();
-          for (let y = 0; y < this.height; y++)
-              for (let x = 0; x < this.width; x++) {
-                  transformMat4(local, [(x + 0.5) / this.width * 2 - 1, 1 - (y + 0.5) / this.height * 2, 0], inverseProjection);
-                  transformMat4(world, local, view._worldMatrix);
-                  subtract(world, world, origin);
-                  normalize$3(world, world);
-                  const hit = frame.session._device.arScene.getHitTestResults(origin, world)[0];
-                  if (hit) {
-                      const depth = hit.distance * (-local[2] / length(local));
-                      const raw = Math.round(depth / this.rawValueToMeters);
-                      this.samples[y * this.width + x] = this.rawValueToMeters === 1 ? depth : raw > 0 && raw <= 65535 ? raw : 0;
-                  }
-              }
-      }
-      get data() { this._frame._assertActive(true); return this.samples.buffer; }
-      getDepthInMeters(x, y) {
-          this._frame._assertActive(true);
-          if (![x, y].every(Number.isFinite))
-              throw new TypeError('Coordinates must be finite.');
-          if (x < 0 || x > 1 || y < 0 || y > 1)
-              throw new RangeError('Depth coordinates must be in [0,1].');
-          return this.samples[Math.min(this.height - 1, Math.floor(y * this.height)) * this.width + Math.min(this.width - 1, Math.floor(x * this.width))] * this.rawValueToMeters;
-      }
-  }
-
-  var sensing = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    XRAnchor: XRAnchor,
-    XRAnchorSet: XRAnchorSet,
-    XRCPUDepthInformation: XRCPUDepthInformation,
-    XRDepthInformation: XRDepthInformation,
-    XRHand: XRHand,
-    XRJointPose: XRJointPose,
-    XRJointSpace: XRJointSpace,
-    XRLightEstimate: XRLightEstimate,
-    XRLightProbe: XRLightProbe,
-    jointObjects: jointObjects
-  });
-
   const REVISION = '186';
   const CullFaceNone = 0;
   const CullFaceBack = 1;
@@ -25699,6 +24233,1554 @@ void main() {
   	}
   }
 
+  function roomMeshes(room) {
+      const meshes = [];
+      room === null || room === void 0 ? void 0 : room.traverse(object => { if (object instanceof Mesh && object.name !== 'sky')
+          meshes.push(object); });
+      return meshes;
+  }
+  function roomSurfaces(room) {
+      var _a;
+      room === null || room === void 0 ? void 0 : room.updateWorldMatrix(true, true);
+      const surfaces = [];
+      for (const mesh of roomMeshes(room)) {
+          const positions = mesh.geometry.getAttribute('position');
+          if (!positions)
+              continue;
+          const indices = mesh.geometry.index;
+          const count = (_a = indices === null || indices === void 0 ? void 0 : indices.count) !== null && _a !== void 0 ? _a : positions.count;
+          for (let i = 0; i + 2 < count; i += 3) {
+              const points = [0, 1, 2].map(j => new Vector3().fromBufferAttribute(positions, indices ? indices.getX(i + j) : i + j).applyMatrix4(mesh.matrixWorld));
+              const x = points[1].clone().sub(points[0]);
+              const edge = points[2].clone().sub(points[0]);
+              const y = x.clone().cross(edge);
+              if (y.lengthSq() < 1e-12)
+                  continue;
+              x.normalize();
+              y.normalize();
+              const z = x.clone().cross(y);
+              const center = points[0].clone().add(points[1]).add(points[2]).multiplyScalar(1 / 3);
+              const matrix = new Matrix4().makeBasis(x, y, z).setPosition(center);
+              const vertices = points.flatMap(point => { const delta = point.clone().sub(center); return [delta.dot(x), 0, delta.dot(z)]; });
+              surfaces.push({ key: `${mesh.uuid}:${i}`, matrix: new Float32Array(matrix.elements), vertices,
+                  orientation: Math.abs(y.y) > 0.999 ? 'horizontal' : Math.abs(y.y) < 0.001 ? 'vertical' : null });
+          }
+      }
+      return surfaces;
+  }
+
+  function createMeshAllocations(sessions) {
+      const meshes = new WeakMap();
+      const sets = new WeakMap();
+      const meshBindings = Object.freeze({
+          meshes: Object.freeze({ get: (value) => meshes.get(value) }),
+          sets: Object.freeze({ get: (value) => sets.get(value) })
+      });
+      const meshTracking = new WeakMap();
+      function allocateMesh(session, prototype) {
+          const state = { matrix: null, vertices: new Float32Array(), indices: new Uint32Array(), changed: 0 };
+          const space = new XRSpace(session, () => session.ended ? null : state.matrix);
+          const mesh = Object.create(prototype);
+          meshes.set(mesh, Object.freeze({ space,
+              vertices: () => new Float32Array(state.vertices),
+              indices: () => new Uint32Array(state.indices), changed: () => state.changed }));
+          meshTracking.set(mesh, state);
+          return mesh;
+      }
+      function allocateSet(values, prototype) {
+          const set = new Set(values);
+          const collection = Object.create(prototype);
+          sets.set(collection, Object.freeze({ size: set.size, has: (value) => set.has(value),
+              values: () => set.values(), entries: () => set.entries() }));
+          return collection;
+      }
+      function updateMesh(mesh, surface, time) {
+          const state = meshTracking.get(mesh);
+          if (state.vertices.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - state.vertices[i]) > 1e-5)) {
+              state.vertices = new Float32Array(surface.vertices);
+              state.indices = new Uint32Array([0, 1, 2]);
+              state.changed = time;
+          }
+          state.matrix = surface.matrix;
+      }
+      const trackers = new WeakMap();
+      class MeshTracker {
+          constructor(session, meshPrototype, setPrototype) {
+              if (!sessions.has(session))
+                  throw new TypeError('Expected XRSession.');
+              trackers.set(this, { session, meshes: new Map(), meshPrototype, setPrototype });
+          }
+          update(time) {
+              var _a, _b;
+              const { session, meshes, meshPrototype } = trackers.get(this);
+              const surfaces = roomSurfaces((_b = (_a = session._device.arScene) === null || _a === void 0 ? void 0 : _a.room) !== null && _b !== void 0 ? _b : null);
+              const keys = new Set(surfaces.map(surface => surface.key));
+              for (const [key, mesh] of meshes)
+                  if (!keys.has(key)) {
+                      meshTracking.get(mesh).matrix = null;
+                      meshes.delete(key);
+                  }
+              if (session.enabledFeatures.includes('mesh-detection'))
+                  for (const surface of surfaces) {
+                      let mesh = meshes.get(surface.key);
+                      if (!mesh)
+                          meshes.set(surface.key, mesh = allocateMesh(session, meshPrototype));
+                      updateMesh(mesh, surface, time);
+                  }
+          }
+          snapshot() {
+              const { meshes, setPrototype } = trackers.get(this);
+              return allocateSet(meshes.values(), setPrototype);
+          }
+          clear() {
+              const { meshes } = trackers.get(this);
+              for (const mesh of meshes.values())
+                  meshTracking.get(mesh).matrix = null;
+              meshes.clear();
+          }
+      }
+      Object.freeze(MeshTracker.prototype);
+      Object.freeze(MeshTracker);
+      return Object.freeze({ MeshTracker, ...meshBindings });
+  }
+
+  function createHitTestAllocations(brands) {
+      const rays = new WeakMap();
+      const hitSources = new WeakMap();
+      const transientHitSources = new WeakMap();
+      const hitResults = new WeakMap();
+      const transientHitResults = new WeakMap();
+      function sourceRecord(session, options, extra, membership, source) {
+          const offsetRay = options.offsetRay;
+          if (!brands.sessions.has(session) || !rays.has(offsetRay))
+              throw new TypeError('Expected session and ray.');
+          const entityTypes = Object.freeze([...options.entityTypes]);
+          if (entityTypes.some(type => !['plane', 'mesh', 'point'].includes(type)))
+              throw new TypeError('Invalid entity type.');
+          return Object.freeze({ ...extra, session, offsetRay, entityTypes,
+              get active() { return membership.has(source); } });
+      }
+      class RayAllocation {
+          constructor(p, d) {
+              p = { x: +p.x, y: +p.y, z: +p.z, w: +p.w };
+              d = { x: +d.x, y: +d.y, z: +d.z, w: +d.w };
+              if (p.w !== 1 || d.w !== 0 || ![d.x, d.y, d.z].every(Number.isFinite) || (d.x === 0 && d.y === 0 && d.z === 0))
+                  throw new TypeError('Invalid ray.');
+              const scale = Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
+              const length = Math.hypot(d.x / scale, d.y / scale, d.z / scale);
+              d.x = d.x / scale / length;
+              d.y = d.y / scale / length;
+              d.z = d.z / scale / length;
+              const origin = Object.freeze(new DOMPointReadOnly(p.x, p.y, p.z, p.w));
+              const direction = Object.freeze(new DOMPointReadOnly(d.x, d.y, d.z, d.w));
+              let matrix;
+              rays.set(this, Object.freeze({ origin, direction, matrix: () => {
+                      if (!matrix || matrix.buffer.byteLength === 0) {
+                          const rotation = create$3();
+                          const sine = Math.hypot(d.x, d.y);
+                          if (sine > 0) {
+                              fromRotation(rotation, Math.atan2(sine, -d.z), [d.y / sine, -d.x / sine, 0]);
+                          }
+                          else if (d.z > 0)
+                              fromRotation(rotation, Math.PI, [1, 0, 0]);
+                          rotation[12] = p.x;
+                          rotation[13] = p.y;
+                          rotation[14] = p.z;
+                          matrix = new Float32Array(rotation);
+                      }
+                      return matrix;
+                  } }));
+          }
+      }
+      class HitSourceAllocation {
+          constructor(session, options) {
+              const space = options.space;
+              if (!brands.spaces.has(space))
+                  throw new TypeError('Expected XRSpace.');
+              hitSources.set(this, sourceRecord(session, options, { space }, session._hitSources, this));
+          }
+      }
+      class TransientHitSourceAllocation {
+          constructor(session, options) {
+              const profile = `${options.profile}`;
+              transientHitSources.set(this, sourceRecord(session, options, { profile }, session._transientSources, this));
+          }
+      }
+      class HitResultAllocation {
+          constructor(frame, transform) {
+              if (!brands.frames.has(frame) || !brands.transforms.has(transform))
+                  throw new TypeError('Expected frame and transform.');
+              hitResults.set(this, Object.freeze({ frame, transform }));
+          }
+      }
+      class TransientHitResultAllocation {
+          constructor(frame, results, inputSource) {
+              if (!brands.frames.has(frame) || !brands.inputSources.has(inputSource))
+                  throw new TypeError('Expected frame and input source.');
+              const snapshot = [...results];
+              if (snapshot.some(result => { var _a; return ((_a = hitResults.get(result)) === null || _a === void 0 ? void 0 : _a.frame) !== frame; }))
+                  throw new TypeError('Expected frame hit results.');
+              transientHitResults.set(this, Object.freeze({ inputSource, results: Object.freeze(snapshot) }));
+          }
+      }
+      function reader(map) {
+          return Object.freeze({ get: (value) => map.get(value), has: (value) => map.has(value) });
+      }
+      for (const C of [RayAllocation, HitSourceAllocation, TransientHitSourceAllocation, HitResultAllocation, TransientHitResultAllocation]) {
+          Object.freeze(C.prototype);
+          Object.freeze(C);
+      }
+      return Object.freeze({ RayAllocation, HitSourceAllocation, TransientHitSourceAllocation, HitResultAllocation, TransientHitResultAllocation,
+          rays: reader(rays), hitSources: reader(hitSources), transientHitSources: reader(transientHitSources),
+          hitResults: reader(hitResults), transientHitResults: reader(transientHitResults) });
+  }
+
+  function createBrands() {
+      const frames = new WeakSet(), spaces = new WeakSet(), joints = new WeakSet();
+      const sessions = new WeakSet(), inputSources = new WeakSet();
+      class SessionObject extends EventTarget {
+          constructor() { super(); sessions.add(this); }
+      }
+      class InputSourceObject {
+          constructor() { inputSources.add(this); }
+      }
+      class FrameObject {
+          constructor() { frames.add(this); }
+      }
+      class SpaceObject extends EventTarget {
+          constructor(joint = false) { super(); spaces.add(this); if (joint)
+              joints.add(this); }
+      }
+      Object.freeze(FrameObject.prototype);
+      Object.freeze(FrameObject);
+      Object.freeze(SpaceObject.prototype);
+      Object.freeze(SpaceObject);
+      Object.freeze(SessionObject.prototype);
+      Object.freeze(SessionObject);
+      Object.freeze(InputSourceObject.prototype);
+      Object.freeze(InputSourceObject);
+      const transforms = new WeakMap();
+      const hitTestAllocations = createHitTestAllocations({ sessions, spaces, frames, inputSources, transforms });
+      return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
+          layerAllocations: createLayerAllocations(sessions),
+          meshAllocations: createMeshAllocations(sessions),
+          planeValues: new WeakMap(),
+          planeSets: new WeakMap(),
+          roomCaptures: new WeakMap(),
+          hitTestAllocations,
+          rays: hitTestAllocations.rays,
+          hitSources: hitTestAllocations.hitSources,
+          transientHitSources: hitTestAllocations.transientHitSources,
+          hitResults: hitTestAllocations.hitResults,
+          transientHitResults: hitTestAllocations.transientHitResults,
+          transforms,
+          referenceOffsets: new WeakMap(),
+          referenceSpaceRequests: new WeakMap(),
+          frameValues: new WeakMap(),
+          viewerPoses: new WeakMap(),
+          poses: new WeakMap(),
+          viewerViews: new WeakMap(),
+          views: new WeakMap(),
+          viewGeometry: new WeakMap(),
+          depthGeometry: new WeakSet(),
+          spaceRelations: new WeakMap(),
+          trackingOrigins: new WeakMap(),
+          bindingSubImages: new WeakMap(),
+          viewports: new WeakMap(),
+          layerViewports: new WeakMap(),
+          eventSessions: new WeakMap(),
+          eventInputs: new WeakMap(),
+          eventChanges: new WeakMap(),
+          eventHandlers: new WeakMap(),
+          sessions: Object.freeze({ has: (value) => sessions.has(value) }),
+          inputSources: Object.freeze({ has: (value) => inputSources.has(value) }),
+          frames: Object.freeze({ has: (value) => frames.has(value) }),
+          spaces: Object.freeze({ has: (value) => spaces.has(value) }),
+          joints: Object.freeze({ has: (value) => joints.has(value) }),
+      });
+  }
+  const key = Symbol.for('WebXR-emulator.interface-brands');
+  let host = globalThis;
+  if (typeof window !== 'undefined') {
+      const pending = [window], visited = new Set();
+      while (pending.length) {
+          const candidate = pending.pop();
+          if (visited.has(candidate))
+              continue;
+          visited.add(candidate);
+          try {
+              void candidate.document;
+              host = candidate;
+              if (Object.prototype.hasOwnProperty.call(candidate, key))
+                  break;
+          }
+          catch ( _a) {  }
+          try {
+              if (candidate.opener)
+                  pending.push(candidate.opener);
+          }
+          catch ( _b) {  }
+          try {
+              pending.push(candidate.parent);
+          }
+          catch ( _c) {  }
+      }
+  }
+  const shared = host;
+  if (!Object.prototype.hasOwnProperty.call(shared, key)) {
+      Object.defineProperty(shared, key, { value: createBrands() });
+  }
+  const interfaceBrands = shared[key];
+  const layerBrands = interfaceBrands.layerAllocations;
+
+  const sessionObjects = interfaceBrands.sessions;
+  const frameObjects = interfaceBrands.frames;
+  const spaceObjects = interfaceBrands.spaces;
+  const compatibleContexts = new WeakSet();
+  const invalidState = (message) => { throw new DOMException(message, 'InvalidStateError'); };
+  const unsupported = (message) => { throw new DOMException(message, 'NotSupportedError'); };
+  function convertPoint(value) {
+      const empty = value === null || value === undefined;
+      if (!empty && Object(value) !== value)
+          throw new TypeError('Expected DOMPointInit.');
+      const result = { w: 1, x: 0, y: 0, z: 0 };
+      for (const key of ['w', 'x', 'y', 'z']) {
+          const component = empty ? undefined : value[key];
+          if (component !== undefined)
+              result[key] = +component;
+      }
+      return [result.x, result.y, result.z, result.w];
+  }
+  function transformState(value) {
+      const state = interfaceBrands.transforms.get(value);
+      if (!state)
+          throw new TypeError('Expected XRRigidTransform.');
+      return state;
+  }
+  const transformObjects = Object.freeze({ has: (value) => interfaceBrands.transforms.has(value) });
+  const transformMatrix = (value) => transformState(value).geometry;
+  class XRRigidTransform {
+      constructor(position = {}, orientation = {}) {
+          const p = convertPoint(position), q = convertPoint(orientation);
+          if (p[3] !== 1)
+              throw new TypeError('Position w must equal 1.');
+          if (![...p, ...q].every(Number.isFinite))
+              throw new TypeError('Transform components must be finite.');
+          const lengthSquared = q.reduce((sum, value) => sum + value * value, 0);
+          if (!lengthSquared || !Number.isFinite(lengthSquared))
+              throw new DOMException('Orientation cannot be normalized.', 'InvalidStateError');
+          const length = Math.sqrt(lengthSquared);
+          for (let i = 0; i < 4; i++)
+              q[i] /= length;
+          const geometry = fromRotationTranslation(new Array(16), q, p);
+          let matrix, inverse;
+          interfaceBrands.transforms.set(this, {
+              position: new DOMPointReadOnly(...p), orientation: new DOMPointReadOnly(...q), geometry,
+              matrix: () => {
+                  if (!matrix || matrix.buffer.byteLength === 0)
+                      matrix = new Float32Array(geometry);
+                  return matrix;
+              },
+              inverse: () => {
+                  if (!inverse) {
+                      inverse = XRRigidTransform._fromMatrix(invert(new Array(16), geometry));
+                      interfaceBrands.transforms.get(inverse).inverse = () => this;
+                  }
+                  return inverse;
+              },
+          });
+      }
+      static _fromMatrix(matrix) {
+          const p = getTranslation([0, 0, 0], matrix);
+          const q = getRotation([0, 0, 0, 1], matrix);
+          return new XRRigidTransform({ x: p[0], y: p[1], z: p[2] }, { x: q[0], y: q[1], z: q[2], w: q[3] });
+      }
+      get position() { return transformState(this).position; }
+      get orientation() { return transformState(this).orientation; }
+      get matrix() { return transformState(this).matrix(); }
+      get inverse() { return transformState(this).inverse(); }
+  }
+  for (const name of ['position', 'orientation', 'matrix', 'inverse']) {
+      Object.defineProperty(XRRigidTransform.prototype, name, { ...Object.getOwnPropertyDescriptor(XRRigidTransform.prototype, name), enumerable: true });
+  }
+  function initializeSpaceRelation(space, origin, offset) {
+      let tracking = interfaceBrands.trackingOrigins.get(origin);
+      if (!tracking) {
+          tracking = { emulatedPosition: false };
+          interfaceBrands.trackingOrigins.set(origin, tracking);
+      }
+      interfaceBrands.spaceRelations.set(space, { origin, offset, tracking });
+  }
+  class XRSpace extends interfaceBrands.SpaceObject {
+      get _emulatedPosition() { return interfaceBrands.spaceRelations.get(this).tracking.emulatedPosition; }
+      set _emulatedPosition(value) { interfaceBrands.spaceRelations.get(this).tracking.emulatedPosition = value; }
+      constructor(_session, matrixProvider, joint = false) {
+          super(joint);
+          this._session = _session;
+          this.matrixProvider = matrixProvider;
+          this._baseMatrix = null;
+          initializeSpaceRelation(this, matrixProvider, create$3());
+      }
+      get _inverseBaseMatrix() { return this._baseMatrix && invert(create$3(), this._baseMatrix); }
+      _update() { this._baseMatrix = this.matrixProvider(); return this._baseMatrix; }
+      _adjustForOriginOffset(_matrix) { }
+  }
+  Object.setPrototypeOf(XRSpace.prototype, EventTarget.prototype);
+  class XRReferenceSpace extends XRSpace {
+      constructor(session, _type, nativeMatrix, offset = create$3()) {
+          super(session, () => {
+              const matrix = nativeMatrix();
+              return matrix && multiply(create$3(), matrix, offset);
+          });
+          this._type = _type;
+          this.nativeMatrix = nativeMatrix;
+          this.offset = offset;
+          this.onreset = null;
+          initializeSpaceRelation(this, nativeMatrix, offset);
+          const allocate = this.createOffsetSpace.bind(this);
+          interfaceBrands.referenceOffsets.set(this, transform => allocate(multiply(create$3(), offset, transform)));
+      }
+      getOffsetReferenceSpace(transform) {
+          const allocate = interfaceBrands.referenceOffsets.get(this);
+          if (!allocate)
+              throw new TypeError('Expected XRReferenceSpace.');
+          return allocate(transformMatrix(transform));
+      }
+      createOffsetSpace(offset) {
+          return new XRReferenceSpace(this._session, this._type, this.nativeMatrix, offset);
+      }
+  }
+  Object.defineProperty(XRReferenceSpace.prototype, 'getOffsetReferenceSpace', { enumerable: true });
+  class XRBoundedReferenceSpace extends XRReferenceSpace {
+      constructor(session, nativeMatrix, nativeBounds, offset = create$3()) {
+          super(session, 'bounded-floor', nativeMatrix, offset);
+          this.nativeBounds = nativeBounds;
+          const inverse = invert(create$3(), offset);
+          this.boundsValue = Object.freeze(nativeBounds.map(point => {
+              const p = transformMat4(create$2(), point, inverse);
+              return Object.freeze(new DOMPointReadOnly(p[0], p[1], p[2], 1));
+          }));
+      }
+      get boundsGeometry() { return this.boundsValue; }
+      getOffsetReferenceSpace(transform) {
+          return super.getOffsetReferenceSpace(transform);
+      }
+      createOffsetSpace(offset) {
+          return new XRBoundedReferenceSpace(this._session, this.nativeMatrix, this.nativeBounds, offset);
+      }
+  }
+  const geometryAllocation = Symbol('geometry allocation');
+  function requireGeometryAllocation(token) {
+      if (token !== geometryAllocation)
+          throw new TypeError('Illegal constructor.');
+  }
+  function poseState(value) {
+      const state = interfaceBrands.poses.get(value);
+      if (!state)
+          throw new TypeError('Expected XRPose.');
+      return state;
+  }
+  function relativePose(space, base) {
+      const source = interfaceBrands.spaceRelations.get(space), target = interfaceBrands.spaceRelations.get(base);
+      if (source.origin === target.origin)
+          return {
+              matrix: multiply(create$3(), invert(create$3(), target.offset), source.offset), emulated: false,
+          };
+      const world = space._update(), baseWorld = base._update();
+      return world && baseWorld ? {
+          matrix: multiply(create$3(), invert(create$3(), baseWorld), world),
+          emulated: source.tracking.emulatedPosition || target.tracking.emulatedPosition,
+      } : null;
+  }
+  class XRPose {
+      constructor(transform, emulatedPosition, token) {
+          requireGeometryAllocation(token);
+          interfaceBrands.poses.set(this, { transform, emulatedPosition });
+      }
+      get transform() { return poseState(this).transform; }
+      get emulatedPosition() { return poseState(this).emulatedPosition; }
+      get linearVelocity() { poseState(this); return null; }
+      get angularVelocity() { poseState(this); return null; }
+  }
+  class XRViewerPose extends XRPose {
+      constructor(transform, views, emulatedPosition, token) {
+          super(transform, emulatedPosition, token);
+          interfaceBrands.viewerViews.set(this, Object.freeze([...views]));
+      }
+      get views() {
+          const views = interfaceBrands.viewerViews.get(this);
+          if (!views)
+              throw new TypeError('Expected XRViewerPose.');
+          return views;
+      }
+  }
+  function viewportState(value) {
+      const state = interfaceBrands.viewports.get(value);
+      if (!state)
+          throw new TypeError('Expected XRViewport.');
+      return state;
+  }
+  class XRViewport {
+      constructor(x, y, width, height, token) {
+          requireGeometryAllocation(token);
+          interfaceBrands.viewports.set(this, { x, y, width, height });
+      }
+      get x() { return viewportState(this).x; }
+      get y() { return viewportState(this).y; }
+      get width() { return viewportState(this).width; }
+      get height() { return viewportState(this).height; }
+  }
+  function initializeViewGeometry(value, transform, projection) {
+      const geometry = Array.from(projection);
+      let array;
+      interfaceBrands.viewGeometry.set(value, { transform, projection: geometry, array: () => {
+              if (!array || array.buffer.byteLength === 0)
+                  array = new Float32Array(geometry);
+              return array;
+          } });
+  }
+  function installViewGeometry(prototype, has) {
+      for (const name of ['transform', 'projectionMatrix']) {
+          Object.defineProperty(prototype, name, { enumerable: true, configurable: true, get() {
+                  if (!has(this))
+                      throw new TypeError('Expected a view geometry receiver.');
+                  const state = interfaceBrands.viewGeometry.get(this);
+                  return name === 'transform' ? state.transform : state.array();
+              } });
+      }
+  }
+  const projectionData = (value) => {
+      const state = interfaceBrands.viewGeometry.get(value);
+      if (!state)
+          throw new TypeError('Expected view geometry.');
+      return state.projection;
+  };
+  function viewState(value) {
+      const state = interfaceBrands.views.get(value);
+      if (!state)
+          throw new TypeError('Expected XRView.');
+      return state;
+  }
+  class XRView {
+      constructor(frame, eye, transform, projection, world, index, token) {
+          requireGeometryAllocation(token);
+          interfaceBrands.views.set(this, { frame, eye, index, world });
+          initializeViewGeometry(this, transform, projection);
+      }
+      get eye() { return viewState(this).eye; }
+      get index() { return viewState(this).index; }
+      get recommendedViewportScale() { viewState(this); return null; }
+      get isFirstPersonObserver() { viewState(this); return false; }
+      get _frame() { return viewState(this).frame; }
+      get _worldMatrix() { return viewState(this).world; }
+      requestViewportScale(scale) {
+          viewState(this);
+          if (arguments.length < 1)
+              throw new TypeError('Expected scale.');
+          if (scale !== null && scale !== undefined && !Number.isFinite(+scale))
+              throw new TypeError('Expected a finite double.');
+      }
+  }
+  installViewGeometry(XRView.prototype, value => interfaceBrands.views.has(value));
+  function enumerableMembers(prototype, names) {
+      for (const name of names)
+          Object.defineProperty(prototype, name, { ...Object.getOwnPropertyDescriptor(prototype, name), enumerable: true });
+  }
+  enumerableMembers(XRPose.prototype, ['transform', 'emulatedPosition', 'linearVelocity', 'angularVelocity']);
+  enumerableMembers(XRViewerPose.prototype, ['views']);
+  enumerableMembers(XRViewport.prototype, ['x', 'y', 'width', 'height']);
+  enumerableMembers(XRView.prototype, ['eye', 'index', 'recommendedViewportScale', 'isFirstPersonObserver', 'requestViewportScale']);
+
+  var geometry = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    XRBoundedReferenceSpace: XRBoundedReferenceSpace,
+    XRPose: XRPose,
+    XRReferenceSpace: XRReferenceSpace,
+    XRRigidTransform: XRRigidTransform,
+    XRSpace: XRSpace,
+    XRView: XRView,
+    XRViewerPose: XRViewerPose,
+    XRViewport: XRViewport,
+    compatibleContexts: compatibleContexts,
+    enumerableMembers: enumerableMembers,
+    frameObjects: frameObjects,
+    geometryAllocation: geometryAllocation,
+    initializeViewGeometry: initializeViewGeometry,
+    installViewGeometry: installViewGeometry,
+    invalidState: invalidState,
+    projectionData: projectionData,
+    relativePose: relativePose,
+    requireGeometryAllocation: requireGeometryAllocation,
+    sessionObjects: sessionObjects,
+    spaceObjects: spaceObjects,
+    transformMatrix: transformMatrix,
+    transformObjects: transformObjects,
+    unsupported: unsupported,
+    viewState: viewState
+  });
+
+  function installWebGLCompatibility() {
+      for (const Context of [globalThis.WebGLRenderingContext, globalThis.WebGL2RenderingContext]) {
+          if (!Context)
+              continue;
+          installOpaqueFramebufferGuards(Context);
+          Context.prototype.makeXRCompatible = function () {
+              if (this.isContextLost())
+                  return Promise.reject(new DOMException('WebGL context is lost.', 'InvalidStateError'));
+              compatibleContexts.add(this);
+              return Promise.resolve();
+          };
+      }
+      const patchCanvas = (prototype) => {
+          const original = prototype.getContext;
+          Object.defineProperty(prototype, 'getContext', { configurable: true, writable: true,
+              value(type, options) {
+                  const webgl = type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl';
+                  const requested = webgl && !!(options === null || options === void 0 ? void 0 : options.xrCompatible);
+                  const context = original.call(this, type, requested ? { ...options, xrCompatible: false } : options);
+                  if (requested && (context instanceof WebGLRenderingContext || (typeof WebGL2RenderingContext !== 'undefined' && context instanceof WebGL2RenderingContext)))
+                      compatibleContexts.add(context);
+                  return context;
+              },
+          });
+      };
+      patchCanvas(HTMLCanvasElement.prototype);
+      if (typeof OffscreenCanvas !== 'undefined')
+          patchCanvas(OffscreenCanvas.prototype);
+  }
+
+  function convertWebGLLayerOptions(value) {
+      if (value != null && typeof value !== 'object' && typeof value !== 'function')
+          throw new TypeError('Expected XRWebGLLayerInit dictionary.');
+      const dictionary = (value !== null && value !== void 0 ? value : {});
+      const result = {};
+      for (const key of ['alpha', 'antialias', 'depth', 'framebufferScaleFactor', 'ignoreDepthValues', 'stencil']) {
+          const member = dictionary[key];
+          if (key === 'framebufferScaleFactor') {
+              const number = member === undefined ? 1 : +member;
+              if (!Number.isFinite(number))
+                  throw new TypeError('framebufferScaleFactor must be a finite double.');
+              result[key] = number;
+          }
+          else
+              result[key] = member === undefined ? ['alpha', 'antialias', 'depth'].includes(key) : Boolean(member);
+      }
+      return result;
+  }
+  function preserve(gl, action) {
+      return compositorOperation(() => {
+          const gl2 = gl instanceof WebGL2RenderingContext ? gl : null;
+          const draw = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+          const read = gl2 === null || gl2 === void 0 ? void 0 : gl2.getParameter(gl2.READ_FRAMEBUFFER_BINDING);
+          const renderbuffer = gl.getParameter(gl.RENDERBUFFER_BINDING);
+          const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+          const unpack = gl2 === null || gl2 === void 0 ? void 0 : gl2.getParameter(gl2.PIXEL_UNPACK_BUFFER_BINDING);
+          const pack = gl2 === null || gl2 === void 0 ? void 0 : gl2.getParameter(gl2.PIXEL_PACK_BUFFER_BINDING);
+          const pixelStore = [gl.PACK_ALIGNMENT, gl.UNPACK_ALIGNMENT, ...(gl2 ? [gl2.PACK_ROW_LENGTH, gl2.PACK_SKIP_PIXELS, gl2.PACK_SKIP_ROWS, gl2.UNPACK_ROW_LENGTH, gl2.UNPACK_SKIP_PIXELS, gl2.UNPACK_SKIP_ROWS] : [])].map(key => [key, gl.getParameter(key)]);
+          const mask = gl.getParameter(gl.COLOR_WRITEMASK);
+          const depthMask = gl.getParameter(gl.DEPTH_WRITEMASK);
+          const front = gl.getParameter(gl.STENCIL_WRITEMASK), back = gl.getParameter(gl.STENCIL_BACK_WRITEMASK);
+          const color = gl.getParameter(gl.COLOR_CLEAR_VALUE);
+          const depth = gl.getParameter(gl.DEPTH_CLEAR_VALUE), stencil = gl.getParameter(gl.STENCIL_CLEAR_VALUE);
+          const enabled = [gl.SCISSOR_TEST, ...(gl2 ? [gl2.RASTERIZER_DISCARD] : [])].map(cap => [cap, gl.isEnabled(cap)]);
+          try {
+              if (gl2) {
+                  gl2.bindBuffer(gl2.PIXEL_PACK_BUFFER, null);
+                  gl2.bindBuffer(gl2.PIXEL_UNPACK_BUFFER, null);
+              }
+              for (const [key] of pixelStore)
+                  gl.pixelStorei(key, key === gl.PACK_ALIGNMENT || key === gl.UNPACK_ALIGNMENT ? 1 : 0);
+              return action();
+          }
+          finally {
+              for (const [key, value] of pixelStore)
+                  gl.pixelStorei(key, value);
+              if (gl2) {
+                  gl2.bindBuffer(gl2.PIXEL_PACK_BUFFER, pack);
+                  gl2.bindBuffer(gl2.PIXEL_UNPACK_BUFFER, unpack);
+                  gl2.bindFramebuffer(gl2.READ_FRAMEBUFFER, read);
+              }
+              gl.bindFramebuffer(gl2 ? gl2.DRAW_FRAMEBUFFER : gl.FRAMEBUFFER, draw);
+              gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
+              gl.bindTexture(gl.TEXTURE_2D, texture);
+              gl.colorMask(mask[0], mask[1], mask[2], mask[3]);
+              gl.depthMask(depthMask);
+              gl.stencilMaskSeparate(gl.FRONT, front);
+              gl.stencilMaskSeparate(gl.BACK, back);
+              gl.clearColor(color[0], color[1], color[2], color[3]);
+              gl.clearDepth(depth);
+              gl.clearStencil(stencil);
+              for (const [cap, value] of enabled)
+                  value ? gl.enable(cap) : gl.disable(cap);
+          }
+      });
+  }
+  class XRFramebuffer {
+      constructor(gl, size, options, stereo) {
+          var _a;
+          this.gl = gl;
+          this.options = options;
+          this.active = false;
+          this.alive = true;
+          this.dirty = false;
+          this.canvas = document.createElement('canvas');
+          this.resolve = null;
+          this.texture = null;
+          this.buffers = [];
+          this.lastStereo = null;
+          const scale = Math.max(1 / 16, Math.min(2, options.framebufferScaleFactor));
+          const maximum = Math.min(4096, gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+          let width = Math.max(stereo ? 2 : 1, Math.min(maximum, Math.floor(size.width * scale)));
+          let height = Math.max(1, Math.min(maximum, Math.floor(size.height * scale)));
+          const reduction = Math.min(1, Math.sqrt(4194304 / (width * height)));
+          this.width = width = Math.max(stereo ? 2 : 1, Math.floor(width * reduction));
+          this.height = height = Math.max(1, Math.floor(height * reduction));
+          this.canvas.width = width;
+          this.canvas.height = height;
+          this.canvas.style.width = '100%';
+          this.canvas.style.height = '100%';
+          try {
+              const output = this.canvas.getContext('2d', { colorSpace: 'srgb' });
+              if (!output)
+                  throw new Error('Unable to create presentation context.');
+              this.output = output;
+              this.image = output.createImageData(width, height);
+              this.pixels = new Uint8Array(width * height * 4);
+          }
+          catch (_b) {
+              throw new DOMException('Unable to allocate XR presentation storage.', 'OperationError');
+          }
+          const gl2 = gl instanceof WebGL2RenderingContext ? gl : null;
+          const colorFormat = options.alpha ? (gl2 ? gl2.RGBA8 : gl.RGBA) : (gl2 ? gl2.RGB8 : gl.RGB);
+          const depthFormat = options.stencil ? (gl2 ? gl2.DEPTH24_STENCIL8 : gl.DEPTH_STENCIL) : gl.DEPTH_COMPONENT16;
+          let samples = 0;
+          if (gl2 && options.antialias) {
+              const counts = gl2.getInternalformatParameter(gl2.RENDERBUFFER, colorFormat, gl2.SAMPLES);
+              const depthCounts = options.depth || options.stencil ? gl2.getInternalformatParameter(gl2.RENDERBUFFER, depthFormat, gl2.SAMPLES) : counts;
+              samples = (_a = Array.from(counts).find(count => count > 1 && count <= 4 && Array.from(depthCounts).includes(count))) !== null && _a !== void 0 ? _a : 0;
+          }
+          this.antialias = samples > 1;
+          const created = gl.createFramebuffer();
+          if (!created)
+              throw new DOMException('Unable to create XR framebuffer.', 'OperationError');
+          this.framebuffer = created;
+          try {
+              preserve(gl, () => {
+                  gl.bindFramebuffer(gl.FRAMEBUFFER, created);
+                  this.texture = gl.createTexture();
+                  if (!this.texture)
+                      throw new Error('Unable to create color texture.');
+                  gl.bindTexture(gl.TEXTURE_2D, this.texture);
+                  gl.texImage2D(gl.TEXTURE_2D, 0, colorFormat, width, height, 0, options.alpha ? gl.RGBA : gl.RGB, gl.UNSIGNED_BYTE, null);
+                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                  if (gl2 && samples) {
+                      this.resolve = gl.createFramebuffer();
+                      if (!this.resolve)
+                          throw new Error('Unable to create resolve framebuffer.');
+                      gl.bindFramebuffer(gl.FRAMEBUFFER, this.resolve);
+                      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+                      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+                          throw new Error('Incomplete XR resolve framebuffer.');
+                      gl.bindFramebuffer(gl.FRAMEBUFFER, created);
+                      this.attach(gl.COLOR_ATTACHMENT0, colorFormat, samples);
+                  }
+                  else
+                      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+                  if (options.depth || options.stencil)
+                      this.attach(options.stencil ? gl.DEPTH_STENCIL_ATTACHMENT : gl.DEPTH_ATTACHMENT, depthFormat, samples);
+                  if (gl.isContextLost() || gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+                      throw new Error('Incomplete XR framebuffer.');
+              });
+              ownFramebuffer(created, this);
+              this.clear();
+          }
+          catch (error) {
+              this.dispose();
+              throw new DOMException(`Unable to allocate XR framebuffer: ${String(error)}`, 'OperationError');
+          }
+      }
+      attach(attachment, format, samples) {
+          const gl = this.gl;
+          const buffer = gl.createRenderbuffer();
+          if (!buffer)
+              throw new Error('Unable to create XR renderbuffer.');
+          this.buffers.push(buffer);
+          gl.bindRenderbuffer(gl.RENDERBUFFER, buffer);
+          if (samples && gl instanceof WebGL2RenderingContext)
+              gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, format, this.width, this.height);
+          else
+              gl.renderbufferStorage(gl.RENDERBUFFER, format, this.width, this.height);
+          gl.framebufferRenderbuffer(gl.FRAMEBUFFER, attachment, gl.RENDERBUFFER, buffer);
+      }
+      get colorTexture() { return this.texture; }
+      clear() {
+          if (!this.alive || this.gl.isContextLost())
+              return;
+          const gl = this.gl;
+          preserve(gl, () => {
+              gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+              const drawBuffer = gl instanceof WebGL2RenderingContext ? gl.getParameter(gl.DRAW_BUFFER0) : 0;
+              gl.disable(gl.SCISSOR_TEST);
+              if (gl instanceof WebGL2RenderingContext) {
+                  gl.disable(gl.RASTERIZER_DISCARD);
+                  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+              }
+              gl.colorMask(true, true, true, true);
+              gl.depthMask(true);
+              gl.stencilMaskSeparate(gl.FRONT, 0xffffffff);
+              gl.stencilMaskSeparate(gl.BACK, 0xffffffff);
+              gl.clearColor(0, 0, 0, 0);
+              gl.clearDepth(1);
+              gl.clearStencil(0);
+              gl.clear(gl.COLOR_BUFFER_BIT | (this.options.depth || this.options.stencil ? gl.DEPTH_BUFFER_BIT : 0) | (this.options.stencil ? gl.STENCIL_BUFFER_BIT : 0));
+              if (gl instanceof WebGL2RenderingContext)
+                  gl.drawBuffers([drawBuffer]);
+          });
+      }
+      present(stereo, force = false) {
+          const gl = this.gl;
+          if (!this.alive || gl.isContextLost())
+              return;
+          const update = force || this.dirty;
+          if (!update && stereo === this.lastStereo)
+              return;
+          this.lastStereo = stereo;
+          this.dirty = false;
+          if (update) {
+              preserve(gl, () => {
+                  var _a;
+                  gl.disable(gl.SCISSOR_TEST);
+                  if (gl instanceof WebGL2RenderingContext && this.resolve) {
+                      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.framebuffer);
+                      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.resolve);
+                      const sourceReadBuffer = gl.getParameter(gl.READ_BUFFER);
+                      gl.readBuffer(gl.COLOR_ATTACHMENT0);
+                      gl.blitFramebuffer(0, 0, this.width, this.height, 0, 0, this.width, this.height, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+                      gl.readBuffer(sourceReadBuffer);
+                  }
+                  gl.bindFramebuffer(gl.FRAMEBUFFER, (_a = this.resolve) !== null && _a !== void 0 ? _a : this.framebuffer);
+                  const readBuffer = gl instanceof WebGL2RenderingContext ? gl.getParameter(gl.READ_BUFFER) : 0;
+                  if (gl instanceof WebGL2RenderingContext)
+                      gl.readBuffer(gl.COLOR_ATTACHMENT0);
+                  gl.flush();
+                  gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.UNSIGNED_BYTE, this.pixels);
+                  if (gl instanceof WebGL2RenderingContext)
+                      gl.readBuffer(readBuffer);
+              });
+              const data = this.image.data, width = this.width, height = this.height;
+              for (let y = 0; y < height; y++)
+                  for (let x = 0; x < width; x++) {
+                      const source = ((height - 1 - y) * width + x) * 4, target = (y * width + x) * 4;
+                      const alpha = this.options.alpha ? this.pixels[source + 3] : 255;
+                      for (let c = 0; c < 3; c++)
+                          data[target + c] = alpha ? Math.min(255, Math.round(this.pixels[source + c] * 255 / alpha)) : 0;
+                      data[target + 3] = alpha;
+                  }
+          }
+          const width = this.width, height = this.height;
+          this.output.putImageData(this.image, 0, 0);
+          if (!stereo) {
+              this.output.globalCompositeOperation = 'copy';
+              this.output.drawImage(this.canvas, 0, 0, Math.floor(width / 2), height, 0, 0, width, height);
+              this.output.globalCompositeOperation = 'source-over';
+          }
+      }
+      dispose() {
+          if (!this.alive)
+              return;
+          this.active = false;
+          this.alive = false;
+          compositorOperation(() => {
+              this.gl.deleteFramebuffer(this.framebuffer);
+              this.gl.deleteFramebuffer(this.resolve);
+              this.gl.deleteTexture(this.texture);
+              for (const buffer of this.buffers)
+                  this.gl.deleteRenderbuffer(buffer);
+          });
+          this.buffers = [];
+          this.canvas.width = this.canvas.height = 1;
+          this.pixels = new Uint8Array(0);
+          this.image = new ImageData(1, 1);
+          this.texture = null;
+          this.resolve = null;
+      }
+  }
+
+  function convertNullableFloat(value) {
+      if (value === null || value === undefined)
+          return;
+      if (!Number.isFinite(Math.fround(+value)))
+          throw new TypeError('Expected a finite float.');
+  }
+  class XRLayer extends EventTarget {
+  }
+  const webglStorage = new WeakMap();
+  let XRWebGLLayer$1 = class XRWebGLLayer extends XRLayer {
+      constructor(_session, context, init) {
+          var _a;
+          super();
+          if (!sessionObjects.has(_session))
+              throw new TypeError('Expected XRSession.');
+          if (!(context instanceof WebGLRenderingContext) && !(typeof WebGL2RenderingContext !== 'undefined' && context instanceof WebGL2RenderingContext))
+              throw new TypeError('Expected WebGL context.');
+          const options = convertWebGLLayerOptions(init);
+          _session._assertLive();
+          if (context.isContextLost() || (_session._mode !== 'inline' && !compatibleContexts.has(context) && !((_a = context.getContextAttributes()) === null || _a === void 0 ? void 0 : _a.xrCompatible)))
+              invalidState('WebGL context is lost or not XR compatible.');
+          const storage = _session._mode === 'inline' ? null : new XRFramebuffer(context, _session._device.getRecommendedFramebufferSize(_session._id), options, !_session._device.handheld);
+          const layer = Reflect.construct(layerBrands.WebGLLayerAllocation, [_session, context, storage], new.target);
+          if (storage)
+              webglStorage.set(layer, storage);
+          const viewports = new Map();
+          interfaceBrands.layerViewports.set(layer, view => {
+              const { eye, frame } = viewState(view);
+              const cached = viewports.get(eye);
+              if ((cached === null || cached === void 0 ? void 0 : cached.frame) === frame)
+                  return cached.viewport;
+              const target = { x: 0, y: 0, width: 0, height: 0 };
+              _session._device.getViewport(_session._id, eye, layer, target);
+              let viewport = cached === null || cached === void 0 ? void 0 : cached.viewport;
+              if (!viewport || ['x', 'y', 'width', 'height'].some(key => viewport[key] !== target[key])) {
+                  viewport = new XRViewport(target.x, target.y, target.width, target.height, geometryAllocation);
+              }
+              viewports.set(eye, { viewport, frame });
+              return viewport;
+          });
+          return layer;
+      }
+      get antialias() { var _a, _b, _c, _d; return (_d = (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.antialias) !== null && _b !== void 0 ? _b : (_c = this.context.getContextAttributes()) === null || _c === void 0 ? void 0 : _c.antialias) !== null && _d !== void 0 ? _d : false; }
+      get ignoreDepthValues() { return true; }
+      get framebuffer() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.framebuffer) !== null && _b !== void 0 ? _b : null; }
+      get fixedFoveation() {
+          if (!layerBrands.webgl.has(this))
+              throw new TypeError('Expected XRWebGLLayer.');
+          return null;
+      }
+      set fixedFoveation(value) {
+          if (!layerBrands.webgl.has(this))
+              throw new TypeError('Expected XRWebGLLayer.');
+          convertNullableFloat(value);
+      }
+      get framebufferWidth() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.width) !== null && _b !== void 0 ? _b : this.context.drawingBufferWidth; }
+      get framebufferHeight() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.height) !== null && _b !== void 0 ? _b : this.context.drawingBufferHeight; }
+      get _presentationCanvas() { var _a, _b; return (_b = (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.canvas) !== null && _b !== void 0 ? _b : this.context.canvas; }
+      _clear() { var _a; (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.clear(); }
+      _activate(active) { const storage = webglStorage.get(this); if (storage)
+          storage.active = active && storage.alive; }
+      _present(force = false) { var _a; (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.present(this._session._device.handheld || this._session._device.stereoEffectEnabled, force); }
+      _dispose() {
+          var _a;
+          (_a = webglStorage.get(this)) === null || _a === void 0 ? void 0 : _a.dispose();
+          this._session._webglLayers.delete(this);
+          this.context.canvas.removeEventListener('webglcontextlost', this.lost);
+      }
+      getViewport(view) {
+          const allocate = interfaceBrands.layerViewports.get(this);
+          if (!allocate)
+              throw new TypeError('Expected XRWebGLLayer.');
+          if (arguments.length < 1)
+              throw new TypeError('Expected XRView.');
+          const { frame } = viewState(view);
+          frame._assertActive(true);
+          if (frame.session !== this._session || this._session._currentAnimationFrame !== frame)
+              invalidState('View does not belong to the current animation frame of this session.');
+          return allocate(view);
+      }
+      static getNativeFramebufferScaleFactor(session) { if (!sessionObjects.has(session))
+          throw new TypeError('Expected XRSession.'); return session.ended ? 0 : 1; }
+  };
+  enumerableMembers(XRWebGLLayer$1.prototype, ['getViewport']);
+  function validateLayerSpace(session, space) {
+      if (!(space instanceof XRSpace) || space._session !== session)
+          throw new TypeError('Layer space must belong to the same session.');
+      return space;
+  }
+  const projectionAllocation = Symbol();
+  class XRCompositionLayer extends XRLayer {
+      constructor(binding, init, allocation) {
+          super();
+          const C = allocation === projectionAllocation ? layerBrands.ProjectionLayerAllocation : layerBrands.CompositionLayerAllocation;
+          return Reflect.construct(C, [binding, init], new.target);
+      }
+      get needsRedraw() { return this._needsRedraw; }
+      get textureWidth() { return this._width; }
+      get textureHeight() { return this._height; }
+      get textureArrayLength() { return 1; }
+      get textureType() { return 'texture'; }
+      destroy() {
+          if (this._destroyed)
+              return;
+          this._destroyed = true;
+          const gl = this._binding._gl2();
+          gl.deleteTexture(this._color);
+          gl.deleteTexture(this._depth);
+          this._binding._session._removeLayer(this);
+      }
+      _allocate(width, height) {
+          const gl = this._binding._gl2();
+          if (width === this._width && height === this._height)
+              return;
+          this._width = width;
+          this._height = height;
+          this._needsRedraw = true;
+          this._needsClear = true;
+          const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+          const unpackBuffer = gl.getParameter(gl.PIXEL_UNPACK_BUFFER_BINDING);
+          gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
+          try {
+              gl.bindTexture(gl.TEXTURE_2D, this._color);
+              gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+              for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER])
+                  gl.texParameteri(gl.TEXTURE_2D, parameter, gl.LINEAR);
+              for (const parameter of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T])
+                  gl.texParameteri(gl.TEXTURE_2D, parameter, gl.CLAMP_TO_EDGE);
+              if (this._depth) {
+                  gl.bindTexture(gl.TEXTURE_2D, this._depth);
+                  gl.texImage2D(gl.TEXTURE_2D, 0, this._hasStencil ? gl.DEPTH24_STENCIL8 : gl.DEPTH_COMPONENT24, width, height, 0, this._hasStencil ? gl.DEPTH_STENCIL : gl.DEPTH_COMPONENT, this._hasStencil ? gl.UNSIGNED_INT_24_8 : gl.UNSIGNED_INT, null);
+                  for (const parameter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER])
+                      gl.texParameteri(gl.TEXTURE_2D, parameter, gl.NEAREST);
+              }
+          }
+          finally {
+              gl.bindTexture(gl.TEXTURE_2D, texture);
+              gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, unpackBuffer);
+          }
+      }
+  }
+  class XRProjectionLayer extends XRCompositionLayer {
+      constructor(binding, init) { super(binding, init, projectionAllocation); }
+      get fixedFoveation() {
+          if (!layerBrands.projection.has(this))
+              throw new TypeError('Expected XRProjectionLayer.');
+          return null;
+      }
+      set fixedFoveation(value) {
+          if (!layerBrands.projection.has(this))
+              throw new TypeError('Expected XRProjectionLayer.');
+          convertNullableFloat(value);
+      }
+  }
+  for (const prototype of [XRWebGLLayer$1.prototype, XRProjectionLayer.prototype]) {
+      Object.defineProperty(prototype, 'fixedFoveation', { ...Object.getOwnPropertyDescriptor(prototype, 'fixedFoveation'), enumerable: true });
+  }
+  class XRQuadLayer extends XRCompositionLayer {
+      get space() { return this.spaceValue; }
+      set space(value) { this.spaceValue = validateLayerSpace(this._binding._session, value); }
+      constructor(binding, init) {
+          var _a, _b, _c;
+          super(binding, init);
+          this.spaceValue = validateLayerSpace(binding._session, init.space);
+          this.transform = (_a = init.transform) !== null && _a !== void 0 ? _a : new XRRigidTransform();
+          this.width = (_b = init.width) !== null && _b !== void 0 ? _b : 1;
+          this.height = (_c = init.height) !== null && _c !== void 0 ? _c : 1;
+      }
+  }
+  class XRSubImage {
+      constructor(viewport) {
+          this.viewport = viewport;
+      }
+  }
+  class XRWebGLSubImage extends XRSubImage {
+      constructor(viewport, colorTexture, depthStencilTexture, colorTextureWidth, colorTextureHeight) {
+          super(viewport);
+          this.colorTexture = colorTexture;
+          this.depthStencilTexture = depthStencilTexture;
+          this.colorTextureWidth = colorTextureWidth;
+          this.colorTextureHeight = colorTextureHeight;
+          this.imageIndex = 0;
+          this.motionVectorTexture = null;
+          this.depthStencilTextureWidth = depthStencilTexture ? colorTextureWidth : null;
+          this.depthStencilTextureHeight = depthStencilTexture ? colorTextureHeight : null;
+      }
+  }
+  let XRWebGLBinding$1 = class XRWebGLBinding {
+      constructor(_session, _context) {
+          this._session = _session;
+          this._context = _context;
+          this.nativeProjectionScaleFactor = 1;
+          this.layers = new Set();
+          this.framebuffer = null;
+          this.program = null;
+          this.vao = null;
+          if (!sessionObjects.has(_session))
+              throw new TypeError('Expected XRSession.');
+          _session._assertLive();
+          if (_session._mode === 'inline')
+              invalidState('XRWebGLBinding requires an immersive session.');
+          interfaceBrands.bindingSubImages.set(this, this.allocateViewSubImage.bind(this));
+          this._presentation = new XRWebGLLayer$1(_session, _context, { antialias: false });
+          _session.addEventListener('end', () => {
+              for (const layer of this.layers)
+                  layer.destroy();
+              if (_context instanceof WebGL2RenderingContext) {
+                  _context.deleteFramebuffer(this.framebuffer);
+                  _context.deleteProgram(this.program);
+                  _context.deleteVertexArray(this.vao);
+              }
+              this.layers.clear();
+          }, { once: true });
+      }
+      _gl2() { if (!(this._context instanceof WebGL2RenderingContext))
+          unsupported('Simulated composition layers require WebGL2.'); return this._context; }
+      assert() { this._session._assertLive(); if (this._context.isContextLost())
+          invalidState('WebGL context is lost.'); }
+      validate(init) {
+          this.assert();
+          const gl = this._gl2();
+          if (init.textureType && !['texture', 'texture-array'].includes(init.textureType))
+              throw new TypeError('Invalid XRTextureType.');
+          if (init.textureType === 'texture-array')
+              unsupported('Only 2D textures are implemented.');
+          if (init.colorFormat !== undefined && ![gl.RGBA, gl.RGBA8].includes(init.colorFormat))
+              unsupported('Only RGBA8 color textures are implemented.');
+          if (init.depthFormat != null && ![0, gl.DEPTH_COMPONENT, gl.DEPTH_COMPONENT24, gl.DEPTH_STENCIL, gl.DEPTH24_STENCIL8].includes(init.depthFormat))
+              unsupported('Only DEPTH_COMPONENT24 and DEPTH24_STENCIL8 depth textures are implemented.');
+          if (init.mipLevels !== undefined && init.mipLevels !== 1)
+              unsupported('Mipmapped layers are not implemented.');
+          if (init.isStatic)
+              unsupported('Static layers are not implemented.');
+      }
+      createProjectionLayer(init = {}) {
+          init = { ...init, depthFormat: init.depthFormat === undefined ? 0x1902 : Number(init.depthFormat) };
+          this.validate(init);
+          if (init.scaleFactor !== undefined && (!Number.isFinite(init.scaleFactor) || init.scaleFactor <= 0))
+              throw new TypeError('scaleFactor must be positive.');
+          const layer = new XRProjectionLayer(this, { ...init, layout: this._session._device.handheld ? 'mono' : 'stereo-left-right' });
+          this.initialize(layer);
+          return layer;
+      }
+      createQuadLayer(init) {
+          var _a, _b, _c;
+          init = { ...init, depthFormat: Number((_a = init.depthFormat) !== null && _a !== void 0 ? _a : 0) };
+          this._session._require('layers');
+          this.validate(init);
+          validateLayerSpace(this._session, init.space);
+          if (init.layout && init.layout !== 'mono')
+              unsupported('Only mono quad layers are implemented.');
+          for (const value of [init.viewPixelWidth, init.viewPixelHeight])
+              if (value === undefined || !Number.isInteger(value) || value <= 0)
+                  throw new TypeError('Quad pixel dimensions must be positive integers.');
+          if (init.transform && !transformObjects.has(init.transform))
+              throw new TypeError('Expected XRRigidTransform.');
+          if (((_b = init.width) !== null && _b !== void 0 ? _b : 1) <= 0 || ((_c = init.height) !== null && _c !== void 0 ? _c : 1) <= 0)
+              throw new TypeError('Quad physical dimensions must be positive.');
+          const layer = new XRQuadLayer(this, init);
+          this.initialize(layer);
+          return layer;
+      }
+      initialize(layer) {
+          try {
+              this.allocate(layer);
+              this.layers.add(layer);
+          }
+          catch (error) {
+              layer.destroy();
+              throw error;
+          }
+      }
+      createCylinderLayer() { return unsupported('Cylinder layers are not implemented.'); }
+      createEquirectLayer() { return unsupported('Equirectangular layers are not implemented.'); }
+      createCubeLayer() { return unsupported('Cube layers are not implemented.'); }
+      check(layer, frame) {
+          var _a;
+          this.assert();
+          frame._assertActive(true);
+          if (this._session._currentAnimationFrame !== frame)
+              invalidState('Frame is not current for this session.');
+          if (layer._binding._session !== this._session || layer._binding._context !== this._context || frame.session !== this._session || layer._destroyed)
+              invalidState('Layer/frame is not usable with this binding.');
+          if (!((_a = this._session.renderState.layers) === null || _a === void 0 ? void 0 : _a.includes(layer)))
+              invalidState('Layer is not in the active render state.');
+          this.allocate(layer);
+          if (layer._needsClear || (layer._clearOnAccess && layer._lastClearFrame !== frame)) {
+              this.clear(layer);
+              layer._needsClear = false;
+              layer._lastClearFrame = frame;
+          }
+      }
+      allocate(layer) {
+          var _a;
+          const gl = this._gl2();
+          const scale = Math.min(1, (_a = layer._init.scaleFactor) !== null && _a !== void 0 ? _a : 1);
+          const maximum = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+          const size = { width: this._presentation.framebufferWidth, height: this._presentation.framebufferHeight };
+          const width = layer instanceof XRProjectionLayer ? Math.max(2, Math.floor(size.width * scale)) : layer._init.viewPixelWidth;
+          const height = layer instanceof XRProjectionLayer ? Math.max(1, Math.floor(size.height * scale)) : layer._init.viewPixelHeight;
+          if (width > maximum || height > maximum)
+              unsupported('Layer exceeds MAX_TEXTURE_SIZE.');
+          layer._allocate(width, height);
+      }
+      getViewSubImage(layer, view) {
+          const allocate = interfaceBrands.bindingSubImages.get(this);
+          if (!allocate)
+              throw new TypeError('Expected XRWebGLBinding.');
+          if (arguments.length < 2)
+              throw new TypeError('Expected projection layer and view.');
+          if (!layerBrands.projection.has(layer))
+              throw new TypeError('Expected projection layer.');
+          viewState(view);
+          return allocate(layer, view);
+      }
+      allocateViewSubImage(layer, view) {
+          this.check(layer, view._frame);
+          const stereo = view.eye !== 'none';
+          const half = Math.floor(layer._width / 2);
+          const viewport = new XRViewport(view.eye === 'right' ? half : 0, 0, stereo ? (view.eye === 'right' ? layer._width - half : half) : layer._width, layer._height, geometryAllocation);
+          layer._needsRedraw = false;
+          return new XRWebGLSubImage(viewport, layer._color, layer._depth, layer._width, layer._height);
+      }
+      getSubImage(layer, frame, eye = 'none') {
+          if (!(layer instanceof XRQuadLayer) || !frameObjects.has(frame))
+              throw new TypeError('Expected quad layer and XRFrame.');
+          if (!['none', 'left', 'right'].includes(eye))
+              throw new TypeError('Invalid XREye.');
+          this.check(layer, frame);
+          setTimeout(() => { layer._needsRedraw = false; }, 0);
+          return new XRWebGLSubImage(new XRViewport(0, 0, layer._width, layer._height, geometryAllocation), layer._color, layer._depth, layer._width, layer._height);
+      }
+      getDepthInformation(view) { this.assert(); view._frame._assertActive(true); return unsupported('GPU depth is not supported; request cpu-optimized depth.'); }
+      getReflectionCubeMap(probe) { this.assert(); if (probe._session !== this._session)
+          invalidState('Probe belongs to a different session.'); return null; }
+      _prepare(layers) {
+          for (const layer of layers)
+              if (!layer._destroyed)
+                  this.allocate(layer);
+      }
+      clear(layer) {
+          const gl = this._gl2();
+          this.preserve(() => {
+              var _a;
+              (_a = this.framebuffer) !== null && _a !== void 0 ? _a : (this.framebuffer = gl.createFramebuffer());
+              gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+              gl.disable(gl.RASTERIZER_DISCARD);
+              gl.disable(gl.SCISSOR_TEST);
+              gl.colorMask(true, true, true, true);
+              gl.depthMask(true);
+              gl.clearColor(0, 0, 0, 0);
+              gl.clearDepth(1);
+              gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, layer._color, 0);
+              gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.TEXTURE_2D, null, 0);
+              gl.framebufferTexture2D(gl.FRAMEBUFFER, layer._hasStencil ? gl.DEPTH_STENCIL_ATTACHMENT : gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, layer._depth, 0);
+              gl.stencilMaskSeparate(gl.FRONT, 0xffffffff);
+              gl.stencilMaskSeparate(gl.BACK, 0xffffffff);
+              gl.clearStencil(0);
+              gl.clear(gl.COLOR_BUFFER_BIT | (layer._depth ? gl.DEPTH_BUFFER_BIT : 0) | (layer._hasStencil ? gl.STENCIL_BUFFER_BIT : 0));
+          });
+      }
+      _compose(frame, layers) {
+          const gl = this._gl2();
+          webglStorage.get(this._presentation).dirty = true;
+          this.preserve(() => {
+              this.setupProgram();
+              gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this._presentation.framebuffer);
+              const drawBuffer = gl.getParameter(gl.DRAW_BUFFER0);
+              gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+              try {
+                  gl.useProgram(this.program);
+                  gl.bindVertexArray(this.vao);
+                  gl.disable(gl.DEPTH_TEST);
+                  gl.disable(gl.SCISSOR_TEST);
+                  gl.disable(gl.CULL_FACE);
+                  gl.colorMask(true, true, true, true);
+                  for (const cap of [gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE])
+                      gl.disable(cap);
+                  gl.enable(gl.BLEND);
+                  gl.blendEquation(gl.FUNC_ADD);
+                  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+                  gl.activeTexture(gl.TEXTURE0);
+                  gl.bindSampler(0, null);
+                  gl.uniform1i(gl.getUniformLocation(this.program, 'image'), 0);
+                  const pose = frame.getViewerPose(this._session._viewer);
+                  for (const layer of layers) {
+                      if (layer._destroyed)
+                          continue;
+                      gl.bindTexture(gl.TEXTURE_2D, layer._color);
+                      for (const view of pose.views) {
+                          const viewport = this._presentation.getViewport(view);
+                          gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+                          let matrix = create$3();
+                          let uv = [0, 1];
+                          if (layer instanceof XRProjectionLayer) {
+                              gl.disable(gl.CULL_FACE);
+                              if (view.eye !== 'none') {
+                                  const left = Math.floor(layer._width / 2) / layer._width;
+                                  const right = view.eye === 'right' && !layer.forceMonoPresentation;
+                                  uv = [right ? left : 0, right ? 1 - left : left];
+                              }
+                          }
+                          else if (layer instanceof XRQuadLayer) {
+                              gl.enable(gl.CULL_FACE);
+                              gl.cullFace(gl.BACK);
+                              gl.frontFace(gl.CCW);
+                              const world = frame._world(layer.space);
+                              if (!world)
+                                  continue;
+                              matrix = multiply(matrix, world, transformMatrix(layer.transform));
+                              scale(matrix, matrix, [layer.width / 2, layer.height / 2, 1]);
+                              multiply(matrix, invert(create$3(), view._worldMatrix), matrix);
+                              multiply(matrix, projectionData(view), matrix);
+                          }
+                          gl.uniform2f(gl.getUniformLocation(this.program, 'alphaOptions'), layer.opacity, layer.blendTextureSourceAlpha ? 1 : 0);
+                          gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'matrix'), false, matrix);
+                          gl.uniform2fv(gl.getUniformLocation(this.program, 'uvRange'), uv);
+                          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                      }
+                  }
+              }
+              finally {
+                  gl.drawBuffers([drawBuffer]);
+              }
+              gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+              const output = gl.getParameter(gl.DRAW_BUFFER0);
+              gl.drawBuffers([gl.BACK]);
+              gl.disable(gl.BLEND);
+              gl.disable(gl.CULL_FACE);
+              gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+              gl.bindTexture(gl.TEXTURE_2D, webglStorage.get(this._presentation).colorTexture);
+              gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'matrix'), false, create$3());
+              gl.uniform2f(gl.getUniformLocation(this.program, 'uvRange'), 0, 1);
+              gl.uniform2f(gl.getUniformLocation(this.program, 'alphaOptions'), 1, 1);
+              gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+              gl.drawBuffers([output]);
+          });
+      }
+      setupProgram() {
+          if (this.program)
+              return;
+          const gl = this._gl2();
+          const compile = (type, source) => { const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader); if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+              throw new Error(gl.getShaderInfoLog(shader)); return shader; };
+          const vertex = compile(gl.VERTEX_SHADER, `#version 300 es
+      uniform mat4 matrix; uniform vec2 uvRange; out vec2 uv;
+      void main() { vec2 p = vec2((gl_VertexID & 1) == 1 ? 1.0 : -1.0, gl_VertexID >= 2 ? 1.0 : -1.0);
+        uv = (p + 1.0) * 0.5; uv.x = uvRange.x + uv.x * uvRange.y; gl_Position = matrix * vec4(p,0,1); }`);
+          const fragment = compile(gl.FRAGMENT_SHADER, `#version 300 es
+      precision mediump float; uniform sampler2D image; uniform vec2 alphaOptions; in vec2 uv; out vec4 color; void main() { color = texture(image,uv); if (alphaOptions.y < 0.5) color.a = 1.0; color *= clamp(alphaOptions.x,0.0,1.0); }`);
+          this.program = gl.createProgram();
+          gl.attachShader(this.program, vertex);
+          gl.attachShader(this.program, fragment);
+          gl.linkProgram(this.program);
+          gl.deleteShader(vertex);
+          gl.deleteShader(fragment);
+          if (!gl.getProgramParameter(this.program, gl.LINK_STATUS))
+              throw new Error(gl.getProgramInfoLog(this.program));
+          this.vao = gl.createVertexArray();
+      }
+      preserve(action) {
+          const gl = this._gl2();
+          const saved = new Map();
+          for (const parameter of [gl.DRAW_FRAMEBUFFER_BINDING, gl.READ_FRAMEBUFFER_BINDING, gl.CURRENT_PROGRAM, gl.VERTEX_ARRAY_BINDING, gl.ACTIVE_TEXTURE,
+              gl.VIEWPORT, gl.SCISSOR_BOX, gl.COLOR_WRITEMASK, gl.DEPTH_WRITEMASK, gl.COLOR_CLEAR_VALUE, gl.DEPTH_CLEAR_VALUE,
+              gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB, gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA, gl.BLEND_EQUATION_RGB, gl.BLEND_EQUATION_ALPHA,
+              gl.CULL_FACE_MODE, gl.FRONT_FACE, gl.STENCIL_WRITEMASK, gl.STENCIL_BACK_WRITEMASK, gl.STENCIL_CLEAR_VALUE])
+              saved.set(parameter, gl.getParameter(parameter));
+          const enabled = [gl.BLEND, gl.DEPTH_TEST, gl.SCISSOR_TEST, gl.CULL_FACE, gl.STENCIL_TEST, gl.RASTERIZER_DISCARD, gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE].map(cap => [cap, gl.isEnabled(cap)]);
+          gl.activeTexture(gl.TEXTURE0);
+          const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+          const sampler = gl.getParameter(gl.SAMPLER_BINDING);
+          try {
+              compositorOperation(action);
+          }
+          finally {
+              gl.bindSampler(0, sampler);
+              gl.bindTexture(gl.TEXTURE_2D, texture);
+              gl.activeTexture(saved.get(gl.ACTIVE_TEXTURE));
+              gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, saved.get(gl.DRAW_FRAMEBUFFER_BINDING));
+              gl.bindFramebuffer(gl.READ_FRAMEBUFFER, saved.get(gl.READ_FRAMEBUFFER_BINDING));
+              gl.useProgram(saved.get(gl.CURRENT_PROGRAM));
+              gl.bindVertexArray(saved.get(gl.VERTEX_ARRAY_BINDING));
+              const viewport = saved.get(gl.VIEWPORT);
+              gl.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+              const scissor = saved.get(gl.SCISSOR_BOX);
+              gl.scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+              const mask = saved.get(gl.COLOR_WRITEMASK);
+              gl.colorMask(mask[0], mask[1], mask[2], mask[3]);
+              gl.depthMask(saved.get(gl.DEPTH_WRITEMASK));
+              const color = saved.get(gl.COLOR_CLEAR_VALUE);
+              gl.clearColor(color[0], color[1], color[2], color[3]);
+              gl.clearDepth(saved.get(gl.DEPTH_CLEAR_VALUE));
+              gl.blendFuncSeparate(saved.get(gl.BLEND_SRC_RGB), saved.get(gl.BLEND_DST_RGB), saved.get(gl.BLEND_SRC_ALPHA), saved.get(gl.BLEND_DST_ALPHA));
+              gl.blendEquationSeparate(saved.get(gl.BLEND_EQUATION_RGB), saved.get(gl.BLEND_EQUATION_ALPHA));
+              gl.stencilMaskSeparate(gl.FRONT, saved.get(gl.STENCIL_WRITEMASK));
+              gl.stencilMaskSeparate(gl.BACK, saved.get(gl.STENCIL_BACK_WRITEMASK));
+              gl.clearStencil(saved.get(gl.STENCIL_CLEAR_VALUE));
+              gl.cullFace(saved.get(gl.CULL_FACE_MODE));
+              gl.frontFace(saved.get(gl.FRONT_FACE));
+              for (const [cap, value] of enabled)
+                  value ? gl.enable(cap) : gl.disable(cap);
+          }
+      }
+  };
+
+  var layers = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    XRCompositionLayer: XRCompositionLayer,
+    XRLayer: XRLayer,
+    XRProjectionLayer: XRProjectionLayer,
+    XRQuadLayer: XRQuadLayer,
+    XRSubImage: XRSubImage,
+    XRWebGLBinding: XRWebGLBinding$1,
+    XRWebGLLayer: XRWebGLLayer$1,
+    XRWebGLSubImage: XRWebGLSubImage
+  });
+
+  class XRAnchorSet {
+      constructor(anchors) { this.valuesSet = new Set(anchors); }
+      get size() { return this.valuesSet.size; }
+      has(anchor) { return this.valuesSet.has(anchor); }
+      values() { return this.valuesSet.values(); }
+      keys() { return this.valuesSet.keys(); }
+      entries() { return this.valuesSet.entries(); }
+      forEach(callback, thisArg) { for (const anchor of this)
+          callback.call(thisArg, anchor, anchor, this); }
+      [Symbol.iterator]() { return this.values(); }
+  }
+  class XRAnchor {
+      constructor(_session, _matrix) {
+          this._session = _session;
+          this._matrix = _matrix;
+          this.deleted = false;
+          this.space = new XRSpace(_session, () => this.deleted ? null : _matrix);
+      }
+      get anchorSpace() { if (this.deleted)
+          invalidState('Anchor was deleted.'); this._session._assertLive(); return this.space; }
+      delete() { this.deleted = true; this._session._anchors.delete(this); }
+      async requestPersistentHandle() { this._session._assertLive(); if (this.deleted)
+          invalidState('Anchor was deleted.'); return unsupported('Persistent anchors are not simulated.'); }
+  }
+  const names = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
+      ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))];
+  const jointObjects = interfaceBrands.joints;
+  class XRJointSpace extends XRSpace {
+      constructor(session, jointName, _radius, provider) {
+          super(session, provider, true);
+          this.jointName = jointName;
+          this._radius = _radius;
+      }
+  }
+  class XRJointPose extends XRPose {
+      constructor(transform, radius, emulatedPosition, token) {
+          super(transform, emulatedPosition, token);
+          this.radius = radius;
+      }
+  }
+  class XRHand {
+      constructor(session, controller, active) {
+          this.joints = new Map();
+          for (const [index, name] of names.entries()) {
+              const radius = index === 0 ? 0.018 : name.endsWith('tip') ? 0.007 : 0.009;
+              this.joints.set(name, new XRJointSpace(session, name, radius, () => {
+                  if (!active())
+                      return null;
+                  const gamepad = session._device.gamepads[controller];
+                  if (!gamepad)
+                      return null;
+                  const matrix = fromRotationTranslation(create$3(), gamepad.pose.orientation, gamepad.pose.position);
+                  if (index === 0)
+                      return matrix;
+                  const finger = index <= 4 ? 0 : 1 + Math.floor((index - 5) / 5);
+                  const joint = index <= 4 ? index : 1 + (index - 5) % 5;
+                  const side = gamepad.hand === 'left' ? -1 : 1;
+                  const curled = gamepad.buttons[0].pressed;
+                  const position = (bone) => fromValues((finger - 2) * 0.019 * side, curled ? -bone * 0.009 : 0, -0.025 - bone * (curled ? 0.008 : 0.025));
+                  const origin = position(joint);
+                  const target = name.endsWith('tip') ? add$1(create$2(), origin, subtract(create$2(), origin, position(joint - 1))) : position(joint + 1);
+                  return multiply(matrix, matrix, targetTo(create$3(), origin, target, [0, 1, 0]));
+              }));
+          }
+      }
+      get size() { return this.joints.size; }
+      get(key) { if (!names.includes(key))
+          throw new TypeError('Invalid XRHandJoint.'); return this.joints.get(key); }
+      keys() { return this.joints.keys(); }
+      values() { return this.joints.values(); }
+      entries() { return this.joints.entries(); }
+      forEach(callback, thisArg) { for (const [name, joint] of this)
+          callback.call(thisArg, joint, name, this); }
+      [Symbol.iterator]() { return this.entries(); }
+  }
+  class XRLightProbe extends EventTarget {
+      constructor(_session) {
+          super();
+          this._session = _session;
+          this.onreflectionchange = null;
+          this.probeSpace = new XRSpace(_session, () => create$3());
+      }
+  }
+  class XRLightEstimate {
+      constructor() {
+          this.primaryLightDirection = new DOMPointReadOnly(-1 / Math.sqrt(3), 1 / Math.sqrt(3), -1 / Math.sqrt(3), 0);
+          this.primaryLightIntensity = new DOMPointReadOnly(4 * Math.PI, 4 * Math.PI, 4 * Math.PI, 1);
+          const light = 4 * Math.PI;
+          const { x, y, z } = this.primaryLightDirection;
+          const basis = [0.282095, 0.488603 * y, 0.488603 * z, 0.488603 * x,
+              1.092548 * x * y, 1.092548 * y * z, 0.315392 * (3 * z * z - 1), 1.092548 * x * z, 0.546274 * (x * x - y * y)];
+          this.sphericalHarmonicsCoefficients = new Float32Array(basis.flatMap(value => [value * light, value * light, value * light]));
+      }
+  }
+  class XRDepthInformation {
+      constructor(_frame, view) {
+          this._frame = _frame;
+          this.view = view;
+          this.width = 32;
+          this.height = 32;
+          this.normDepthBufferFromNormView = new XRRigidTransform();
+          interfaceBrands.depthGeometry.add(this);
+          initializeViewGeometry(this, view.transform, projectionData(view));
+          this.rawValueToMeters = _frame.session.depthDataFormat === 'float32' ? 1 : 0.001;
+      }
+  }
+  installViewGeometry(XRDepthInformation.prototype, value => interfaceBrands.depthGeometry.has(value));
+  class XRCPUDepthInformation extends XRDepthInformation {
+      constructor(frame, view) {
+          super(frame, view);
+          this.samples = this.rawValueToMeters === 1 ? new Float32Array(this.width * this.height) : new Uint16Array(this.width * this.height);
+          const origin = getTranslation(create$2(), view._worldMatrix);
+          const inverseProjection = invert(create$3(), projectionData(view));
+          const local = create$2();
+          const world = create$2();
+          for (let y = 0; y < this.height; y++)
+              for (let x = 0; x < this.width; x++) {
+                  transformMat4(local, [(x + 0.5) / this.width * 2 - 1, 1 - (y + 0.5) / this.height * 2, 0], inverseProjection);
+                  transformMat4(world, local, view._worldMatrix);
+                  subtract(world, world, origin);
+                  normalize$3(world, world);
+                  const hit = frame.session._device.arScene.getHitTestResults(origin, world)[0];
+                  if (hit) {
+                      const depth = hit.distance * (-local[2] / length(local));
+                      const raw = Math.round(depth / this.rawValueToMeters);
+                      this.samples[y * this.width + x] = this.rawValueToMeters === 1 ? depth : raw > 0 && raw <= 65535 ? raw : 0;
+                  }
+              }
+      }
+      get data() { this._frame._assertActive(true); return this.samples.buffer; }
+      getDepthInMeters(x, y) {
+          this._frame._assertActive(true);
+          if (![x, y].every(Number.isFinite))
+              throw new TypeError('Coordinates must be finite.');
+          if (x < 0 || x > 1 || y < 0 || y > 1)
+              throw new RangeError('Depth coordinates must be in [0,1].');
+          return this.samples[Math.min(this.height - 1, Math.floor(y * this.height)) * this.width + Math.min(this.width - 1, Math.floor(x * this.width))] * this.rawValueToMeters;
+      }
+  }
+
+  var sensing = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    XRAnchor: XRAnchor,
+    XRAnchorSet: XRAnchorSet,
+    XRCPUDepthInformation: XRCPUDepthInformation,
+    XRDepthInformation: XRDepthInformation,
+    XRHand: XRHand,
+    XRJointPose: XRJointPose,
+    XRJointSpace: XRJointSpace,
+    XRLightEstimate: XRLightEstimate,
+    XRLightProbe: XRLightProbe,
+    jointObjects: jointObjects
+  });
+
   const epsilon = 1e-5;
   const canonical = (e) => { var _a; const first = (_a = e.toArray().find(v => Math.abs(v) > epsilon)) !== null && _a !== void 0 ? _a : 1; return first < 0 ? e.negate() : e; };
   const edgeKey = (a, b) => [a, b].map(p => p.toArray().map(v => Math.round(v / epsilon)).join(',')).sort().join(':');
@@ -25795,41 +25877,6 @@ void main() {
       });
   }
 
-  function roomMeshes(room) {
-      const meshes = [];
-      room === null || room === void 0 ? void 0 : room.traverse(object => { if (object instanceof Mesh && object.name !== 'sky')
-          meshes.push(object); });
-      return meshes;
-  }
-  function roomSurfaces(room) {
-      var _a;
-      room === null || room === void 0 ? void 0 : room.updateWorldMatrix(true, true);
-      const surfaces = [];
-      for (const mesh of roomMeshes(room)) {
-          const positions = mesh.geometry.getAttribute('position');
-          if (!positions)
-              continue;
-          const indices = mesh.geometry.index;
-          const count = (_a = indices === null || indices === void 0 ? void 0 : indices.count) !== null && _a !== void 0 ? _a : positions.count;
-          for (let i = 0; i + 2 < count; i += 3) {
-              const points = [0, 1, 2].map(j => new Vector3().fromBufferAttribute(positions, indices ? indices.getX(i + j) : i + j).applyMatrix4(mesh.matrixWorld));
-              const x = points[1].clone().sub(points[0]);
-              const edge = points[2].clone().sub(points[0]);
-              const y = x.clone().cross(edge);
-              if (y.lengthSq() < 1e-12)
-                  continue;
-              x.normalize();
-              y.normalize();
-              const z = x.clone().cross(y);
-              const center = points[0].clone().add(points[1]).add(points[2]).multiplyScalar(1 / 3);
-              const matrix = new Matrix4().makeBasis(x, y, z).setPosition(center);
-              const vertices = points.flatMap(point => { const delta = point.clone().sub(center); return [delta.dot(x), 0, delta.dot(z)]; });
-              surfaces.push({ key: `${mesh.uuid}:${i}`, matrix: new Float32Array(matrix.elements), vertices,
-                  orientation: Math.abs(y.y) > 0.999 ? 'horizontal' : Math.abs(y.y) < 0.001 ? 'vertical' : null });
-          }
-      }
-      return surfaces;
-  }
   const planeAllocation = Symbol('plane allocation');
   function planeState(value) {
       const state = interfaceBrands.planeValues.get(value);
@@ -25874,7 +25921,6 @@ void main() {
       [Symbol.iterator]: { value: XRPlaneSet.prototype.values, writable: true, configurable: true },
       [Symbol.toStringTag]: { value: 'XRPlaneSet', configurable: true },
   });
-  const meshAllocation = Symbol('mesh allocation');
   const meshBindings = interfaceBrands.meshAllocations;
   function meshState(value) {
       const state = meshBindings.meshes.get(value);
@@ -25888,12 +25934,8 @@ void main() {
           throw new TypeError('Expected XRMeshSet.');
       return state;
   }
-  class XRMeshSet extends meshBindings.MeshSetAllocation {
-      constructor(values, token) {
-          if (token !== meshAllocation)
-              throw new TypeError('Illegal constructor.');
-          super(values);
-      }
+  class XRMeshSet {
+      constructor(_values) { throw new TypeError('Illegal constructor.'); }
       get size() { return meshSetState(this).size; }
       has(value) {
           const set = meshSetState(this);
@@ -25953,16 +25995,8 @@ void main() {
       state.orientation = surface.orientation;
       state.matrix = surface.matrix;
   }
-  const meshTracking = new WeakMap();
-  class XRMesh extends meshBindings.MeshAllocation {
-      constructor(session, token) {
-          if (token !== meshAllocation)
-              throw new TypeError('Illegal constructor.');
-          const state = { matrix: null, vertices: new Float32Array(), indices: new Uint32Array(), changed: 0 };
-          const space = new XRSpace(session, () => session.ended ? null : state.matrix);
-          super(space, () => state);
-          meshTracking.set(this, state);
-      }
+  class XRMesh {
+      constructor(_session) { throw new TypeError('Illegal constructor.'); }
       get meshSpace() { return meshState(this).space; }
       get vertices() { return meshState(this).vertices(); }
       get indices() { return meshState(this).indices(); }
@@ -25977,36 +26011,21 @@ void main() {
               Object.defineProperty(C.prototype, name, { enumerable: true });
       }
   }
-  function updateMesh(mesh, surface, time) {
-      const state = meshTracking.get(mesh);
-      if (state.vertices.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - state.vertices[i]) > 1e-5)) {
-          state.vertices = new Float32Array(surface.vertices);
-          state.indices = new Uint32Array([0, 1, 2]);
-          state.changed = time;
-      }
-      state.matrix = surface.matrix;
-  }
   class EnvironmentTracker {
       constructor(session) {
           this.session = session;
           this.planes = new Map();
-          this.meshes = new Map();
+          this.meshes = new interfaceBrands.meshAllocations.MeshTracker(session, XRMesh.prototype, XRMeshSet.prototype);
       }
       update(time) {
-          var _a, _b, _c, _d;
-          const surfaces = roomSurfaces((_b = (_a = this.session._device.arScene) === null || _a === void 0 ? void 0 : _a.room) !== null && _b !== void 0 ? _b : null);
-          const planeSurfaces = roomMeshes((_d = (_c = this.session._device.arScene) === null || _c === void 0 ? void 0 : _c.room) !== null && _d !== void 0 ? _d : null).flatMap(planeRegions);
+          var _a, _b;
+          this.meshes.update(time);
+          const planeSurfaces = roomMeshes((_b = (_a = this.session._device.arScene) === null || _a === void 0 ? void 0 : _a.room) !== null && _b !== void 0 ? _b : null).flatMap(planeRegions);
           const planeKeys = new Set(planeSurfaces.map(surface => surface.key));
           for (const [key, plane] of this.planes)
               if (!planeKeys.has(key)) {
                   planeState(plane).matrix = null;
                   this.planes.delete(key);
-              }
-          const meshKeys = new Set(surfaces.map(surface => surface.key));
-          for (const [key, mesh] of this.meshes)
-              if (!meshKeys.has(key)) {
-                  meshTracking.get(mesh).matrix = null;
-                  this.meshes.delete(key);
               }
           if (this.session.enabledFeatures.includes('plane-detection'))
               for (const surface of planeSurfaces) {
@@ -26015,19 +26034,10 @@ void main() {
                       this.planes.set(surface.key, plane = new XRPlane(this.session, planeAllocation));
                   updatePlane(plane, surface, time);
               }
-          for (const surface of surfaces) {
-              if (this.session.enabledFeatures.includes('mesh-detection')) {
-                  let mesh = this.meshes.get(surface.key);
-                  if (!mesh)
-                      this.meshes.set(surface.key, mesh = new XRMesh(this.session, meshAllocation));
-                  updateMesh(mesh, surface, time);
-              }
-          }
       }
-      snapshot() { return { planes: new XRPlaneSet(this.planes.values(), planeAllocation), meshes: new XRMeshSet(this.meshes.values(), meshAllocation) }; }
+      snapshot() { return { planes: new XRPlaneSet(this.planes.values(), planeAllocation), meshes: this.meshes.snapshot() }; }
       clear() { for (const plane of this.planes.values())
-          planeState(plane).matrix = null; this.planes.clear(); for (const mesh of this.meshes.values())
-          meshTracking.get(mesh).matrix = null; this.meshes.clear(); }
+          planeState(plane).matrix = null; this.planes.clear(); this.meshes.clear(); }
   }
 
   var environment = /*#__PURE__*/Object.freeze({
