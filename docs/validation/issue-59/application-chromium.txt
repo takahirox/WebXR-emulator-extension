@@ -1,0 +1,7 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:hand-applications:chromium
+> tsx tests/hand-applications.ts chromium
+
+hand application chromium cycle 0
+hand application chromium cycle 1
+{"status":"passed","browser":"chromium","cycles":2,"failures":[],"cleanup":{"browserStopped":true,"profileRemoved":true}}

@@ -1,0 +1,2007 @@
+{
+  "issue": 59,
+  "finding": "Populated caller-owned sessions/backends could allocate accepted hand identities through the shared registry.",
+  "status": "passed",
+  "recordedAt": "2026-10-24T06:48:13.098Z",
+  "startingCheckpoint": "b4c6fca5c48d64d1572d64b4b7f5d2dffe936da3",
+  "commands": [
+    {
+      "command": "npm run build:firefox",
+      "exitCode": 0,
+      "log": "docs/validation/issue-59/allocation-fix/build.txt"
+    },
+    {
+      "command": "npm run test:hands:chromium",
+      "exitCode": 0,
+      "log": "docs/validation/issue-59/allocation-fix/hands-chromium.txt"
+    },
+    {
+      "command": "WEBXR_FIREFOX_EXECUTABLE=/tmp/webxr-review-55.16qb9L/browser-tools/Firefox.app/Contents/MacOS/firefox WEBXR_GECKODRIVER=/tmp/webxr-review-55.16qb9L/browser-tools/geckodriver npm run test:hands:firefox",
+      "exitCode": 0,
+      "log": "docs/validation/issue-59/allocation-fix/hands-firefox.txt"
+    },
+    {
+      "command": "npm run test:hand-applications:chromium",
+      "exitCode": 0,
+      "log": "docs/validation/issue-59/allocation-fix/applications-chromium.txt"
+    },
+    {
+      "command": "WEBXR_FIREFOX_EXECUTABLE=/tmp/webxr-review-55.16qb9L/browser-tools/Firefox.app/Contents/MacOS/firefox WEBXR_GECKODRIVER=/tmp/webxr-review-55.16qb9L/browser-tools/geckodriver npm run test:hand-applications:firefox",
+      "exitCode": 0,
+      "log": "docs/validation/issue-59/allocation-fix/applications-firefox.txt"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "sourceHashes": {
+    "src/polyfill/api/hand-allocation.ts": "4822f34f019710133612bb967f9182d963f429f06e15ad7c5ddab29ed6aebd12",
+    "tests/hands.ts": "e865f17565fa29988690fa8a3dd7626750ebcb63c67b7bf8dcd3d524250de800",
+    "src/polyfill/api/bulk-input.ts": "08d92beec8fb5f326a01f640026cb3795e62d3379d8f2bab21081d393997fb20",
+    "src/polyfill/api/runtime.ts": "aa157cfe3b3abe7df96e23426f5c037f1cd3c24debe88b4171ebdd9ce137e51e",
+    "src/polyfill/api/interface-brand.ts": "d5020b8faad160c2d8a01592593a419d8c4383ec7085bc1fdb1bd92380544ab9",
+    "src/polyfill/api/geometry.ts": "54167c9ce748026329354f572c1f3c8a645bc70f8a75bb5a2d77dd1ac3c0c462",
+    "src/polyfill/CustomWebXRPolyfill.ts": "7de6edaca57d3225a9a3fbd91e6256da39f3ef5a56fe6a5b8385d1b2fbcc1167",
+    "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+    "package.json": "34d15f0b0b74356a31a58d239ac47cc9aaafa4d1b697ea9acf12f3344e865c8e",
+    "tests/reference-space-browser.ts": "46002e7fc2d48a55cb084f8b8fe1b4cea719a8236d59a3349273b027803f4576",
+    "polyfill/webxr-polyfill.js": "f0fc81ca3a7373e08b9ca4e4a0e366a4ec78e8c1806beeb1e73b6feb1d7d46e5",
+    "build/firefox/polyfill/webxr-polyfill.js": "f0fc81ca3a7373e08b9ca4e4a0e366a4ec78e8c1806beeb1e73b6feb1d7d46e5",
+    "src/polyfill/api/sensing.ts": "c55de944ef6b553961ff644a37bb2164b5bdb491d14c380ddaa939c8fc182cf1",
+    "src/polyfill/EmulatedXRDevice.ts": "17bd94c1cf1ab817866f0995c16ea4d8ff0753ad11820ed2e0cdf80d5049ab51",
+    "tests/hand-applications.ts": "9440253676de0e114e73ac28db9c6b13d3cfce0d3d7af0bbfe95c9214021de63",
+    "tests/tracking-browser.ts": "381e49ea21632f14666b0953545344ece9f2b681367c6c4b6d03f4d9608aab19",
+    "tests/tracking-observation.ts": "69540030de1e98f710f30750172de74b96200d730bcdaeb68db8d7b73103f1cd",
+    "tests/firefox-upstream.ts": "b1a41945ca5d5d1fabf5ebfebcb04be10907df9570f134fbf2d24f0df555a818",
+    "tests/firefox-scenes.js": "375b5b68b93860fba25b79868ae19d315b7788bd60402c7d42855d8e85b595b4"
+  },
+  "contracts": [
+    {
+      "browser": "chromium",
+      "status": "passed",
+      "startedAt": "2026-10-24T06:44:30.796Z",
+      "completedAt": "2026-10-24T06:44:38.686Z",
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "rawReportSHA256": "6f2e0cfccf4a4ae6cee9665d6d810768e450ed43e0a5dd47fd1d8e10a1dbf6f2",
+      "assertions": 7168,
+      "scenarios": [
+        {
+          "device": "Meta Quest 3",
+          "mode": "immersive-vr",
+          "assertions": 3480,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission",
+            "populated fake backend satisfies former public-property checks",
+            "public runtime construction cannot reuse a genuine backend (got TypeError: Illegal constructor.)",
+            "populated fake backend cannot register or allocate joints (got TypeError: Expected backend XRSession.)",
+            "fake backend has no private session allocation (got TypeError: Expected backend XRSession.)",
+            "rejected fake source acquires no hand"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "mode": "immersive-ar",
+          "assertions": 3480,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission",
+            "populated fake backend satisfies former public-property checks",
+            "public runtime construction cannot reuse a genuine backend (got TypeError: Illegal constructor.)",
+            "populated fake backend cannot register or allocate joints (got TypeError: Expected backend XRSession.)",
+            "fake backend has no private session allocation (got TypeError: Expected backend XRSession.)",
+            "rejected fake source acquires no hand"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "mode": "immersive-ar",
+          "assertions": 70,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "mode": "inline",
+          "assertions": 69,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "mode": "inline",
+          "assertions": 69,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        }
+      ],
+      "instrumentation": [
+        "Genuine extension and panel; separately injected populated parent/child Quest sessions and borrowed collection, iterator, joint and frame bindings in both directions.",
+        "Controlled existing backend translation, rotation, trigger, whole-hand slot loss and source activation; restored in finally; no production testing API. Real RAF and input-event frames. Shared registry readers, constructor/superclass/reflective allocation and buffer mutations probed."
+      ],
+      "failures": [],
+      "skips": [],
+      "runtimeErrors": [],
+      "cleanup": {
+        "contextClosed": true,
+        "profileRemoved": true
+      }
+    },
+    {
+      "browser": "firefox",
+      "status": "passed",
+      "startedAt": "2026-10-24T06:44:31.959Z",
+      "completedAt": "2026-10-24T06:44:41.752Z",
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "rawReportSHA256": "dd55a893880785fff41dfe0f7706213f6192ace4b0147818973c6894bab96a26",
+      "assertions": 7168,
+      "scenarios": [
+        {
+          "device": "Meta Quest 3",
+          "mode": "immersive-vr",
+          "assertions": 3480,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission",
+            "populated fake backend satisfies former public-property checks",
+            "public runtime construction cannot reuse a genuine backend (got TypeError: Illegal constructor.)",
+            "populated fake backend cannot register or allocate joints (got TypeError: Expected backend XRSession.)",
+            "fake backend has no private session allocation (got TypeError: Expected backend XRSession.)",
+            "rejected fake source acquires no hand"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "mode": "immersive-ar",
+          "assertions": 3480,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission",
+            "populated fake backend satisfies former public-property checks",
+            "public runtime construction cannot reuse a genuine backend (got TypeError: Illegal constructor.)",
+            "populated fake backend cannot register or allocate joints (got TypeError: Expected backend XRSession.)",
+            "fake backend has no private session allocation (got TypeError: Expected backend XRSession.)",
+            "rejected fake source acquires no hand"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "mode": "immersive-ar",
+          "assertions": 70,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "mode": "inline",
+          "assertions": 69,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "mode": "inline",
+          "assertions": 69,
+          "skips": [],
+          "allocationRegression": [
+            "runtime construction requires private allocation permission (got TypeError: Illegal constructor.)",
+            "borrowed request cannot substitute caller-owned backend promise",
+            "borrowed system binding retains genuine backend permission"
+          ],
+          "borrowedSystemBindings": [
+            "borrowed system binding retains genuine backend permission"
+          ]
+        }
+      ],
+      "instrumentation": [
+        "Genuine extension and panel; separately injected populated parent/child Quest sessions and borrowed collection, iterator, joint and frame bindings in both directions.",
+        "Controlled existing backend translation, rotation, trigger, whole-hand slot loss and source activation; restored in finally; no production testing API. Real RAF and input-event frames. Shared registry readers, constructor/superclass/reflective allocation and buffer mutations probed."
+      ],
+      "failures": [],
+      "skips": [],
+      "runtimeErrors": [],
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      }
+    }
+  ],
+  "applications": [
+    {
+      "browser": "chromium",
+      "status": "passed",
+      "startedAt": "2026-10-24T06:45:06.290Z",
+      "completedAt": "2026-10-24T06:45:18.315Z",
+      "versions": {
+        "browser": "156.0.8078.4",
+        "build": {
+          "protocolVersion": "1.3",
+          "product": "Chrome/156.0.8078.4",
+          "revision": "@f842f52ef39fd97b449eb27cff414bf05a98ddce",
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+          "jsVersion": "15.6.75"
+        },
+        "playwright": "1.64.0",
+        "node": "v24.12.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "rawReportSHA256": "2d793971304c2fe50ae49e524863a98ad8c41322df993cc85af1a1a97531ac6e",
+      "coverage": "Quest VR immersive-vr only. Unchanged VRButton does not request Quest MR immersive-ar.",
+      "instrumentation": [
+        "Unchanged upstream handinput HTML and all Three.js modules served byte-for-byte at the pinned revision. No application/dependency logic changes.",
+        "Existing Three.js devtools observe event and original scene.onBeforeRender; request/frame/joint-pose wrappers preserve receivers, arguments, results and exceptions. Post-render inspection of both original hand joint groups, sphere instance transforms/radii and presentation canvas pixels projected separately in both eyes.",
+        "Genuine unpacked extension and DevTools panel. Panel reset, stereo/Quest VR selection, retained TransformControls movement and real panel trigger clicks. No synthetic XR adapter, clocks, GL or production test API."
+      ],
+      "cycles": [
+        {
+          "cycle": 0,
+          "request": {
+            "mode": "immersive-vr",
+            "options": {
+              "requiredFeatures": [
+                "hand-tracking"
+              ],
+              "optionalFeatures": [
+                "local-floor",
+                "bounded-floor",
+                "layers"
+              ]
+            },
+            "enabled": [
+              "viewer",
+              "local",
+              "hand-tracking",
+              "local-floor",
+              "bounded-floor",
+              "layers"
+            ],
+            "frames": 194,
+            "ends": 0,
+            "events": [
+              {
+                "type": "selectstart",
+                "hand": "right",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "select",
+                "hand": "right",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "selectend",
+                "hand": "right",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "selectstart",
+                "hand": "left",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "select",
+                "hand": "left",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "selectend",
+                "hand": "left",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              }
+            ],
+            "poses": {
+              "right-ray": [
+                0.9800665974617004,
+                -0.029688773676753044,
+                -0.1964384913444519,
+                0,
+                -1.7154258569185288e-10,
+                0.9887710809707642,
+                -0.14943812787532806,
+                0,
+                0.19866932928562164,
+                0.14645932614803314,
+                0.9690614938735962,
+                0,
+                0.3199999928474426,
+                1.4299999475479126,
+                -0.6000000238418579,
+                1
+              ],
+              "left-ray": [
+                0.9800665974617004,
+                0.029688773676753044,
+                0.1964384913444519,
+                0,
+                1.7154258569185288e-10,
+                0.9887710809707642,
+                -0.14943812787532806,
+                0,
+                -0.19866932928562164,
+                0.14645932614803314,
+                0.9690614938735962,
+                0,
+                -0.3199999928474426,
+                1.4299999475479126,
+                -0.6000000238418579,
+                1
+              ]
+            },
+            "identityChecks": 388,
+            "views": [
+              {
+                "eye": "left",
+                "width": 640,
+                "height": 720
+              },
+              {
+                "eye": "right",
+                "width": 640,
+                "height": 720
+              }
+            ],
+            "viewer": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1.600000023841858,
+              0,
+              1
+            ]
+          },
+          "shutdown": {
+            "frames": 201,
+            "callbacks": 0,
+            "layers": 0,
+            "canvasConnected": false,
+            "oldNull": true,
+            "ends": 1
+          },
+          "states": [
+            {
+              "label": "0-before",
+              "textureSHA256": "096190c1fe109777f42b7673e518782febe1e51a9fc8896624a5b8a03872e65e",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 0,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 0,
+                  "brightNearJointsByHand": {
+                    "right": 1717,
+                    "left": 1651
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 0,
+                  "brightNearJointsByHand": {
+                    "right": 1706,
+                    "left": 1692
+                  }
+                }
+              ]
+            },
+            {
+              "label": "0-right-moved",
+              "textureSHA256": "b5623af8b7bfc5be48aa5a29b1695f73bada7666547a0567a5ea8a03a7a59bbe",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 2767,
+                  "brightNearJointsByHand": {
+                    "right": 1616,
+                    "left": 1651
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 2643,
+                  "brightNearJointsByHand": {
+                    "right": 1662,
+                    "left": 1692
+                  }
+                }
+              ]
+            },
+            {
+              "label": "0-right-curled",
+              "textureSHA256": "7b809786bab62147ad73e35c3ad16fb5a95793e87fe9c31f10d10c89a4382431",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 1598,
+                  "brightNearJointsByHand": {
+                    "right": 323,
+                    "left": 1651
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 1562,
+                  "brightNearJointsByHand": {
+                    "right": 302,
+                    "left": 1692
+                  }
+                }
+              ]
+            },
+            {
+              "label": "0-left-moved",
+              "textureSHA256": "fb26c034aa3cc5ae3d7af924f04922ad933d8ad76f0b97b46d8706de6f9f4557",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 4236,
+                  "brightNearJointsByHand": {
+                    "right": 1616,
+                    "left": 1647
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 4314,
+                  "brightNearJointsByHand": {
+                    "right": 1662,
+                    "left": 1596
+                  }
+                }
+              ]
+            },
+            {
+              "label": "0-left-curled",
+              "textureSHA256": "d93d620a461d3314c6fbe236ac875b421dc33d653b2550febb3e147009788266",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 1567,
+                  "brightNearJointsByHand": {
+                    "right": 1616,
+                    "left": 308
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 1593,
+                  "brightNearJointsByHand": {
+                    "right": 1662,
+                    "left": 329
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cycle": 1,
+          "request": {
+            "mode": "immersive-vr",
+            "options": {
+              "requiredFeatures": [
+                "hand-tracking"
+              ],
+              "optionalFeatures": [
+                "local-floor",
+                "bounded-floor",
+                "layers"
+              ]
+            },
+            "enabled": [
+              "viewer",
+              "local",
+              "hand-tracking",
+              "local-floor",
+              "bounded-floor",
+              "layers"
+            ],
+            "frames": 184,
+            "ends": 0,
+            "events": [
+              {
+                "type": "selectstart",
+                "hand": "right",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "select",
+                "hand": "right",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "selectend",
+                "hand": "right",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "selectstart",
+                "hand": "left",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "select",
+                "hand": "left",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              },
+              {
+                "type": "selectend",
+                "hand": "left",
+                "sameSource": true,
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ]
+              }
+            ],
+            "poses": {
+              "right-ray": [
+                0.9800665974617004,
+                -0.029688773676753044,
+                -0.1964384913444519,
+                0,
+                -1.7154258569185288e-10,
+                0.9887710809707642,
+                -0.14943812787532806,
+                0,
+                0.19866932928562164,
+                0.14645932614803314,
+                0.9690614938735962,
+                0,
+                0.3199999928474426,
+                1.4299999475479126,
+                -0.6000000238418579,
+                1
+              ],
+              "left-ray": [
+                0.9800665974617004,
+                0.029688773676753044,
+                0.1964384913444519,
+                0,
+                1.7154258569185288e-10,
+                0.9887710809707642,
+                -0.14943812787532806,
+                0,
+                -0.19866932928562164,
+                0.14645932614803314,
+                0.9690614938735962,
+                0,
+                -0.3199999928474426,
+                1.4299999475479126,
+                -0.6000000238418579,
+                1
+              ]
+            },
+            "identityChecks": 368,
+            "views": [
+              {
+                "eye": "left",
+                "width": 640,
+                "height": 720
+              },
+              {
+                "eye": "right",
+                "width": 640,
+                "height": 720
+              }
+            ],
+            "viewer": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1.600000023841858,
+              0,
+              1
+            ]
+          },
+          "shutdown": {
+            "frames": 392,
+            "callbacks": 0,
+            "layers": 0,
+            "canvasConnected": false,
+            "oldNull": true,
+            "ends": 1
+          },
+          "states": [
+            {
+              "label": "1-before",
+              "textureSHA256": "096190c1fe109777f42b7673e518782febe1e51a9fc8896624a5b8a03872e65e",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 0,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 5823,
+                  "brightNearJointsByHand": {
+                    "right": 1717,
+                    "left": 1651
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 5794,
+                  "brightNearJointsByHand": {
+                    "right": 1706,
+                    "left": 1692
+                  }
+                }
+              ]
+            },
+            {
+              "label": "1-right-moved",
+              "textureSHA256": "b5623af8b7bfc5be48aa5a29b1695f73bada7666547a0567a5ea8a03a7a59bbe",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 2767,
+                  "brightNearJointsByHand": {
+                    "right": 1616,
+                    "left": 1651
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 2643,
+                  "brightNearJointsByHand": {
+                    "right": 1662,
+                    "left": 1692
+                  }
+                }
+              ]
+            },
+            {
+              "label": "1-right-curled",
+              "textureSHA256": "7b809786bab62147ad73e35c3ad16fb5a95793e87fe9c31f10d10c89a4382431",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 1598,
+                  "brightNearJointsByHand": {
+                    "right": 323,
+                    "left": 1651
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 1562,
+                  "brightNearJointsByHand": {
+                    "right": 302,
+                    "left": 1692
+                  }
+                }
+              ]
+            },
+            {
+              "label": "1-left-moved",
+              "textureSHA256": "fb26c034aa3cc5ae3d7af924f04922ad933d8ad76f0b97b46d8706de6f9f4557",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 4236,
+                  "brightNearJointsByHand": {
+                    "right": 1616,
+                    "left": 1647
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 4314,
+                  "brightNearJointsByHand": {
+                    "right": 1662,
+                    "left": 1596
+                  }
+                }
+              ]
+            },
+            {
+              "label": "1-left-curled",
+              "textureSHA256": "d93d620a461d3314c6fbe236ac875b421dc33d653b2550febb3e147009788266",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 1567,
+                  "brightNearJointsByHand": {
+                    "right": 1616,
+                    "left": 308
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 1593,
+                  "brightNearJointsByHand": {
+                    "right": 1662,
+                    "left": 329
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "restoration": {
+        "buttonsReleased": true,
+        "posesReset": true
+      },
+      "failures": [],
+      "skips": [],
+      "runtimeErrors": [],
+      "cleanup": {
+        "browserStopped": true,
+        "profileRemoved": true
+      }
+    },
+    {
+      "browser": "firefox",
+      "status": "passed",
+      "startedAt": "2026-10-24T06:45:06.266Z",
+      "completedAt": "2026-10-24T06:45:23.399Z",
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "rawReportSHA256": "e83974c5c32b57fb28a80d26d85b4108ddcdc50837de1e93ee2bc03db61771a0",
+      "coverage": "Quest VR immersive-vr only. Unchanged VRButton does not request Quest MR immersive-ar.",
+      "instrumentation": [
+        "Unchanged upstream handinput HTML and all Three.js modules served byte-for-byte at the pinned revision. No application/dependency logic changes.",
+        "Existing Three.js devtools observe event and original scene.onBeforeRender; request/frame/joint-pose wrappers preserve receivers, arguments, results and exceptions. Post-render inspection of both original hand joint groups, sphere instance transforms/radii and presentation canvas pixels projected separately in both eyes.",
+        "Genuine unpacked extension and DevTools panel. Panel reset, stereo/Quest VR selection, retained TransformControls movement and real panel trigger clicks. No synthetic XR adapter, clocks, GL or production test API."
+      ],
+      "cycles": [
+        {
+          "cycle": 0,
+          "request": {
+            "enabled": [
+              "viewer",
+              "local",
+              "hand-tracking",
+              "local-floor",
+              "bounded-floor",
+              "layers"
+            ],
+            "ends": 0,
+            "events": [
+              {
+                "hand": "right",
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectstart"
+              },
+              {
+                "hand": "right",
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "select"
+              },
+              {
+                "hand": "right",
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectend"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectstart"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "select"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectend"
+              }
+            ],
+            "frames": 171,
+            "identityChecks": 342,
+            "mode": "immersive-vr",
+            "options": {
+              "optionalFeatures": [
+                "local-floor",
+                "bounded-floor",
+                "layers"
+              ],
+              "requiredFeatures": [
+                "hand-tracking"
+              ]
+            },
+            "poses": {
+              "left-ray": [
+                0.9800665974617004,
+                0.029688773676753044,
+                0.1964384913444519,
+                0,
+                1.7154258569185288e-10,
+                0.9887710809707642,
+                -0.14943812787532806,
+                0,
+                -0.19866932928562164,
+                0.14645932614803314,
+                0.9690614938735962,
+                0,
+                -0.3199999928474426,
+                1.4299999475479126,
+                -0.6000000238418579,
+                1
+              ],
+              "right-ray": [
+                0.9800665974617004,
+                -0.029688773676753044,
+                -0.1964384913444519,
+                0,
+                -1.7154258569185288e-10,
+                0.9887710809707642,
+                -0.14943812787532806,
+                0,
+                0.19866932928562164,
+                0.14645932614803314,
+                0.9690614938735962,
+                0,
+                0.3199999928474426,
+                1.4299999475479126,
+                -0.6000000238418579,
+                1
+              ]
+            },
+            "viewer": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1.600000023841858,
+              0,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "shutdown": {
+            "callbacks": 0,
+            "canvasConnected": false,
+            "ends": 1,
+            "frames": 176,
+            "layers": 0,
+            "oldNull": true
+          },
+          "states": [
+            {
+              "label": "0-before",
+              "textureSHA256": "275351b3acec8df90824e350dd23b359b161240f59a0d4edf73a652e3e5f1822",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 0,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 0,
+                  "brightNearJointsByHand": {
+                    "right": 2056,
+                    "left": 1988
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 0,
+                  "brightNearJointsByHand": {
+                    "right": 2029,
+                    "left": 2019
+                  }
+                }
+              ]
+            },
+            {
+              "label": "0-right-moved",
+              "textureSHA256": "b058db089f27c1406fd0f349b07ddbcb2ad65e57d963d92505f7f5b4c6cf1987",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 3424,
+                  "brightNearJointsByHand": {
+                    "right": 2021,
+                    "left": 1988
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 3276,
+                  "brightNearJointsByHand": {
+                    "right": 2123,
+                    "left": 2019
+                  }
+                }
+              ]
+            },
+            {
+              "label": "0-right-curled",
+              "textureSHA256": "956da9054645431147d02110c2ec18c583ca26f66873c948166819f6058a9c08",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 2018,
+                  "brightNearJointsByHand": {
+                    "right": 342,
+                    "left": 1988
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 1969,
+                  "brightNearJointsByHand": {
+                    "right": 331,
+                    "left": 2019
+                  }
+                }
+              ]
+            },
+            {
+              "label": "0-left-moved",
+              "textureSHA256": "29dff552a6e392e1176852c7a788c2819cf2d546a003864b51785f59270dae59",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 5292,
+                  "brightNearJointsByHand": {
+                    "right": 2021,
+                    "left": 2100
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 5370,
+                  "brightNearJointsByHand": {
+                    "right": 2123,
+                    "left": 1996
+                  }
+                }
+              ]
+            },
+            {
+              "label": "0-left-curled",
+              "textureSHA256": "a5eb1d95f80aea5ebb7c5f5aaf06e0d1a5b22ebca1edbe4a6f01631cf52d9d7b",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 1971,
+                  "brightNearJointsByHand": {
+                    "right": 2021,
+                    "left": 342
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 2015,
+                  "brightNearJointsByHand": {
+                    "right": 2123,
+                    "left": 351
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "cycle": 1,
+          "request": {
+            "enabled": [
+              "viewer",
+              "local",
+              "hand-tracking",
+              "local-floor",
+              "bounded-floor",
+              "layers"
+            ],
+            "ends": 0,
+            "events": [
+              {
+                "hand": "right",
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectstart"
+              },
+              {
+                "hand": "right",
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "select"
+              },
+              {
+                "hand": "right",
+                "pose": [
+                  0.9800665974617004,
+                  -0.029688773676753044,
+                  -0.1964384913444519,
+                  0,
+                  -1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectend"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectstart"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "select"
+              },
+              {
+                "hand": "left",
+                "pose": [
+                  0.9800665974617004,
+                  0.029688773676753044,
+                  0.1964384913444519,
+                  0,
+                  1.7154258569185288e-10,
+                  0.9887710809707642,
+                  -0.14943812787532806,
+                  0,
+                  -0.19866932928562164,
+                  0.14645932614803314,
+                  0.9690614938735962,
+                  0,
+                  -0.3199999928474426,
+                  1.4299999475479126,
+                  -0.6000000238418579,
+                  1
+                ],
+                "sameSource": true,
+                "type": "selectend"
+              }
+            ],
+            "frames": 194,
+            "identityChecks": 388,
+            "mode": "immersive-vr",
+            "options": {
+              "optionalFeatures": [
+                "local-floor",
+                "bounded-floor",
+                "layers"
+              ],
+              "requiredFeatures": [
+                "hand-tracking"
+              ]
+            },
+            "poses": {
+              "left-ray": [
+                0.9800665974617004,
+                0.029688773676753044,
+                0.1964384913444519,
+                0,
+                1.7154258569185288e-10,
+                0.9887710809707642,
+                -0.14943812787532806,
+                0,
+                -0.19866932928562164,
+                0.14645932614803314,
+                0.9690614938735962,
+                0,
+                -0.3199999928474426,
+                1.4299999475479126,
+                -0.6000000238418579,
+                1
+              ],
+              "right-ray": [
+                0.9800665974617004,
+                -0.029688773676753044,
+                -0.1964384913444519,
+                0,
+                -1.7154258569185288e-10,
+                0.9887710809707642,
+                -0.14943812787532806,
+                0,
+                0.19866932928562164,
+                0.14645932614803314,
+                0.9690614938735962,
+                0,
+                0.3199999928474426,
+                1.4299999475479126,
+                -0.6000000238418579,
+                1
+              ]
+            },
+            "viewer": [
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1.600000023841858,
+              0,
+              1
+            ],
+            "views": [
+              {
+                "eye": "left",
+                "height": 809,
+                "width": 640
+              },
+              {
+                "eye": "right",
+                "height": 809,
+                "width": 640
+              }
+            ]
+          },
+          "shutdown": {
+            "callbacks": 0,
+            "canvasConnected": false,
+            "ends": 1,
+            "frames": 375,
+            "layers": 0,
+            "oldNull": true
+          },
+          "states": [
+            {
+              "label": "1-before",
+              "textureSHA256": "275351b3acec8df90824e350dd23b359b161240f59a0d4edf73a652e3e5f1822",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 0,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 7203,
+                  "brightNearJointsByHand": {
+                    "right": 2056,
+                    "left": 1988
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 7166,
+                  "brightNearJointsByHand": {
+                    "right": 2029,
+                    "left": 2019
+                  }
+                }
+              ]
+            },
+            {
+              "label": "1-right-moved",
+              "textureSHA256": "b058db089f27c1406fd0f349b07ddbcb2ad65e57d963d92505f7f5b4c6cf1987",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 3424,
+                  "brightNearJointsByHand": {
+                    "right": 2021,
+                    "left": 1988
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 3276,
+                  "brightNearJointsByHand": {
+                    "right": 2123,
+                    "left": 2019
+                  }
+                }
+              ]
+            },
+            {
+              "label": "1-right-curled",
+              "textureSHA256": "956da9054645431147d02110c2ec18c583ca26f66873c948166819f6058a9c08",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 2018,
+                  "brightNearJointsByHand": {
+                    "right": 342,
+                    "left": 1988
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 1969,
+                  "brightNearJointsByHand": {
+                    "right": 331,
+                    "left": 2019
+                  }
+                }
+              ]
+            },
+            {
+              "label": "1-left-moved",
+              "textureSHA256": "29dff552a6e392e1176852c7a788c2819cf2d546a003864b51785f59270dae59",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 5292,
+                  "brightNearJointsByHand": {
+                    "right": 2021,
+                    "left": 2100
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 5370,
+                  "brightNearJointsByHand": {
+                    "right": 2123,
+                    "left": 1996
+                  }
+                }
+              ]
+            },
+            {
+              "label": "1-left-curled",
+              "textureSHA256": "a5eb1d95f80aea5ebb7c5f5aaf06e0d1a5b22ebca1edbe4a6f01631cf52d9d7b",
+              "jointsPerHand": [
+                25,
+                25
+              ],
+              "maxConsumedMatrixError": 0,
+              "maxRadiusError": 0,
+              "maxInstanceMatrixError": 6.792530982124845e-10,
+              "eyes": [
+                {
+                  "eye": "left",
+                  "changed": 1971,
+                  "brightNearJointsByHand": {
+                    "right": 2021,
+                    "left": 342
+                  }
+                },
+                {
+                  "eye": "right",
+                  "changed": 2015,
+                  "brightNearJointsByHand": {
+                    "right": 2123,
+                    "left": 351
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "restoration": {
+        "buttonsReleased": true,
+        "posesReset": true
+      },
+      "failures": [],
+      "skips": [],
+      "runtimeErrors": [],
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      }
+    }
+  ],
+  "limitations": [
+    "Scoped allocation protection assumes installed bindings have not been arbitrarily replaced; no native security-isolation claim.",
+    "Original application/dependency bytes and observation wrappers are unchanged.",
+    "Fresh raw reports and screenshots are in ignored test-results; this record retains bounded summaries and raw-report hashes. Earlier captures remain in docs/validation/issue-59.",
+    "No generic full-suite run, independent AI re-review, optional popup consumer or physical hardware validation."
+  ],
+  "upstream": {
+    "revisions": {
+      "samples": "fb41c3416496974672e2c766a41c6febcba2d07e",
+      "three": "9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8",
+      "wpt": "e1859580b5fcf74940a18d2f783296b4961035e3"
+    },
+    "servedSources": [
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/build/three.core.js",
+        "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+        "bytes": 1458113
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/build/three.module.js",
+        "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea",
+        "bytes": 662772
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/controls/OrbitControls.js",
+        "sha256": "3d79d07ecb686b4e5d93232eedab255331c1beef711e13164eaa1f68655a5f2b",
+        "bytes": 40755
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/libs/motion-controllers.module.js",
+        "sha256": "4bf534b98dbb0f3e90b1332ac4d49c7d7747253768970abc7e4133b7700b75b1",
+        "bytes": 13492
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/loaders/GLTFLoader.js",
+        "sha256": "131c0f78c01d19368ae495caa65b3adaa10487810a36a05bb5901b769a35ac16",
+        "bytes": 117570
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/utils/BufferGeometryUtils.js",
+        "sha256": "9fb63427ce6641fa14fd0baff9cc4d1b5f9c3d85fd084bf2e90e803c44ec1797",
+        "bytes": 37712
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/utils/SkeletonUtils.js",
+        "sha256": "b1632a703206c3d830de9fcbe515696770d04b71a15ee6b50afa6d2c3298c86f",
+        "bytes": 11535
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/VRButton.js",
+        "sha256": "35a7621bbbe776203dad04cddc79c8e1b166dc3b6757d8b907f97df86d8a9d48",
+        "bytes": 5866
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/XRControllerModelFactory.js",
+        "sha256": "401dcb638ca3de94dd0a7744dd7a1c0d20374c73695b3d4e890eac6100e56877",
+        "bytes": 10185
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/XRHandMeshModel.js",
+        "sha256": "9bcb2e3f36fcc17c952589f9c40d2e6abe33af1a0bf797bd4b50d5dd311781ae",
+        "bytes": 4112
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/XRHandModelFactory.js",
+        "sha256": "eb850592ebc60acd01b5d40f9151bd1404c6479ad1167da7914d370707c3205e",
+        "bytes": 4207
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/jsm/webxr/XRHandPrimitiveModel.js",
+        "sha256": "401ec6836ba4ca82f709e07329d6df4f687c91062b532a1e30415fb689ffdb97",
+        "bytes": 3494
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/main.css",
+        "sha256": "57bbd270f4befef0dc767537cd803c30cab549f84aac1bbe86c748520bdfc3fe",
+        "bytes": 1403
+      },
+      {
+        "url": "https://raw.githubusercontent.com/mrdoob/three.js/9b4a2ac29c63ccb43fd51c5661f2f873ac2c39b8/examples/webxr_vr_handinput.html",
+        "sha256": "a3609dd5c64e3e4ef2e48daf26fefb478c967453ca1fbce405687dfdcf7b3afa",
+        "bytes": 4706
+      }
+    ]
+  }
+}

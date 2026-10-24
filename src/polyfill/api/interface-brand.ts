@@ -6,12 +6,13 @@ import {createLayerAllocations} from './layer-allocation';
 import {createMeshAllocations} from './mesh-allocation';
 import {createPlaneAllocations} from './plane-allocation';
 import {createHitTestAllocations} from './hit-test-allocation';
+import {createHandAllocations} from './hand-allocation';
 
 // Same-origin injections share allocation brands, not writable WeakSets. Only
 // constructors can brand a newly allocated object; borrowing a prototype or
 // wrapping an instance in a Proxy cannot acquire its brand.
 function createBrands() {
-  const frames = new WeakSet<object>(), spaces = new WeakSet<object>(), joints = new WeakSet<object>();
+  const frames = new WeakSet<object>(), spaces = new WeakSet<object>();
   const sessions = new WeakSet<object>(), inputSources = new WeakSet<object>();
   class SessionObject extends EventTarget {
     constructor() { super(); sessions.add(this); }
@@ -23,7 +24,7 @@ function createBrands() {
     constructor() { frames.add(this); }
   }
   class SpaceObject extends EventTarget {
-    constructor(joint = false) { super(); spaces.add(this); if (joint) joints.add(this); }
+    constructor() { super(); spaces.add(this); }
   }
   Object.freeze(FrameObject.prototype); Object.freeze(FrameObject);
   Object.freeze(SpaceObject.prototype); Object.freeze(SpaceObject);
@@ -35,7 +36,10 @@ function createBrands() {
   }>();
   const hitTestAllocations = createHitTestAllocations({sessions, spaces, frames, inputSources, transforms});
   const planeAllocations = createPlaneAllocations(sessions);
+  const frameValues = new WeakMap<object, {session: XRSession; predictedDisplayTime: number; pose: (matrix: mat4, emulated: boolean) => XRPose}>();
+  const handAllocations = createHandAllocations(sessions, inputSources, frameValues);
   return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
+    handAllocations,
     layerAllocations: createLayerAllocations(sessions),
     meshAllocations: createMeshAllocations(sessions),
     planeAllocations,
@@ -52,7 +56,7 @@ function createBrands() {
     transforms,
     referenceOffsets: new WeakMap<object, (transform: mat4) => XRReferenceSpace>(),
     referenceSpaceRequests: new WeakMap<object, (type: string) => Promise<XRReferenceSpace>>(),
-    frameValues: new WeakMap<object, {session: XRSession; predictedDisplayTime: number; pose: (matrix: mat4, emulated: boolean) => XRPose}>(),
+    frameValues,
     viewerPoses: new WeakMap<object, (frame: XRFrame, reference: XRReferenceSpace) => XRViewerPose | null>(),
     poses: new WeakMap<object, {transform: XRRigidTransform; emulatedPosition: boolean}>(),
     viewerViews: new WeakMap<object, readonly XRView[]>(),
@@ -75,7 +79,7 @@ function createBrands() {
     inputSources: Object.freeze({has: (value: object) => inputSources.has(value)}),
     frames: Object.freeze({has: (value: object) => frames.has(value)}),
     spaces: Object.freeze({has: (value: object) => spaces.has(value)}),
-    joints: Object.freeze({has: (value: object) => joints.has(value)}),
+    joints: handAllocations.joints,
   });
 }
 

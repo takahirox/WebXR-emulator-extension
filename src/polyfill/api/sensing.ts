@@ -1,7 +1,8 @@
 import {mat4, vec3} from 'gl-matrix';
-import {XRSpace, XRPose, XRRigidTransform, XRView, initializeViewGeometry, installViewGeometry, projectionData, invalidState, unsupported} from './geometry';
+import {XRSpace, XRPose, XRRigidTransform, XRView, initializeViewGeometry, installViewGeometry, projectionData, enumerableMembers, invalidState, unsupported} from './geometry';
 import type {XRSession, XRFrame} from './runtime';
 import {interfaceBrands} from './interface-brand';
+import {jointNames} from './hand-allocation';
 
 /** Read-only WebIDL setlike view; callers cannot add/delete tracked anchors. */
 export class XRAnchorSet implements Iterable<XRAnchor> {
@@ -24,45 +25,69 @@ export class XRAnchor {
   async requestPersistentHandle(): Promise<string> { this._session._assertLive(); if (this.deleted) invalidState('Anchor was deleted.'); return unsupported('Persistent anchors are not simulated.'); }
 }
 
-const names = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
-  ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))];
 export const jointObjects = interfaceBrands.joints;
-export class XRJointSpace extends XRSpace {
-  constructor(session: XRSession, readonly jointName: string, readonly _radius: number, provider: () => mat4 | null) { super(session, provider, true); }
+const handBindings = interfaceBrands.handAllocations;
+function handState(value: object) {
+  const state = handBindings.hands.get(value);
+  if (!state) throw new TypeError('Expected XRHand.');
+  return state;
 }
-export class XRJointPose extends XRPose { constructor(transform: XRRigidTransform, readonly radius: number, emulatedPosition: boolean, token?: symbol) { super(transform, emulatedPosition, token); } }
-export class XRHand implements Iterable<[string, XRJointSpace]> {
-  private joints = new Map<string, XRJointSpace>();
-  constructor(session: XRSession, controller: number, active: () => boolean) {
-    for (const [index, name] of names.entries()) {
-      const radius = index === 0 ? 0.018 : name.endsWith('tip') ? 0.007 : 0.009;
-      this.joints.set(name, new XRJointSpace(session, name, radius, () => {
-        if (!active()) return null;
-        const gamepad = session._device.gamepads[controller]; if (!gamepad) return null;
-        const matrix = mat4.fromRotationTranslation(mat4.create(), gamepad.pose.orientation, gamepad.pose.position);
-        if (index === 0) return matrix;
-        // A reproducible five-finger skeleton. The panel trigger curls the fingers;
-        // controller translation/rotation moves the entire simulated hand.
-        const finger = index <= 4 ? 0 : 1 + Math.floor((index - 5) / 5);
-        const joint = index <= 4 ? index : 1 + (index - 5) % 5;
-        const side = gamepad.hand === 'left' ? -1 : 1;
-        const curled = gamepad.buttons[0].pressed;
-        const position = (bone: number): vec3 => vec3.fromValues((finger - 2) * 0.019 * side, curled ? -bone * 0.009 : 0, -0.025 - bone * (curled ? 0.008 : 0.025));
-        const origin = position(joint);
-        // -Z follows the outgoing bone; tips continue the distal bone. The
-        // palm's +Y fixes roll, keeping -Y outward from the palm's skin.
-        const target = name.endsWith('tip') ? vec3.add(vec3.create(), origin, vec3.subtract(vec3.create(), origin, position(joint - 1))) : position(joint + 1);
-        return mat4.multiply(matrix, matrix, mat4.targetTo(mat4.create(), origin, target, [0, 1, 0]));
-      }));
-    }
+function jointState(value: object) {
+  const state = handBindings.joints.get(value);
+  if (!state) throw new TypeError('Expected XRJointSpace.');
+  return state;
+}
+function illegalHandConstruction(): never { throw new TypeError('Illegal constructor.'); }
+export class XRJointSpace extends XRSpace {
+  constructor() { super(illegalHandConstruction(), () => null); }
+  get jointName() { return jointState(this).name; }
+  get _radius() { return jointState(this).radius; }
+  override _update() { this._baseMatrix = jointState(this).update(); return this._baseMatrix; }
+}
+export class XRJointPose extends XRPose {
+  constructor() { super(illegalHandConstruction(), false); }
+  get radius() {
+    const radius = handBindings.poses.get(this);
+    if (radius === undefined) throw new TypeError('Expected XRJointPose.');
+    return radius;
   }
-  get size() { return this.joints.size; }
-  get(key: string) { if (!names.includes(key)) throw new TypeError('Invalid XRHandJoint.'); return this.joints.get(key)!; }
-  keys() { return this.joints.keys(); }
-  values() { return this.joints.values(); }
-  entries() { return this.joints.entries(); }
-  forEach(callback: (value: XRJointSpace, key: string, hand: XRHand) => void, thisArg?: unknown) { for (const [name, joint] of this) callback.call(thisArg, joint, name, this); }
+}
+const handIteratorPrototype = Object.create(Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]())));
+Object.defineProperties(handIteratorPrototype, {
+  next: {value: {next(this: object) {
+    const step = handBindings.next(this);
+    const value = Array.isArray(step.value) ? [step.value[0], step.value[1]] : step.value;
+    return {value, done: step.done};
+  }}.next, enumerable: true, configurable: true, writable: true},
+  [Symbol.toStringTag]: {value: 'XRHand Iterator', configurable: true},
+});
+export class XRHand implements Iterable<[string, XRJointSpace]> {
+  constructor() { throw new TypeError('Illegal constructor.'); }
+  get size() { return handState(this).size; }
+  get(key: string) {
+    const state = handState(this);
+    if (arguments.length < 1) throw new TypeError('Expected XRHandJoint.');
+    // Template interpolation performs abstract ToString (unlike String(), it
+    // rejects Symbols), including objects, boxed strings and abrupt coercions.
+    const name = `${key}`;
+    if (!jointNames.includes(name)) throw new TypeError('Invalid XRHandJoint.');
+    return state.get(name);
+  }
+  keys(): IterableIterator<string> { handState(this); return handBindings.iterator(this, 'keys', handIteratorPrototype); }
+  values(): IterableIterator<XRJointSpace> { handState(this); return handBindings.iterator(this, 'values', handIteratorPrototype); }
+  entries(): IterableIterator<[string, XRJointSpace]> { handState(this); return handBindings.iterator(this, 'entries', handIteratorPrototype); }
+  forEach(callback: (value: XRJointSpace, key: string, hand: XRHand) => void, thisArg?: unknown) {
+    const state = handState(this);
+    if (typeof callback !== 'function') throw new TypeError('Expected callback.');
+    for (const [name, joint] of state.entries()) Reflect.apply(callback, thisArg, [joint, name, this]);
+  }
   [Symbol.iterator]() { return this.entries(); }
+}
+Object.defineProperty(XRHand.prototype, Symbol.iterator, {value: XRHand.prototype.entries, writable: true, configurable: true});
+Object.defineProperty(XRHand.prototype.forEach, 'length', {value: 1, configurable: true});
+for (const [C, members] of [[XRHand, ['size','get','keys','values','entries','forEach']], [XRJointSpace, ['jointName']], [XRJointPose, ['radius']]] as const) {
+  enumerableMembers(C.prototype, members);
+  Object.defineProperty(C.prototype, Symbol.toStringTag, {value: C.name, configurable: true});
 }
 
 export class XRLightProbe extends EventTarget {
