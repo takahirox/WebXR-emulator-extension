@@ -14,5 +14,29 @@
   "webxr/xrRigidTransform_sameObject.https.html": {
     "sha256": "79b69b27995f4cbaffbc9abeb7f66f8ca8a513c5d1e864ff25b84616679feec0",
     "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/xrRigidTransform_sameObject.https.html"
+  },
+  "webxr/plane-detection/xrFrame_detectedPlanes_plumbing.https.html": {
+    "sha256": "4910d98be551f72a51620ce3f38d18e11fc4509e5559f610a0ea51928cc37c7b",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/plane-detection/xrFrame_detectedPlanes_plumbing.https.html"
+  },
+  "webxr/plane-detection/xrSession_initiateRoomCapture.https.html": {
+    "sha256": "3872df96323b8e1c9311526ade618d59d34ecbdd21f0e330a97ab9cdadacfc12",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/plane-detection/xrSession_initiateRoomCapture.https.html"
+  },
+  "webxr/plane-detection/xrFrame_detectedPlanes_inactive_frame.https.html": {
+    "sha256": "ceec170c1cd6ec45aa1ab2826d10516a89a79b948d1cc579c7d6cd09b9ce413c",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/plane-detection/xrFrame_detectedPlanes_inactive_frame.https.html"
+  },
+  "webxr/plane-detection/xrPlane_lastChangedTime_no_change.https.html": {
+    "sha256": "c9c0fd36391fe4a0d4a62f20313210b0b888a0d45055e61434c65d44f58df26f",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/plane-detection/xrPlane_lastChangedTime_no_change.https.html"
+  },
+  "webxr/plane-detection/xrPlane_identity.https.html": {
+    "sha256": "af9961673e3fa8b058beb65384b8037110ffa6b5b6b55e6f880344f23a1f61f4",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/plane-detection/xrPlane_identity.https.html"
+  },
+  "webxr/plane-detection/xrFrame_detectedPlanes_incomplete_update.https.html": {
+    "sha256": "d9bf23219496ecea9623efe4ca9db62c1583f40e97dfc1e604503ab749b922d5",
+    "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/plane-detection/xrFrame_detectedPlanes_incomplete_update.https.html"
   }
 }

@@ -202,6 +202,13 @@ export class XRSession extends interfaceBrands.SessionObject {
     this.activeRenderState = new XRRenderState({inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null});
     const viewerMatrix = () => mat4.clone(_device.getBasePoseMatrix());
     this._viewer = new XRReferenceSpace(this, 'viewer', viewerMatrix);
+    interfaceBrands.roomCaptures.set(this, async () => {
+      this._assertLive();
+      if (this.roomCaptureCompleted) invalidState('Room capture already completed.');
+      this._require('plane-detection');
+      // Automatic capture: the packaged room needs no manual sensor workflow.
+      this.roomCaptureCompleted = true;
+    });
     interfaceBrands.viewerPoses.set(this, (frame, reference) => allocateViewerPose(frame, reference));
     // Capture this injection's constructors, Promise and task queue. Borrowed
     // operations must allocate in the session's relevant realm (Device §6.2).
@@ -297,12 +304,12 @@ export class XRSession extends interfaceBrands.SessionObject {
     // Device §4.3 suspends inline frames independently of §4.1 visibility.
     this.immersiveSuppressed = value;
   }
-  async initiateRoomCapture() {
-    this._assertLive();
-    if (this.roomCaptureCompleted) invalidState('Room capture already completed.');
-    this._require('plane-detection');
-    // The packaged room loads automatically; there is no manual sensor capture.
-    this.roomCaptureCompleted = true;
+  initiateRoomCapture(): Promise<void> {
+    try {
+      const capture = interfaceBrands.roomCaptures.get(this);
+      if (!capture) throw new TypeError('Expected XRSession receiver.');
+      return capture();
+    } catch (error) { return Promise.reject(error); }
   }
   requestReferenceSpace(type: unknown): Promise<XRReferenceSpace> {
     try {
@@ -509,7 +516,7 @@ export class XRFrame extends interfaceBrands.FrameObject {
     this._assertActive(true); state.session._owns(referenceSpace);
     return interfaceBrands.viewerPoses.get(state.session)!(this, referenceSpace);
   }
-  get detectedPlanes() { this._assertActive(); return this.environmentSnapshot.planes; }
+  get detectedPlanes() { frameState(this); this._assertActive(); return this.environmentSnapshot.planes; }
   get detectedMeshes() { this._assertActive(); return this.environmentSnapshot.meshes; }
   get trackedAnchors() { this._assertActive(); this.session._require('anchors'); return this.anchorSnapshot; }
   async createAnchor(pose: XRRigidTransform, space: XRSpace) {

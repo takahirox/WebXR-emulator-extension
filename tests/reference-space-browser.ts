@@ -11,15 +11,28 @@ import {attachTarget, getTargets} from './cdp-target';
 import {referenceSpaceCases} from './reference-space';
 import {rigidTransformCases} from './rigid-transform';
 import {poseViewCases} from './pose-view';
+import {planeCases} from './planes';
+import {runPlaneApplications} from './plane-applications';
 
 const browser = process.argv[2];
+const applications = process.argv[3] === 'plane-applications';
+const planes = process.argv[3] === 'planes';
 const transforms = process.argv[3] === 'transforms';
 const poses = process.argv[3] === 'poses';
-const selection = poses ? 'pose-view' : transforms ? 'rigid-transform' : 'reference-space';
-const cases = poses ? poseViewCases : transforms ? rigidTransformCases : referenceSpaceCases;
+const selection = applications ? 'planes-applications' : planes ? 'planes-contract' : poses ? 'pose-view' : transforms ? 'rigid-transform' : 'reference-space';
+const cases = planes ? planeCases : poses ? poseViewCases : transforms ? rigidTransformCases : referenceSpaceCases;
 assert(['chromium', 'firefox'].includes(browser), 'Select chromium or firefox');
-const {origin, server} = await serveFirefoxFixtures();
-const report: any = {issue: poses ? 49 : transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: poses ? ['Genuine separately injected iframe and popup constructors, getters and borrowed operations; real inline animation frames in all three realms.', 'Inspect _device, _session, callbacks.size and _presentationCanvas for ownership, calibration/presentation, cleanup and controlled input-button events.', 'Construct explicit unavailable/estimated XRSpace providers; mark _emulatedPosition only for the estimated-provider case. Temporarily remove/restore one gamepad slot synchronously for existing joint tracking loss; toggle/restore one existing input slot for source retirement/reacquisition. Await real AR room readiness. Firefox WebDriver activates the actual main/popup windows for realm inline frames, without modifying visibility. No GL, timers or animation callbacks replaced.'] : transforms ? ['Real injected iframe/popup realms; application-visible matrix transfers, pose queries and WebGL triangle pixels.', 'Inspect _session ownership, callbacks.size and the real layer _presentationCanvas for presented pixels/captures; no adapter, GL or timer replacements.'] : [
+const {origin, server, provenance} = await serveFirefoxFixtures();
+const report: any = {issue: planes || applications ? 51 : poses ? 49 : transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: applications ? [
+  'Unchanged pinned applications and their dependencies; only Sample existing overlay checkbox disabled.',
+  'Three.js observe events installed before scripts; original scene.onBeforeRender called with original arguments. Chromium panel bootstrap paused once to install observer, then resumed before running scenarios.',
+  'XR request/frame/pose/createAnchor observation preserves arguments, return values and exceptions; inspect application scene geometry, actual presentation canvas, retained plane spaces and cleanup counters.',
+  'Genuine panel TransformControls changes viewer/phone poses; real Quest panel button clicks and desktop right-click on the rendered Android phone dispatch selection. No application geometry or logic replaced.',
+] : planes ? [
+  'Genuine injected iframe and main realm interfaces and borrowed operations; real RAF and extension panel configuration.',
+  'API fixture temporarily moves/scales the actual room, removes/restores its room pointer, and makes one plane native provider unavailable; restored in cleanup. These controls are absent from application scenarios.',
+  'WPT assertions adapted from pinned e185958; see docs/webxr-planes.md for fake-device setup differences.',
+] : poses ? ['Genuine separately injected iframe and popup constructors, getters and borrowed operations; real inline animation frames in all three realms.', 'Inspect _device, _session, callbacks.size and _presentationCanvas for ownership, calibration/presentation, cleanup and controlled input-button events.', 'Construct explicit unavailable/estimated XRSpace providers; mark _emulatedPosition only for the estimated-provider case. Temporarily remove/restore one gamepad slot synchronously for existing joint tracking loss; toggle/restore one existing input slot for source retirement/reacquisition. Await real AR room readiness. Firefox WebDriver activates the actual main/popup windows for realm inline frames, without modifying visibility. No GL, timers or animation callbacks replaced.'] : transforms ? ['Real injected iframe/popup realms; application-visible matrix transfers, pose queries and WebGL triangle pixels.', 'Inspect _session ownership, callbacks.size and the real layer _presentationCanvas for presented pixels/captures; no adapter, GL or timer replacements.'] : [
   'Inspect session pendingReferenceRequests sizes for release; access _device/_id only for targeted races.',
   'Temporarily replace adapter transform method with controlled Promises; restore in finally.',
   'Capture real timer callbacks through calling-task microtasks; restore timers, shut down, then replay cancelled callbacks.',
@@ -50,8 +63,16 @@ try {
   if (browser === 'firefox') {
     const firefox = await launchFirefox(); close = () => firefox.close();
     report.versions = firefox.versions;
+    if (applications) await firefox.bidi('script.addPreloadScript', {functionDeclaration: await readFile('tests/firefox-scenes.js','utf8')});
     await firefox.navigate(origin + '/csp'); await firefox.openPanel();
-    for (const [device, selected, mode] of scenarios) {
+    if (applications) report.results=await runPlaneApplications({
+      browser,origin,navigate:url=>firefox.navigate(url),configure:device=>configure(firefox,device,'immersive-ar'),
+      evaluate:(script,args)=>firefox.evaluate(script,args),panel:(script,args)=>firefox.panel(script,args),
+      clickEntry:async()=>{const button=await firefox.evaluate<Record<string,string>>(`return [...document.querySelectorAll('button')].find(b=>/START|ENTER/.test(b.textContent)&&!b.disabled)`);await firefox.request('POST',`/element/${button['element-6066-11e4-a52e-4f735466cecf']}/click`,{});},
+      screenshot:async()=>Buffer.from(await firefox.request<string>('GET','/screenshot'),'base64'),
+      phoneSelect:point=>firefox.request('POST','/actions',{actions:[{type:'pointer',id:'mouse',parameters:{pointerType:'mouse'},actions:[{type:'pointerMove',duration:100,origin:'viewport',...point},{type:'pointerDown',button:2},{type:'pause',duration:150},{type:'pointerUp',button:2}]}]}),
+    });
+    else for (const [device, selected, mode] of scenarios) {
       console.log('scenario', browser, device, mode);
       await configure(firefox, device, selected); await firefox.navigate(origin + '/csp');
       const start = firefox.logs.length;
@@ -81,6 +102,8 @@ try {
       report.results.push({device, selected, ...result as object, errors});
       await writeFile(filename, JSON.stringify(report, null, 2));
     }
+    report.browserFetches=firefox.network;report.runtimeErrors=firefox.logs.filter(log=>log.level==='error');
+    if(applications)assert.deepEqual(report.runtimeErrors,[],'no application runtime errors');
     await close(); close = undefined;
     report.cleanup = firefox.cleanup;
     assert(Object.values(firefox.cleanup).every(Boolean), 'Firefox owned resources cleaned up');
@@ -98,7 +121,9 @@ try {
       executableSHA256: createHash('sha256').update(await readFile(executable)).digest('hex')};
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
     assert(worker.url().endsWith('/dist/extension/background.js'));
-    const page = await context.newPage(); await page.goto(origin + '/csp');
+    const page = await context.newPage();
+    if(applications)await page.addInitScript((await readFile('tests/firefox-scenes.js','utf8'))+';observeScenes();');
+    await page.goto(origin + '/csp');
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
     const cdp = await context.newCDPSession(page);
     const info = await eventually(async () => (await getTargets(cdp)).find(t => t.url.startsWith('devtools://') && t.title.includes(new URL(origin).host)), Boolean, 'real Chromium DevTools target');
@@ -113,8 +138,30 @@ try {
     }), Boolean, 'registered WebXR tool');
     const panelInfo = await eventually(async () => (await getTargets(cdp)).find(t => t.url.endsWith('/src/app/panel.html')), Boolean, 'actual panel target');
     const panel = await attachTarget(cdp, panelInfo!.targetId); targets.push(panel);
-    await eventually(() => panel.evaluate(() => !!document.querySelector('#deviceSelect')), Boolean, 'panel controls');
-    for (const [device, selected, mode] of scenarios) {
+    await eventually(() => panel.evaluate(() => !!document.querySelector('#rightControllerPosition')?.textContent), Boolean, 'panel controls and model readiness');
+    if(applications) {
+      const observed=await readFile('tests/firefox-scenes.js','utf8');
+      await panel.command('Debugger.enable',{});
+      const extensionOrigin=worker.url().slice(0,worker.url().indexOf('/','chrome-extension://'.length));
+      const {breakpointId}=await panel.command<{breakpointId:string}>('Debugger.setBreakpointByUrl',{url:extensionOrigin+'/dist/app/panel.js',lineNumber:0});
+      const paused=panel.nextEvent<{callFrames:{callFrameId:string}[]}>('Debugger.paused');
+      await panel.evaluate(()=>location.reload());const pause=await paused;
+      await panel.command('Debugger.evaluateOnCallFrame',{callFrameId:pause.callFrames[0].callFrameId,expression:observed+';observeScenes();'});
+      await panel.command('Debugger.removeBreakpoint',{breakpointId});await panel.command('Debugger.resume',{});await panel.command('Debugger.disable',{});
+      await eventually(()=>panel.evaluate(()=>!!(window as any).firefoxScenes?.length && !!document.querySelector('#rightControllerPosition')?.textContent),Boolean,'observed real panel/assets');
+      report.results=await runPlaneApplications({
+        browser,origin,navigate:async url=>{await page.goto(url);await page.bringToFront();},
+        configure:async device=>{
+          await panel.evaluate(device=>{const d=document.querySelector('#deviceSelect') as HTMLSelectElement;d.value=device;d.dispatchEvent(new Event('change'));const m=document.querySelector('#questModeSelect') as HTMLSelectElement;m.value='immersive-ar';m.dispatchEvent(new Event('change'));},device);
+          await eventually(()=>worker.evaluate(async()=>JSON.parse((await chrome.storage.local.get('webxr-extension'))['webxr-extension'] as string || '{}')),v=>v.deviceKey===device && v.questMode==='immersive-ar','saved real panel configuration');
+        },
+        evaluate:(script,args=[])=>page.evaluate(`(function(){${script}}).apply(null,${JSON.stringify(args)})`),
+        panel:async(script,args=[])=>{const r=await panel.command<any>('Runtime.evaluate',{expression:`(function(){${script}}).apply(null,${JSON.stringify(args)})`,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value;},
+        clickEntry:async()=>{await page.getByRole('button',{name:/START AR|ENTER AR/}).click();},
+        screenshot:()=>page.screenshot(),phoneSelect:async point=>{await page.mouse.click(point.x,point.y,{button:'right',delay:150});},
+      });
+      assert.deepEqual(errors,[],'no application runtime errors');
+    } else for (const [device, selected, mode] of scenarios) {
       console.log('scenario', browser, device, mode);
       await panel.evaluate(({device, selected}) => {
         const d = document.querySelector('#deviceSelect') as HTMLSelectElement; d.value = device; d.dispatchEvent(new Event('change'));
@@ -141,10 +188,11 @@ try {
 finally {
   await close?.(); server.close();
   report.completedAt = new Date().toISOString();
+  report.servedSources=[...provenance.values()];
   report.provenance = {};
-  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'package.json', 'src/polyfill/api/layer-allocation.ts', 'tests/environment.ts', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/pose-view.ts', 'src/polyfill/api/sensing.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
+  for (const file of ['src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'package.json', 'src/polyfill/api/layer-allocation.ts', 'tests/environment.ts', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/pose-view.ts', 'src/polyfill/api/environment.ts', 'src/polyfill/api/plane-regions.ts', 'tests/planes.ts', 'tests/plane-applications.ts', 'src/polyfill/api/sensing.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
     report.provenance[file] = createHash('sha256').update(await readFile(file)).digest('hex');
   }
   await writeFile(filename, JSON.stringify(report, null, 2));
-  console.log(JSON.stringify({status: report.status, browser, scenarios: report.results.length, assertions: report.results.reduce((n: number, r: any) => n+r.assertions, 0), failures: report.failures}));
+  console.log(JSON.stringify({status: report.status, browser, scenarios: report.results.length, assertions: report.results.reduce((n: number, r: any) => n+(r.assertions??0), 0), failures: report.failures}));
 }

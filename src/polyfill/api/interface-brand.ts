@@ -28,6 +28,13 @@ function createBrands() {
   Object.freeze(InputSourceObject.prototype); Object.freeze(InputSourceObject);
   return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
     layerAllocations: createLayerAllocations(sessions),
+    planeValues: new WeakMap<object, {
+      space: import('./geometry').XRSpace; polygon: readonly DOMPointReadOnly[];
+      orientation: 'horizontal' | 'vertical' | null; changed: number;
+      matrix: mat4 | null; signature: number[];
+    }>(),
+    planeSets: new WeakMap<object, Set<import('./environment').XRPlane>>(),
+    roomCaptures: new WeakMap<object, () => Promise<void>>(),
     // Invoke the session realm's operation without consulting public properties.
     transforms: new WeakMap<object, {
       position: DOMPointReadOnly; orientation: DOMPointReadOnly; geometry: mat4;
