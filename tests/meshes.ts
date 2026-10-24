@@ -7,9 +7,9 @@ export async function meshCases(mode: SessionMode) {
   function check(value:unknown,label:string) {if(!value) throw new Error(`${mode}: ${label}`);passed.push(label);}
   function throws(fn:()=>unknown,name:string,label:string) {let error:any;try{fn();}catch(e){error=e;}check(error?.name===name,label);}
   async function rejects(p:Promise<unknown>,name:string,label:string) {let error:any;try{await p;}catch(e){error=e;}check(error?.name===name,label);}
-  function request(options:any) {return new Promise<any>((resolve,reject)=>{
+  function request(options:any,realm:any=w) {return new Promise<any>((resolve,reject)=>{
     const b=document.createElement('button');b.id='reference-space-session';b.textContent='Start mesh contract';b.style.cssText='position:fixed;top:0;left:0;z-index:2147483647';
-    b.onclick=()=>{b.remove();w.navigator.xr.requestSession(mode,options).then(resolve,reject);};document.body.append(b);
+    b.onclick=()=>{b.remove();realm.navigator.xr.requestSession(mode,options).then(resolve,reject);};document.body.append(b);
   });}
   const sessions:any[]=[], child=document.createElement('iframe'); child.src='/frame';
   const ready=new Promise<void>(resolve=>{child.onload=()=>resolve();});document.body.append(child);await ready;
@@ -140,6 +140,48 @@ export async function meshCases(mode: SessionMode) {
     check(session._environment.snapshot().meshes.size===0 && fresh.meshSpace._update()===null,'shutdown retires tracking');
     check(l._presentationCanvas===null || !l._presentationCanvas.isConnected,'shutdown releases presentation');
     check(first.mesh.vertices.length===9 && first.mesh.semanticLabel===null,'retained metadata readable after end');
+    // The shared tracker was allocated by the main injection. It must also
+    // traverse Three.js room objects allocated by a separately injected child.
+    const childSession=await request({requiredFeatures:['mesh-detection','plane-detection']},other);sessions.push(childSession);
+    const childLayer=await layer(childSession,other),childReference=await childSession.requestReferenceSpace('local');
+    const childDeadline=Date.now()+20000;
+    while(!childSession._device.arScene?.room) {if(Date.now()>childDeadline)throw new Error('child room timeout');await new Promise(r=>setTimeout(r,30));}
+    const childFirst=await frame(childSession,f=>{
+      const set=f.detectedMeshes,meshes=[...set],planes=f.detectedPlanes;
+      check(meshes.length>0 && planes.size>0,'populated child-realm AR mesh and plane collections');
+      check(set.size===first.set.size,'child room publishes the complete mesh partition');
+      check(Object.getPrototypeOf(f)===other.XRFrame.prototype && Object.getPrototypeOf(set)===other.XRMeshSet.prototype,'child frame and set retain realm-local prototypes');
+      for(const realm of [w,other]) {
+        const proto=realm.XRMeshSet.prototype;
+        check(Object.getOwnPropertyDescriptor(realm.XRFrame.prototype,'detectedMeshes')!.get!.call(f)===set,'borrowed frame getter accepts active child AR frame');
+        check(Object.getOwnPropertyDescriptor(proto,'size')!.get!.call(set)===meshes.length,'borrowed size accepts populated child AR set');
+        check([...proto.values.call(set)].every((m,i)=>m===meshes[i]),'borrowed values preserve child AR insertion order');
+        check([...proto.entries.call(set)].every(([a,b],i)=>a===b && a===meshes[i]),'borrowed child AR entries are paired');
+        let count=0;const receiver={};
+        proto.forEach.call(set,function(this:unknown,m:any,k:any,s:any){check(this===receiver && m===k && s===set && m===meshes[count++],'borrowed child AR callback arguments and order');},receiver);
+        check(count===meshes.length,'borrowed child AR callbacks visit all meshes');
+        for(const mesh of meshes) {
+          check(Object.getPrototypeOf(mesh)===other.XRMesh.prototype,'child mesh retains realm-local prototype');
+          check(proto.has.call(set,mesh) && !proto.has.call(set,first.mesh),'borrowed has accepts child members and genuine foreign nonmembers');
+          for(const name of ['meshSpace','vertices','indices','lastChangedTime','semanticLabel']) {
+            const get=Object.getOwnPropertyDescriptor(realm.XRMesh.prototype,name)!.get!;
+            check(name==='vertices'||name==='indices'?Array.from(get.call(mesh)).join()===Array.from(mesh[name]).join():get.call(mesh)===mesh[name],'borrowed getter accepts genuine child AR mesh');
+            throws(()=>get.call(new Proxy(mesh,{})),'TypeError','borrowed getter rejects proxied child AR mesh');
+          }
+          check(!!realm.XRFrame.prototype.getPose.call(f,mesh.meshSpace,childReference),'borrowed pose resolves child-owned mesh space');
+          throws(()=>realm.XRFrame.prototype.getPose.call(f,mesh.meshSpace,reference),'InvalidStateError','child mesh rejects foreign-session base');
+          throws(()=>realm.XRFrame.prototype.getPose.call(f,first.space,childReference),'InvalidStateError','child frame rejects main-session mesh space');
+        }
+        throws(()=>proto.has.call(set,new Proxy(meshes[0],{})),'TypeError','borrowed has rejects proxied child mesh');
+        throws(()=>proto.values.call(new Proxy(set,{})),'TypeError','borrowed values rejects proxied child set');
+      }
+      measurements.push({realm:'child',meshes:set.size,planes:planes.size});
+      return {frame:f,mesh:meshes[0]};
+    });
+    for(const realm of [w,other]) throws(()=>Object.getOwnPropertyDescriptor(realm.XRFrame.prototype,'detectedMeshes')!.get!.call(childFirst.frame),'InvalidStateError','borrowed child frame getter rejects inactive frame');
+    await childSession.end();
+    check(childSession._environment.snapshot().meshes.size===0 && childFirst.mesh.meshSpace._update()===null,'child session shutdown retires mesh tracking');
+    check(childLayer._presentationCanvas===null || !childLayer._presentationCanvas.isConnected,'child session shutdown releases presentation');
     const disabled=await request({});sessions.push(disabled);await layer(disabled);
     await frame(disabled,f=>check(f.detectedMeshes.size===0,'AR unenabled active collection empty'));
     await disabled.end();

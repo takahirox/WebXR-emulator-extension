@@ -24235,7 +24235,7 @@ void main() {
 
   function roomMeshes(room) {
       const meshes = [];
-      room === null || room === void 0 ? void 0 : room.traverse(object => { if (object instanceof Mesh && object.name !== 'sky')
+      room === null || room === void 0 ? void 0 : room.traverse(object => { if (object.isMesh === true && object.name !== 'sky')
           meshes.push(object); });
       return meshes;
   }

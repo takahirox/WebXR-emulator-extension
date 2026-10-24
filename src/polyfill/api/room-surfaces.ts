@@ -6,7 +6,9 @@ import type {mat4} from 'gl-matrix';
  * The decorative sky is excluded. No camera/recognition is used. */
 export function roomMeshes(room: Object3D | null) {
   const meshes: Mesh[] = [];
-  room?.traverse(object => { if (object instanceof Mesh && object.name !== 'sky') meshes.push(object); });
+  // Shared trackers can read rooms created by another injection's Three.js.
+  // Its Mesh constructor has a different identity; use Three.js's type marker.
+  room?.traverse(object => { if ((object as Mesh).isMesh === true && object.name !== 'sky') meshes.push(object as Mesh); });
   return meshes;
 }
 export interface Surface {
