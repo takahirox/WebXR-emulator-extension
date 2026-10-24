@@ -1,10 +1,10 @@
 {
   "issue": 49,
   "status": "passed",
-  "recordedAt": "2026-10-24T01:22:37.284298+00:00",
+  "recordedAt": "2026-10-24T01:31:14.722Z",
   "evaluationBaseline": "baf056097b1a366a61927e75666473ce44793ba9",
-  "executionBaseCommit": "080867051b0098c18578e5f7d5c5c66e897f8351",
-  "testedRevision": "Issue #49 working tree, identified by exact source and executable bundle hashes below. The final checkpoint commit is reported in the node Result.",
+  "executionBaseCommit": "e4c4241fa44de51b4b6ac45129529ee3a2b5ef68",
+  "testedRevision": "Issue #49 review-fix working tree, identified by exact source and executable bundle hashes below. Pose/view runs and listed checks were refreshed for the document.all conversion fix. Related rigid-transform/reference-space runs retain their original implementation-stage provenance and were not rerun. The final checkpoint commit is reported in the node Result.",
   "sourceIssue": "https://github.com/takahirox/WebXR-emulator-extension/issues/49",
   "checks": [
     {
@@ -33,7 +33,7 @@
       "issue": 49,
       "browser": "chromium",
       "status": "passed",
-      "startedAt": "2026-10-24T01:16:50.349Z",
+      "startedAt": "2026-10-24T01:29:23.813Z",
       "failures": [],
       "skips": [],
       "instrumentation": [
@@ -51,11 +51,11 @@
         "contextClosed": true,
         "profileRemoved": true
       },
-      "completedAt": "2026-10-24T01:16:59.156Z",
+      "completedAt": "2026-10-24T01:29:40.198Z",
       "provenance": {
         "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
         "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
-        "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+        "src/polyfill/api/geometry.ts": "3c4ab7a879249113f45c030d52e14726f0ee87223f8ff939ee0c9ec53db22d81",
         "src/polyfill/api/XRRay.ts": "f05bda68251ce1afd949a50d581db9f8aa356350678e7d102077ac09ee881b74",
         "src/polyfill/api/XRHitTestResult.ts": "d1cf9f42dd4b2df8880f69bdfade63ffb99138d9a0697b02f3f9bd915846dd89",
         "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
@@ -68,26 +68,26 @@
         "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
         "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
         "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
-        "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+        "tests/pose-view.ts": "83c432a6b0a7e27e6f8fec7d2ba5e33b73e54d35eed8326143e0132a352cb9a1",
         "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
         "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
-        "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
-        "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+        "polyfill/webxr-polyfill.js": "dd038380ed86ecdffcf3055b5e9f69746fbd7266afcdf23eb32456b3e7c77d29",
+        "build/firefox/polyfill/webxr-polyfill.js": "dd038380ed86ecdffcf3055b5e9f69746fbd7266afcdf23eb32456b3e7c77d29"
       },
       "selection": "pose-view",
       "command": "npm run test:pose-view:chromium",
-      "rawReportSHA256": "c1cd5139c6cf72a02063447c83bc2f3ae222a70063271459c67c46831ca57fda",
-      "durationSeconds": 8.807,
+      "rawReportSHA256": "76be7d5ae4ddc5a4200761c5a227b55fe2e810201a801c82b2a0f87160b71f19",
+      "durationSeconds": 16.385,
       "results": [
         {
           "device": "Meta Quest 3",
           "selected": "immersive-vr",
           "mode": "immersive-vr",
-          "assertions": 6904,
+          "assertions": 6907,
           "adaptations": [],
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "10af5311257e37d75d38e1f01d27e6f8ede4876bf111c740a41dafe1af845a0b",
+          "assertionLabelsSHA256": "9668f0d4d32189a8a3f1d22f59a555359c740fd52bc78c632c8ef8692593f832",
           "rendering": [
             {
               "label": "base-before",
@@ -121,7 +121,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-base-before.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             },
             {
               "label": "base-transfer",
@@ -155,7 +157,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-base-transfer.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             },
             {
               "label": "base-navigation",
@@ -189,7 +193,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-base-navigation.png",
-              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d"
+              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d",
+              "executedCaptureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d",
+              "captureRasterDataSHA256": "715188e3f8e8d577e47c7e004e04104f838bd6547dae267564799591f00b05b2"
             },
             {
               "label": "projection-before",
@@ -223,7 +229,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-projection-before.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             },
             {
               "label": "projection-transfer",
@@ -257,7 +265,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-projection-transfer.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             },
             {
               "label": "projection-navigation",
@@ -291,7 +301,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-projection-navigation.png",
-              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d"
+              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d",
+              "executedCaptureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d",
+              "captureRasterDataSHA256": "715188e3f8e8d577e47c7e004e04104f838bd6547dae267564799591f00b05b2"
             },
             {
               "label": "restart",
@@ -325,7 +337,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-vr-restart.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             }
           ]
         },
@@ -333,11 +347,11 @@
           "device": "Meta Quest 3",
           "selected": "immersive-ar",
           "mode": "immersive-ar",
-          "assertions": 6915,
+          "assertions": 6918,
           "adaptations": [],
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "bbb1e05859e9a5094aea785ac4047d3d381bf0ac0d47f70c3cc380c7708de91f",
+          "assertionLabelsSHA256": "1f9e0262f8bb3804cb7f7f2f655683b0f653d1c881d90e3f2ec2725794d9acbc",
           "rendering": [
             {
               "label": "base-before",
@@ -371,7 +385,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-base-before.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             },
             {
               "label": "base-transfer",
@@ -405,7 +421,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-base-transfer.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             },
             {
               "label": "base-navigation",
@@ -439,7 +457,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-base-navigation.png",
-              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d"
+              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d",
+              "executedCaptureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d",
+              "captureRasterDataSHA256": "715188e3f8e8d577e47c7e004e04104f838bd6547dae267564799591f00b05b2"
             },
             {
               "label": "projection-before",
@@ -473,7 +493,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-projection-before.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             },
             {
               "label": "projection-transfer",
@@ -507,7 +529,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-projection-transfer.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             },
             {
               "label": "projection-navigation",
@@ -541,7 +565,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-projection-navigation.png",
-              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d"
+              "captureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d",
+              "executedCaptureSHA256": "92e16220eae736257687ec78601f31c35cfd4c30bc1a8af00dd58dc25b56ab2d",
+              "captureRasterDataSHA256": "715188e3f8e8d577e47c7e004e04104f838bd6547dae267564799591f00b05b2"
             },
             {
               "label": "restart",
@@ -575,7 +601,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-immersive-ar-restart.png",
-              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e"
+              "captureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "executedCaptureSHA256": "f9b603f4302e232fbf087c5f6126f29e274d2c0239afc9997ad6951e1a2cf93e",
+              "captureRasterDataSHA256": "1ab35bc3cf50b5687dcea11a17bc58ff829838ccc6d710da4d458e36bc68e699"
             }
           ]
         },
@@ -583,11 +611,11 @@
           "device": "Generic Android Phone (ARCore)",
           "selected": "immersive-ar",
           "mode": "immersive-ar",
-          "assertions": 5968,
+          "assertions": 5971,
           "adaptations": [],
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "ce7d5c06a7b4b6a00553d626f23083f21ee66857bb8048d78435c20b964b8519",
+          "assertionLabelsSHA256": "5de1ba5cd893ecfe3c7f7d17fd2f6606b184f41acc7b23becf9f7eb759109834",
           "rendering": [
             {
               "label": "base-before",
@@ -608,7 +636,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-base-before.png",
-              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "executedCaptureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "captureRasterDataSHA256": "ecc467cb09f2a0d41d33e56169eef5de22d367c6d40683bd41d10b0bfae87ca7"
             },
             {
               "label": "base-transfer",
@@ -629,7 +659,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-base-transfer.png",
-              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "executedCaptureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "captureRasterDataSHA256": "ecc467cb09f2a0d41d33e56169eef5de22d367c6d40683bd41d10b0bfae87ca7"
             },
             {
               "label": "base-navigation",
@@ -650,7 +682,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-base-navigation.png",
-              "captureSHA256": "d3da2189416a7616f5314a09463779e1159ad077b20d9d01717a0a8517b2c22a"
+              "captureSHA256": "d3da2189416a7616f5314a09463779e1159ad077b20d9d01717a0a8517b2c22a",
+              "executedCaptureSHA256": "d3da2189416a7616f5314a09463779e1159ad077b20d9d01717a0a8517b2c22a",
+              "captureRasterDataSHA256": "bcad8ff675c954bf2dc73355746360f9cb2fd7c32cf5ddfa74bf3489018694b7"
             },
             {
               "label": "projection-before",
@@ -671,7 +705,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-projection-before.png",
-              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "executedCaptureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "captureRasterDataSHA256": "ecc467cb09f2a0d41d33e56169eef5de22d367c6d40683bd41d10b0bfae87ca7"
             },
             {
               "label": "projection-transfer",
@@ -692,7 +728,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-projection-transfer.png",
-              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "executedCaptureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "captureRasterDataSHA256": "ecc467cb09f2a0d41d33e56169eef5de22d367c6d40683bd41d10b0bfae87ca7"
             },
             {
               "label": "projection-navigation",
@@ -713,7 +751,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-projection-navigation.png",
-              "captureSHA256": "d3da2189416a7616f5314a09463779e1159ad077b20d9d01717a0a8517b2c22a"
+              "captureSHA256": "d3da2189416a7616f5314a09463779e1159ad077b20d9d01717a0a8517b2c22a",
+              "executedCaptureSHA256": "d3da2189416a7616f5314a09463779e1159ad077b20d9d01717a0a8517b2c22a",
+              "captureRasterDataSHA256": "bcad8ff675c954bf2dc73355746360f9cb2fd7c32cf5ddfa74bf3489018694b7"
             },
             {
               "label": "restart",
@@ -734,7 +774,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-immersive-ar-restart.png",
-              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121"
+              "captureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "executedCaptureSHA256": "a40deac7931d037ac41f69c67aa443535ebe1583cb1d3750041a81c6ca21f121",
+              "captureRasterDataSHA256": "ecc467cb09f2a0d41d33e56169eef5de22d367c6d40683bd41d10b0bfae87ca7"
             }
           ]
         },
@@ -742,13 +784,13 @@
           "device": "Meta Quest 3",
           "selected": "immersive-vr",
           "mode": "inline",
-          "assertions": 5930,
+          "assertions": 5933,
           "adaptations": [
             "Inline has no input/depth/hand features; immersive scenarios exercise their existing paths."
           ],
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "a6c9dcc45bc0d2ab9048240cb63b8310afad7d741b4cd8425753ca7c26e3eb34",
+          "assertionLabelsSHA256": "59625021e82da5eb6d25983114577f1746d7f64d0b98a6b29a381c86f6de538c",
           "rendering": [
             {
               "label": "base-before",
@@ -768,7 +810,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-inline-base-before.png",
-              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "executedCaptureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "captureRasterDataSHA256": "908b521d882493ba839337142f0f2f70f98d75152ab1aefe7b8b7b6de36eb893"
             },
             {
               "label": "base-transfer",
@@ -788,7 +832,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-inline-base-transfer.png",
-              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "executedCaptureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "captureRasterDataSHA256": "908b521d882493ba839337142f0f2f70f98d75152ab1aefe7b8b7b6de36eb893"
             },
             {
               "label": "base-navigation",
@@ -808,7 +854,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-inline-base-navigation.png",
-              "captureSHA256": "94c6ba5e4e95c3c1bdbb140d374101db07adf95678add6cea9551944807815e8"
+              "captureSHA256": "94c6ba5e4e95c3c1bdbb140d374101db07adf95678add6cea9551944807815e8",
+              "executedCaptureSHA256": "94c6ba5e4e95c3c1bdbb140d374101db07adf95678add6cea9551944807815e8",
+              "captureRasterDataSHA256": "b8f8e9651b62c7e88359994fd7045ec70290601f7d698ef2a77cb0b8dc1a9427"
             },
             {
               "label": "restart",
@@ -828,7 +876,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-quest-inline-restart.png",
-              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "executedCaptureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "captureRasterDataSHA256": "908b521d882493ba839337142f0f2f70f98d75152ab1aefe7b8b7b6de36eb893"
             }
           ]
         },
@@ -836,13 +886,13 @@
           "device": "Generic Android Phone (ARCore)",
           "selected": "immersive-ar",
           "mode": "inline",
-          "assertions": 5930,
+          "assertions": 5933,
           "adaptations": [
             "Inline has no input/depth/hand features; immersive scenarios exercise their existing paths."
           ],
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "a6c9dcc45bc0d2ab9048240cb63b8310afad7d741b4cd8425753ca7c26e3eb34",
+          "assertionLabelsSHA256": "59625021e82da5eb6d25983114577f1746d7f64d0b98a6b29a381c86f6de538c",
           "rendering": [
             {
               "label": "base-before",
@@ -862,7 +912,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-inline-base-before.png",
-              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "executedCaptureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "captureRasterDataSHA256": "908b521d882493ba839337142f0f2f70f98d75152ab1aefe7b8b7b6de36eb893"
             },
             {
               "label": "base-transfer",
@@ -882,7 +934,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-inline-base-transfer.png",
-              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "executedCaptureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "captureRasterDataSHA256": "908b521d882493ba839337142f0f2f70f98d75152ab1aefe7b8b7b6de36eb893"
             },
             {
               "label": "base-navigation",
@@ -902,7 +956,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-inline-base-navigation.png",
-              "captureSHA256": "94c6ba5e4e95c3c1bdbb140d374101db07adf95678add6cea9551944807815e8"
+              "captureSHA256": "94c6ba5e4e95c3c1bdbb140d374101db07adf95678add6cea9551944807815e8",
+              "executedCaptureSHA256": "94c6ba5e4e95c3c1bdbb140d374101db07adf95678add6cea9551944807815e8",
+              "captureRasterDataSHA256": "b8f8e9651b62c7e88359994fd7045ec70290601f7d698ef2a77cb0b8dc1a9427"
             },
             {
               "label": "restart",
@@ -922,17 +978,20 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-chromium-android-inline-restart.png",
-              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828"
+              "captureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "executedCaptureSHA256": "ee349de039eeafb9a74157ed9d527a138d9b937c1844d598e1736653ef8af828",
+              "captureRasterDataSHA256": "908b521d882493ba839337142f0f2f70f98d75152ab1aefe7b8b7b6de36eb893"
             }
           ]
         }
-      ]
+      ],
+      "captureReuse": "Retain the existing versioned captures after exact comparison of IHDR and decompressed IDAT data. Pixels and measured centroids are unchanged. Firefox deBG metadata differs; executedCaptureSHA256 identifies the fresh PNG and captureSHA256 identifies the versioned PNG."
     },
     {
       "issue": 49,
       "browser": "firefox",
       "status": "passed",
-      "startedAt": "2026-10-24T01:17:28.832Z",
+      "startedAt": "2026-10-24T01:29:45.466Z",
       "failures": [],
       "skips": [],
       "instrumentation": [
@@ -957,11 +1016,11 @@
         "driverStopped": true,
         "profileRemoved": true
       },
-      "completedAt": "2026-10-24T01:17:48.727Z",
+      "completedAt": "2026-10-24T01:30:12.151Z",
       "provenance": {
         "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
         "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
-        "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+        "src/polyfill/api/geometry.ts": "3c4ab7a879249113f45c030d52e14726f0ee87223f8ff939ee0c9ec53db22d81",
         "src/polyfill/api/XRRay.ts": "f05bda68251ce1afd949a50d581db9f8aa356350678e7d102077ac09ee881b74",
         "src/polyfill/api/XRHitTestResult.ts": "d1cf9f42dd4b2df8880f69bdfade63ffb99138d9a0697b02f3f9bd915846dd89",
         "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
@@ -974,26 +1033,26 @@
         "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
         "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
         "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
-        "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+        "tests/pose-view.ts": "83c432a6b0a7e27e6f8fec7d2ba5e33b73e54d35eed8326143e0132a352cb9a1",
         "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
         "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
-        "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
-        "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+        "polyfill/webxr-polyfill.js": "dd038380ed86ecdffcf3055b5e9f69746fbd7266afcdf23eb32456b3e7c77d29",
+        "build/firefox/polyfill/webxr-polyfill.js": "dd038380ed86ecdffcf3055b5e9f69746fbd7266afcdf23eb32456b3e7c77d29"
       },
       "selection": "pose-view",
       "command": "WEBXR_FIREFOX_EXECUTABLE=\"$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox\" WEBXR_GECKODRIVER=\"$PWD/test-results/browser-tools/geckodriver\" npm run test:pose-view:firefox",
-      "rawReportSHA256": "8f00abb554cfd95ae1fc52c694d8def5cd0d88b58eb3da1eccdf0632bb295e10",
-      "durationSeconds": 19.895,
+      "rawReportSHA256": "bd3916397e1ffe509deb87d0cc13ab956720802af26b5cca0c783639741c1f41",
+      "durationSeconds": 26.685,
       "results": [
         {
           "device": "Meta Quest 3",
           "selected": "immersive-vr",
           "adaptations": [],
-          "assertions": 6904,
+          "assertions": 6907,
           "mode": "immersive-vr",
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "10af5311257e37d75d38e1f01d27e6f8ede4876bf111c740a41dafe1af845a0b",
+          "assertionLabelsSHA256": "9668f0d4d32189a8a3f1d22f59a555359c740fd52bc78c632c8ef8692593f832",
           "rendering": [
             {
               "label": "base-before",
@@ -1027,7 +1086,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-base-before.png",
-              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4",
+              "executedCaptureSHA256": "cc1e178c61e3f247d67291e1c41b9fbe50c69a76605353400f1f07000c9ff4e2",
+              "captureRasterDataSHA256": "6be796b9f9f40f3b2b1eedb8a206c27dfd75d766cd332f3ae4334fc36c00e3a1"
             },
             {
               "label": "base-transfer",
@@ -1061,7 +1122,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-base-transfer.png",
-              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4",
+              "executedCaptureSHA256": "cc1e178c61e3f247d67291e1c41b9fbe50c69a76605353400f1f07000c9ff4e2",
+              "captureRasterDataSHA256": "6be796b9f9f40f3b2b1eedb8a206c27dfd75d766cd332f3ae4334fc36c00e3a1"
             },
             {
               "label": "base-navigation",
@@ -1095,7 +1158,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-base-navigation.png",
-              "captureSHA256": "8467eba6b9fc2f5f9e44d2ce4707afdb2cfa844be599bd86bb36e9cb72a7da6e"
+              "captureSHA256": "8467eba6b9fc2f5f9e44d2ce4707afdb2cfa844be599bd86bb36e9cb72a7da6e",
+              "executedCaptureSHA256": "7e23a137249a57551eeef84177eabee65c20099b9616bcb306d4729cb5e9d6de",
+              "captureRasterDataSHA256": "c4e10691898871e6a4ca0a3000c3b9f0ac3d678e7060b21e34d143b201c0d96a"
             },
             {
               "label": "projection-before",
@@ -1129,7 +1194,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-projection-before.png",
-              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4",
+              "executedCaptureSHA256": "cc1e178c61e3f247d67291e1c41b9fbe50c69a76605353400f1f07000c9ff4e2",
+              "captureRasterDataSHA256": "6be796b9f9f40f3b2b1eedb8a206c27dfd75d766cd332f3ae4334fc36c00e3a1"
             },
             {
               "label": "projection-transfer",
@@ -1163,7 +1230,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-projection-transfer.png",
-              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4",
+              "executedCaptureSHA256": "cc1e178c61e3f247d67291e1c41b9fbe50c69a76605353400f1f07000c9ff4e2",
+              "captureRasterDataSHA256": "6be796b9f9f40f3b2b1eedb8a206c27dfd75d766cd332f3ae4334fc36c00e3a1"
             },
             {
               "label": "projection-navigation",
@@ -1197,7 +1266,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-projection-navigation.png",
-              "captureSHA256": "8467eba6b9fc2f5f9e44d2ce4707afdb2cfa844be599bd86bb36e9cb72a7da6e"
+              "captureSHA256": "8467eba6b9fc2f5f9e44d2ce4707afdb2cfa844be599bd86bb36e9cb72a7da6e",
+              "executedCaptureSHA256": "7e23a137249a57551eeef84177eabee65c20099b9616bcb306d4729cb5e9d6de",
+              "captureRasterDataSHA256": "c4e10691898871e6a4ca0a3000c3b9f0ac3d678e7060b21e34d143b201c0d96a"
             },
             {
               "label": "restart",
@@ -1231,7 +1302,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-vr-restart.png",
-              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4"
+              "captureSHA256": "9c847a751bc6c8b2e545939a9c2c8d4ad13a4d9ec87a3f6e2a901c01b4cfc0a4",
+              "executedCaptureSHA256": "cc1e178c61e3f247d67291e1c41b9fbe50c69a76605353400f1f07000c9ff4e2",
+              "captureRasterDataSHA256": "6be796b9f9f40f3b2b1eedb8a206c27dfd75d766cd332f3ae4334fc36c00e3a1"
             }
           ]
         },
@@ -1239,11 +1312,11 @@
           "device": "Meta Quest 3",
           "selected": "immersive-ar",
           "adaptations": [],
-          "assertions": 6915,
+          "assertions": 6918,
           "mode": "immersive-ar",
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "bbb1e05859e9a5094aea785ac4047d3d381bf0ac0d47f70c3cc380c7708de91f",
+          "assertionLabelsSHA256": "1f9e0262f8bb3804cb7f7f2f655683b0f653d1c881d90e3f2ec2725794d9acbc",
           "rendering": [
             {
               "label": "base-before",
@@ -1277,7 +1350,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-base-before.png",
-              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565",
+              "executedCaptureSHA256": "ae43720495c35ca2383b01a88f8c4d7a9bc2b961f33ff3a363ada31e74a03260",
+              "captureRasterDataSHA256": "ae02ebdd611d7fccc62e5516bfd3299b036afecafe04e563f845899d20e21f52"
             },
             {
               "label": "base-transfer",
@@ -1311,7 +1386,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-base-transfer.png",
-              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565",
+              "executedCaptureSHA256": "ae43720495c35ca2383b01a88f8c4d7a9bc2b961f33ff3a363ada31e74a03260",
+              "captureRasterDataSHA256": "ae02ebdd611d7fccc62e5516bfd3299b036afecafe04e563f845899d20e21f52"
             },
             {
               "label": "base-navigation",
@@ -1345,7 +1422,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-base-navigation.png",
-              "captureSHA256": "84a0efe20e3e76e8bf6444d4c4797bf58f6391e66bd31c43f357f46d82d8f200"
+              "captureSHA256": "84a0efe20e3e76e8bf6444d4c4797bf58f6391e66bd31c43f357f46d82d8f200",
+              "executedCaptureSHA256": "7555bc3be0ec815d96ca9b36f61b6d735da27620f30b439059dc73c3cf7bb0a9",
+              "captureRasterDataSHA256": "432a75ce08f0fdc45619e54f140a2074d73cee97478893152231fbc763d4b9b3"
             },
             {
               "label": "projection-before",
@@ -1379,7 +1458,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-projection-before.png",
-              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565",
+              "executedCaptureSHA256": "ae43720495c35ca2383b01a88f8c4d7a9bc2b961f33ff3a363ada31e74a03260",
+              "captureRasterDataSHA256": "ae02ebdd611d7fccc62e5516bfd3299b036afecafe04e563f845899d20e21f52"
             },
             {
               "label": "projection-transfer",
@@ -1413,7 +1494,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-projection-transfer.png",
-              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565",
+              "executedCaptureSHA256": "ae43720495c35ca2383b01a88f8c4d7a9bc2b961f33ff3a363ada31e74a03260",
+              "captureRasterDataSHA256": "ae02ebdd611d7fccc62e5516bfd3299b036afecafe04e563f845899d20e21f52"
             },
             {
               "label": "projection-navigation",
@@ -1447,7 +1530,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-projection-navigation.png",
-              "captureSHA256": "84a0efe20e3e76e8bf6444d4c4797bf58f6391e66bd31c43f357f46d82d8f200"
+              "captureSHA256": "84a0efe20e3e76e8bf6444d4c4797bf58f6391e66bd31c43f357f46d82d8f200",
+              "executedCaptureSHA256": "7555bc3be0ec815d96ca9b36f61b6d735da27620f30b439059dc73c3cf7bb0a9",
+              "captureRasterDataSHA256": "432a75ce08f0fdc45619e54f140a2074d73cee97478893152231fbc763d4b9b3"
             },
             {
               "label": "restart",
@@ -1481,7 +1566,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-immersive-ar-restart.png",
-              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565"
+              "captureSHA256": "0775e83c9bf2f376236cc77c88e09f173ea2fa6edccb97228dc8019f58e79565",
+              "executedCaptureSHA256": "ae43720495c35ca2383b01a88f8c4d7a9bc2b961f33ff3a363ada31e74a03260",
+              "captureRasterDataSHA256": "ae02ebdd611d7fccc62e5516bfd3299b036afecafe04e563f845899d20e21f52"
             }
           ]
         },
@@ -1489,11 +1576,11 @@
           "device": "Generic Android Phone (ARCore)",
           "selected": "immersive-ar",
           "adaptations": [],
-          "assertions": 5968,
+          "assertions": 5971,
           "mode": "immersive-ar",
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "ce7d5c06a7b4b6a00553d626f23083f21ee66857bb8048d78435c20b964b8519",
+          "assertionLabelsSHA256": "5de1ba5cd893ecfe3c7f7d17fd2f6606b184f41acc7b23becf9f7eb759109834",
           "rendering": [
             {
               "label": "base-before",
@@ -1514,7 +1601,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-base-before.png",
-              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356",
+              "executedCaptureSHA256": "00458c1662d931062739888ed891b8e9c0f436f6fec64adc85c9ff4b4dad4359",
+              "captureRasterDataSHA256": "3cffdb20d4f67c30f323dd35c9c3d2c5a16b26dfa9aa75324e374bc2a66ce6d3"
             },
             {
               "label": "base-transfer",
@@ -1535,7 +1624,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-base-transfer.png",
-              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356",
+              "executedCaptureSHA256": "00458c1662d931062739888ed891b8e9c0f436f6fec64adc85c9ff4b4dad4359",
+              "captureRasterDataSHA256": "3cffdb20d4f67c30f323dd35c9c3d2c5a16b26dfa9aa75324e374bc2a66ce6d3"
             },
             {
               "label": "base-navigation",
@@ -1556,7 +1647,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-base-navigation.png",
-              "captureSHA256": "d05d37c72999d3f27c7b6e2d085801f8756d5d69c7428bf7621f99a53ab10410"
+              "captureSHA256": "d05d37c72999d3f27c7b6e2d085801f8756d5d69c7428bf7621f99a53ab10410",
+              "executedCaptureSHA256": "c87a4f581e9a892dcf1a961da05f14eb6a3879632c2ea6409405369eec68ae12",
+              "captureRasterDataSHA256": "d28fe50d1ef6e9ece5df50b2364e326ea9948fbb8c4f79137f55f34fcb473dcb"
             },
             {
               "label": "projection-before",
@@ -1577,7 +1670,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-projection-before.png",
-              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356",
+              "executedCaptureSHA256": "00458c1662d931062739888ed891b8e9c0f436f6fec64adc85c9ff4b4dad4359",
+              "captureRasterDataSHA256": "3cffdb20d4f67c30f323dd35c9c3d2c5a16b26dfa9aa75324e374bc2a66ce6d3"
             },
             {
               "label": "projection-transfer",
@@ -1598,7 +1693,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-projection-transfer.png",
-              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356",
+              "executedCaptureSHA256": "00458c1662d931062739888ed891b8e9c0f436f6fec64adc85c9ff4b4dad4359",
+              "captureRasterDataSHA256": "3cffdb20d4f67c30f323dd35c9c3d2c5a16b26dfa9aa75324e374bc2a66ce6d3"
             },
             {
               "label": "projection-navigation",
@@ -1619,7 +1716,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-projection-navigation.png",
-              "captureSHA256": "d05d37c72999d3f27c7b6e2d085801f8756d5d69c7428bf7621f99a53ab10410"
+              "captureSHA256": "d05d37c72999d3f27c7b6e2d085801f8756d5d69c7428bf7621f99a53ab10410",
+              "executedCaptureSHA256": "c87a4f581e9a892dcf1a961da05f14eb6a3879632c2ea6409405369eec68ae12",
+              "captureRasterDataSHA256": "d28fe50d1ef6e9ece5df50b2364e326ea9948fbb8c4f79137f55f34fcb473dcb"
             },
             {
               "label": "restart",
@@ -1640,7 +1739,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-immersive-ar-restart.png",
-              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356"
+              "captureSHA256": "bc2ea9170b97531fb41f8c38c71468ecc41745047f99c64a80bacaf09e66c356",
+              "executedCaptureSHA256": "00458c1662d931062739888ed891b8e9c0f436f6fec64adc85c9ff4b4dad4359",
+              "captureRasterDataSHA256": "3cffdb20d4f67c30f323dd35c9c3d2c5a16b26dfa9aa75324e374bc2a66ce6d3"
             }
           ]
         },
@@ -1650,11 +1751,11 @@
           "adaptations": [
             "Inline has no input/depth/hand features; immersive scenarios exercise their existing paths."
           ],
-          "assertions": 5930,
+          "assertions": 5933,
           "mode": "inline",
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "a6c9dcc45bc0d2ab9048240cb63b8310afad7d741b4cd8425753ca7c26e3eb34",
+          "assertionLabelsSHA256": "59625021e82da5eb6d25983114577f1746d7f64d0b98a6b29a381c86f6de538c",
           "rendering": [
             {
               "label": "base-before",
@@ -1674,7 +1775,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-inline-base-before.png",
-              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a",
+              "executedCaptureSHA256": "86ed7a1e444cc3890e2dd9df8c31b49a9c5f2e2ae229f6dd643e3c26a3a520fd",
+              "captureRasterDataSHA256": "771568a7130695619fe7529489ee8c8ebd6f557fd079c9c27613f8a6d1c8ffaa"
             },
             {
               "label": "base-transfer",
@@ -1694,7 +1797,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-inline-base-transfer.png",
-              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a",
+              "executedCaptureSHA256": "86ed7a1e444cc3890e2dd9df8c31b49a9c5f2e2ae229f6dd643e3c26a3a520fd",
+              "captureRasterDataSHA256": "771568a7130695619fe7529489ee8c8ebd6f557fd079c9c27613f8a6d1c8ffaa"
             },
             {
               "label": "base-navigation",
@@ -1714,7 +1819,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-inline-base-navigation.png",
-              "captureSHA256": "ffb7a9fe6afb16f94c065c93f061df4c494ec9423f43b02b412034b27ff26915"
+              "captureSHA256": "ffb7a9fe6afb16f94c065c93f061df4c494ec9423f43b02b412034b27ff26915",
+              "executedCaptureSHA256": "21f76b90cea38e3929439de572c90d261c120214df09cb6aaa13586f457fc9c3",
+              "captureRasterDataSHA256": "bd0a70b319d1b0e284b0dfe1a1fadd08b6436907aa55f659e25ade54cc3b59b7"
             },
             {
               "label": "restart",
@@ -1734,7 +1841,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-quest-inline-restart.png",
-              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a",
+              "executedCaptureSHA256": "86ed7a1e444cc3890e2dd9df8c31b49a9c5f2e2ae229f6dd643e3c26a3a520fd",
+              "captureRasterDataSHA256": "771568a7130695619fe7529489ee8c8ebd6f557fd079c9c27613f8a6d1c8ffaa"
             }
           ]
         },
@@ -1744,11 +1853,11 @@
           "adaptations": [
             "Inline has no input/depth/hand features; immersive scenarios exercise their existing paths."
           ],
-          "assertions": 5930,
+          "assertions": 5933,
           "mode": "inline",
           "tolerance": 0.0001,
           "errors": [],
-          "assertionLabelsSHA256": "a6c9dcc45bc0d2ab9048240cb63b8310afad7d741b4cd8425753ca7c26e3eb34",
+          "assertionLabelsSHA256": "59625021e82da5eb6d25983114577f1746d7f64d0b98a6b29a381c86f6de538c",
           "rendering": [
             {
               "label": "base-before",
@@ -1768,7 +1877,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-inline-base-before.png",
-              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a",
+              "executedCaptureSHA256": "86ed7a1e444cc3890e2dd9df8c31b49a9c5f2e2ae229f6dd643e3c26a3a520fd",
+              "captureRasterDataSHA256": "771568a7130695619fe7529489ee8c8ebd6f557fd079c9c27613f8a6d1c8ffaa"
             },
             {
               "label": "base-transfer",
@@ -1788,7 +1899,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-inline-base-transfer.png",
-              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a",
+              "executedCaptureSHA256": "86ed7a1e444cc3890e2dd9df8c31b49a9c5f2e2ae229f6dd643e3c26a3a520fd",
+              "captureRasterDataSHA256": "771568a7130695619fe7529489ee8c8ebd6f557fd079c9c27613f8a6d1c8ffaa"
             },
             {
               "label": "base-navigation",
@@ -1808,7 +1921,9 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-inline-base-navigation.png",
-              "captureSHA256": "ffb7a9fe6afb16f94c065c93f061df4c494ec9423f43b02b412034b27ff26915"
+              "captureSHA256": "ffb7a9fe6afb16f94c065c93f061df4c494ec9423f43b02b412034b27ff26915",
+              "executedCaptureSHA256": "21f76b90cea38e3929439de572c90d261c120214df09cb6aaa13586f457fc9c3",
+              "captureRasterDataSHA256": "bd0a70b319d1b0e284b0dfe1a1fadd08b6436907aa55f659e25ade54cc3b59b7"
             },
             {
               "label": "restart",
@@ -1828,11 +1943,14 @@
                 }
               ],
               "capture": "docs/validation/issue-49/pose-view-firefox-android-inline-restart.png",
-              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a"
+              "captureSHA256": "1fa635c645ccf130399f0703848e9ee54c55327d0d08f410fb8a5ff885de517a",
+              "executedCaptureSHA256": "86ed7a1e444cc3890e2dd9df8c31b49a9c5f2e2ae229f6dd643e3c26a3a520fd",
+              "captureRasterDataSHA256": "771568a7130695619fe7529489ee8c8ebd6f557fd079c9c27613f8a6d1c8ffaa"
             }
           ]
         }
-      ]
+      ],
+      "captureReuse": "Retain the existing versioned captures after exact comparison of IHDR and decompressed IDAT data. Pixels and measured centroids are unchanged. Firefox deBG metadata differs; executedCaptureSHA256 identifies the fresh PNG and captureSHA256 identifies the versioned PNG."
     },
     {
       "issue": 47,
@@ -2391,6 +2509,26 @@
       "outcome": "resolved",
       "failure": "Popup hid the main document and Firefox ignored script window.focus(), correctly suspending its inline callbacks.",
       "correction": "Activate the actual main/popup window through WebDriver for the realm under test; preserve document visibility and inline suppression."
+    },
+    {
+      "command": "npm run test:pose-view:chromium",
+      "outcome": "resolved",
+      "failure": "New regression failed on the original implementation: requestViewportScale(document.all) returned undefined instead of throwing TypeError. document.all is neither null nor undefined and converts to NaN.",
+      "correction": "Use strict null and undefined checks before finite-double conversion. The same regression passes on both browsers across all five scenarios each.",
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "startedAt": "2026-10-24T01:28:49.730Z",
+      "completedAt": "2026-10-24T01:28:54.409Z",
+      "rawReportSHA256": "1d0b9f3c2791f1be691c56b71a2f11865ebf49b894c4ae00a6ae1782f433381c",
+      "provenance": {
+        "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+        "tests/pose-view.ts": "83c432a6b0a7e27e6f8fec7d2ba5e33b73e54d35eed8326143e0132a352cb9a1",
+        "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+      }
     }
   ],
   "skips": [
@@ -2443,26 +2581,26 @@
   "requiredPostMergeVerification": [],
   "totals": {
     "poseViewScenarios": 10,
-    "poseViewAssertions": 63294,
+    "poseViewAssertions": 63324,
     "versionedCaptures": 58,
     "relatedRegressionScenarios": 20
   },
   "sourceAndDocumentationSHA256": {
-    "src/polyfill/api/geometry.ts": "aaa1fa2fb56b4245a4996d48c35c80bc4ed2d92439b2b16ae07bebecf4fba1b1",
+    "src/polyfill/api/geometry.ts": "3c4ab7a879249113f45c030d52e14726f0ee87223f8ff939ee0c9ec53db22d81",
     "src/polyfill/api/runtime.ts": "5703214b35b51be6cc93191cb56277460c4d6900d1c8e9ceda184531a4bea20c",
     "src/polyfill/api/interface-brand.ts": "0f43463683ecdcbef78583cf5d2611f9f807f623d761dbf3d97b673f0019acfc",
     "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
     "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
     "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
     "src/polyfill/EmulatedXRDevice.ts": "07eafcee7e90a8fe80e80f03241f9d769e0b0a80b6dbeef796fb1a9ac098d3b6",
-    "tests/pose-view.ts": "1dfdcc047c9894ad406a87531b609b629aaafcf6758a0fde689637d5e44f615f",
+    "tests/pose-view.ts": "83c432a6b0a7e27e6f8fec7d2ba5e33b73e54d35eed8326143e0132a352cb9a1",
     "tests/reference-space-browser.ts": "8cddebdefbbd7d36c4cac290d8df0f1db16db9014039287100dfca7e3d1d0c2b",
     "tests/environment.ts": "1d1908d8b662f7c994981fd353b903301446d827cc26f8f9822f398440f0d7fa",
-    "docs/webxr-pose-view.md": "a097dfaf67f8f70febe7bf3a9e1f5cf521dce89d7b58a72d4cdad5b4460e058b",
+    "docs/webxr-pose-view.md": "cfe9dd612a5eb52acf2f4a12e7a54a8345419c5672f0d2949f5e3c61988f10e4",
     "docs/webxr-conformance.md": "19ae01ca12b3ad44d0ec105670b4d328cffb2c2abd155355593ed4e7d5705914",
     "package.json": "ae5920aba9698fed3c8fdda94c057be90383e864add44f76390b4a807f751d3e",
     "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
-    "polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c",
-    "build/firefox/polyfill/webxr-polyfill.js": "3a55b182851e0b928cce2f1d857aee18bc68453640cc32458a33db0fbafb6e1c"
+    "polyfill/webxr-polyfill.js": "dd038380ed86ecdffcf3055b5e9f69746fbd7266afcdf23eb32456b3e7c77d29",
+    "build/firefox/polyfill/webxr-polyfill.js": "dd038380ed86ecdffcf3055b5e9f69746fbd7266afcdf23eb32456b3e7c77d29"
   }
 }

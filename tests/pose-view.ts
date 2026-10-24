@@ -179,6 +179,10 @@ export async function poseViewCases(mode: SessionMode) {
       check(scale.length===1,'viewport scale required arity');
       throws(()=>scale.call({}, {valueOf(){throw new Error('must not convert');}}),'TypeError','scale receiver precedes numeric conversion');
       throws(()=>scale.call(view),'TypeError','scale missing argument');
+      const all=w.document.all;
+      check(all!==null && all!==undefined,'document.all is neither null nor undefined');
+      check(Number.isNaN(+all),'document.all converts to NaN');
+      throws(()=>scale.call(view,all),'TypeError','scale rejects document.all as a nonfinite double');
       for (const value of [NaN,Infinity,-Infinity,'NaN','Infinity',Symbol(),BigInt(1)]) throws(()=>scale.call(view,value),'TypeError','scale rejects nonfinite/non-number conversion');
       for (const value of [null,undefined,0,-1,2,.5,'0.5',false,1e100]) check(scale.call(view,value)===undefined,'fixed resolution nullable-double no-op');
       let conversions=0;scale.call(view,{valueOf(){conversions++;return .5;}});check(conversions===1,'scale converted once');

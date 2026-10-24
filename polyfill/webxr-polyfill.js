@@ -1412,7 +1412,7 @@ function WebXRPolyfillInjection() {
           viewState(this);
           if (arguments.length < 1)
               throw new TypeError('Expected scale.');
-          if (scale != null && !Number.isFinite(+scale))
+          if (scale !== null && scale !== undefined && !Number.isFinite(+scale))
               throw new TypeError('Expected a finite double.');
       }
   }

@@ -250,7 +250,7 @@ export class XRView {
     viewState(this);
     if (arguments.length < 1) throw new TypeError('Expected scale.');
     // Required nullable double: explicit undefined and null both convert to null.
-    if (scale != null && !Number.isFinite(+scale)) throw new TypeError('Expected a finite double.');
+    if (scale !== null && scale !== undefined && !Number.isFinite(+scale)) throw new TypeError('Expected a finite double.');
     // Advisory; fixed emulated resolution, including retained views.
   }
 }
