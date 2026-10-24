@@ -24608,8 +24608,122 @@ void main() {
           hitResults: reader(hitResults), transientHitResults: reader(transientHitResults) });
   }
 
+  const jointNames = Object.freeze(['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
+      ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))]);
+  function createHandAllocations(sessions, inputs, frames) {
+      const hands = new WeakMap();
+      const joints = new WeakMap();
+      const poses = new WeakMap();
+      const iterators = new WeakMap();
+      const sourceHands = new WeakMap();
+      const backends = new WeakMap(), trackers = new WeakMap();
+      function allocateHand(backend, source, controller) {
+          const { session } = backend;
+          const collection = new Map();
+          const hand = Object.create(backend.hand);
+          for (const [index, name] of jointNames.entries()) {
+              const radius = Math.fround(index === 0 ? 0.018 : name.endsWith('tip') ? 0.007 : 0.009);
+              const update = () => {
+                  if (session.ended || !Array.from(session.inputSources).includes(source))
+                      return null;
+                  const gamepad = session._device.gamepads[controller];
+                  if (!gamepad)
+                      return null;
+                  const matrix = fromRotationTranslation(create$3(), gamepad.pose.orientation, gamepad.pose.position);
+                  if (index === 0)
+                      return matrix;
+                  const finger = index <= 4 ? 0 : 1 + Math.floor((index - 5) / 5);
+                  const joint = index <= 4 ? index : 1 + (index - 5) % 5;
+                  const side = gamepad.hand === 'left' ? -1 : 1, curled = gamepad.buttons[0].pressed;
+                  const position = (bone) => fromValues((finger - 2) * 0.019 * side, curled ? -bone * 0.009 : 0, -0.025 - bone * (curled ? 0.008 : 0.025));
+                  const origin = position(joint);
+                  const target = name.endsWith('tip') ? add$1(create$2(), origin, subtract(create$2(), origin, position(joint - 1))) : position(joint + 1);
+                  return multiply(matrix, matrix, targetTo(create$3(), origin, target, [0, 1, 0]));
+              };
+              const space = new XRSpace(session, update);
+              Reflect.deleteProperty(space, 'matrixProvider');
+              Object.defineProperty(space, '_session', { value: session, configurable: false, writable: false });
+              Object.setPrototypeOf(space, backend.joint);
+              joints.set(space, Object.freeze({ name, radius, session, update }));
+              collection.set(name, space);
+          }
+          hands.set(hand, Object.freeze({ size: collection.size, get: (name) => collection.get(name),
+              keys: () => collection.keys(), values: () => collection.values(), entries: () => collection.entries() }));
+          sourceHands.set(source, hand);
+          return hand;
+      }
+      class HandTracker {
+          constructor(session, hand, joint, pose) {
+              var _a;
+              if (!sessions.has(session) || !((_a = session._device) === null || _a === void 0 ? void 0 : _a.sessions.has(session._id)))
+                  throw new TypeError('Expected backend XRSession.');
+              let backend = backends.get(session);
+              if (!backend) {
+                  backend = { session, hand, joint, pose };
+                  backends.set(session, backend);
+              }
+              trackers.set(this, backend);
+          }
+          hand(source, raw) {
+              const backend = trackers.get(this);
+              if (!backend || !inputs.has(source))
+                  throw new TypeError('Expected XRInputSource.');
+              const existing = sourceHands.get(source);
+              if (existing) {
+                  if (joints.get(hands.get(existing).get('wrist')).session !== backend.session)
+                      invalidState('Foreign hand source.');
+                  return existing;
+              }
+              if (backend.session.ended || !backend.session.enabledFeatures.includes('hand-tracking') || !Array.from(backend.session.inputSources).includes(source))
+                  invalidState('Source is not an active hand source.');
+              const controller = backend.session._device.gamepadInputSources.findIndex(input => input.inputSource === raw);
+              if (controller < 0)
+                  throw new TypeError('Expected connected backend input.');
+              return allocateHand(backend, source, controller);
+          }
+      }
+      function pose(frame, joint, base) {
+          const state = frames.get(frame), metadata = joints.get(joint);
+          if (!state || !metadata)
+              throw new TypeError('Expected frame and joint.');
+          frame._assertActive();
+          state.session._owns(joint);
+          state.session._owns(base);
+          if (!metadata.update())
+              return null;
+          const relative = relativePose(joint, base);
+          if (!relative)
+              return null;
+          const result = state.pose(relative.matrix, relative.emulated);
+          Object.setPrototypeOf(result, backends.get(state.session).pose);
+          poses.set(result, metadata.radius);
+          return result;
+      }
+      Object.freeze(HandTracker.prototype);
+      Object.freeze(HandTracker);
+      return Object.freeze({ HandTracker, pose,
+          iterator: (hand, kind, prototype) => {
+              const state = hands.get(hand);
+              if (!state)
+                  throw new TypeError('Expected XRHand.');
+              const iterator = Object.create(prototype);
+              iterators.set(iterator, state[kind]());
+              return iterator;
+          },
+          next: (value) => {
+              const iterator = iterators.get(value);
+              if (!iterator)
+                  throw new TypeError('Expected XRHand Iterator.');
+              return iterator.next();
+          },
+          sources: Object.freeze({ get: (value) => sourceHands.get(value) }),
+          hands: Object.freeze({ get: (value) => hands.get(value) }),
+          joints: Object.freeze({ get: (value) => joints.get(value), has: (value) => joints.has(value) }),
+          poses: Object.freeze({ get: (value) => poses.get(value) }) });
+  }
+
   function createBrands() {
-      const frames = new WeakSet(), spaces = new WeakSet(), joints = new WeakSet();
+      const frames = new WeakSet(), spaces = new WeakSet();
       const sessions = new WeakSet(), inputSources = new WeakSet();
       class SessionObject extends EventTarget {
           constructor() { super(); sessions.add(this); }
@@ -24621,8 +24735,7 @@ void main() {
           constructor() { frames.add(this); }
       }
       class SpaceObject extends EventTarget {
-          constructor(joint = false) { super(); spaces.add(this); if (joint)
-              joints.add(this); }
+          constructor() { super(); spaces.add(this); }
       }
       Object.freeze(FrameObject.prototype);
       Object.freeze(FrameObject);
@@ -24635,7 +24748,10 @@ void main() {
       const transforms = new WeakMap();
       const hitTestAllocations = createHitTestAllocations({ sessions, spaces, frames, inputSources, transforms });
       const planeAllocations = createPlaneAllocations(sessions);
+      const frameValues = new WeakMap();
+      const handAllocations = createHandAllocations(sessions, inputSources, frameValues);
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
+          handAllocations,
           layerAllocations: createLayerAllocations(sessions),
           meshAllocations: createMeshAllocations(sessions),
           planeAllocations,
@@ -24651,7 +24767,7 @@ void main() {
           transforms,
           referenceOffsets: new WeakMap(),
           referenceSpaceRequests: new WeakMap(),
-          frameValues: new WeakMap(),
+          frameValues,
           viewerPoses: new WeakMap(),
           poses: new WeakMap(),
           viewerViews: new WeakMap(),
@@ -24671,8 +24787,7 @@ void main() {
           inputSources: Object.freeze({ has: (value) => inputSources.has(value) }),
           frames: Object.freeze({ has: (value) => frames.has(value) }),
           spaces: Object.freeze({ has: (value) => spaces.has(value) }),
-          joints: Object.freeze({ has: (value) => joints.has(value) }),
-      });
+          joints: handAllocations.joints, });
   }
   const key = Symbol.for('WebXR-emulator.interface-brands');
   let host = globalThis;
@@ -24789,8 +24904,8 @@ void main() {
   class XRSpace extends interfaceBrands.SpaceObject {
       get _emulatedPosition() { return interfaceBrands.spaceRelations.get(this).tracking.emulatedPosition; }
       set _emulatedPosition(value) { interfaceBrands.spaceRelations.get(this).tracking.emulatedPosition = value; }
-      constructor(_session, matrixProvider, joint = false) {
-          super(joint);
+      constructor(_session, matrixProvider) {
+          super();
           this._session = _session;
           this.matrixProvider = matrixProvider;
           this._baseMatrix = null;
@@ -25826,56 +25941,74 @@ void main() {
       async requestPersistentHandle() { this._session._assertLive(); if (this.deleted)
           invalidState('Anchor was deleted.'); return unsupported('Persistent anchors are not simulated.'); }
   }
-  const names = ['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
-      ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))];
   const jointObjects = interfaceBrands.joints;
+  const handBindings = interfaceBrands.handAllocations;
+  function handState(value) {
+      const state = handBindings.hands.get(value);
+      if (!state)
+          throw new TypeError('Expected XRHand.');
+      return state;
+  }
+  function jointState(value) {
+      const state = handBindings.joints.get(value);
+      if (!state)
+          throw new TypeError('Expected XRJointSpace.');
+      return state;
+  }
+  function illegalHandConstruction() { throw new TypeError('Illegal constructor.'); }
   class XRJointSpace extends XRSpace {
-      constructor(session, jointName, _radius, provider) {
-          super(session, provider, true);
-          this.jointName = jointName;
-          this._radius = _radius;
-      }
+      constructor() { super(illegalHandConstruction(), () => null); }
+      get jointName() { return jointState(this).name; }
+      get _radius() { return jointState(this).radius; }
+      _update() { this._baseMatrix = jointState(this).update(); return this._baseMatrix; }
   }
   class XRJointPose extends XRPose {
-      constructor(transform, radius, emulatedPosition, token) {
-          super(transform, emulatedPosition, token);
-          this.radius = radius;
+      constructor() { super(illegalHandConstruction(), false); }
+      get radius() {
+          const radius = handBindings.poses.get(this);
+          if (radius === undefined)
+              throw new TypeError('Expected XRJointPose.');
+          return radius;
       }
   }
+  const handIteratorPrototype = Object.create(Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]())));
+  Object.defineProperties(handIteratorPrototype, {
+      next: { value: { next() {
+                  const step = handBindings.next(this);
+                  const value = Array.isArray(step.value) ? [step.value[0], step.value[1]] : step.value;
+                  return { value, done: step.done };
+              } }.next, enumerable: true, configurable: true, writable: true },
+      [Symbol.toStringTag]: { value: 'XRHand Iterator', configurable: true },
+  });
   class XRHand {
-      constructor(session, controller, active) {
-          this.joints = new Map();
-          for (const [index, name] of names.entries()) {
-              const radius = index === 0 ? 0.018 : name.endsWith('tip') ? 0.007 : 0.009;
-              this.joints.set(name, new XRJointSpace(session, name, radius, () => {
-                  if (!active())
-                      return null;
-                  const gamepad = session._device.gamepads[controller];
-                  if (!gamepad)
-                      return null;
-                  const matrix = fromRotationTranslation(create$3(), gamepad.pose.orientation, gamepad.pose.position);
-                  if (index === 0)
-                      return matrix;
-                  const finger = index <= 4 ? 0 : 1 + Math.floor((index - 5) / 5);
-                  const joint = index <= 4 ? index : 1 + (index - 5) % 5;
-                  const side = gamepad.hand === 'left' ? -1 : 1;
-                  const curled = gamepad.buttons[0].pressed;
-                  const position = (bone) => fromValues((finger - 2) * 0.019 * side, curled ? -bone * 0.009 : 0, -0.025 - bone * (curled ? 0.008 : 0.025));
-                  const origin = position(joint);
-                  const target = name.endsWith('tip') ? add$1(create$2(), origin, subtract(create$2(), origin, position(joint - 1))) : position(joint + 1);
-                  return multiply(matrix, matrix, targetTo(create$3(), origin, target, [0, 1, 0]));
-              }));
-          }
+      constructor() { throw new TypeError('Illegal constructor.'); }
+      get size() { return handState(this).size; }
+      get(key) {
+          const state = handState(this);
+          if (arguments.length < 1)
+              throw new TypeError('Expected XRHandJoint.');
+          const name = `${key}`;
+          if (!jointNames.includes(name))
+              throw new TypeError('Invalid XRHandJoint.');
+          return state.get(name);
       }
-      get size() { return this.joints.size; }
-      get(key) { if (!names.includes(key))
-          throw new TypeError('Invalid XRHandJoint.'); return this.joints.get(key); }
-      keys() { return this.joints.keys(); }
-      values() { return this.joints.values(); }
-      entries() { return this.joints.entries(); }
-      forEach(callback, thisArg) { for (const [name, joint] of this)
-          callback.call(thisArg, joint, name, this); }
+      keys() { handState(this); return handBindings.iterator(this, 'keys', handIteratorPrototype); }
+      values() { handState(this); return handBindings.iterator(this, 'values', handIteratorPrototype); }
+      entries() { handState(this); return handBindings.iterator(this, 'entries', handIteratorPrototype); }
+      forEach(callback, thisArg) {
+          const state = handState(this);
+          if (typeof callback !== 'function')
+              throw new TypeError('Expected callback.');
+          for (const [name, joint] of state.entries())
+              Reflect.apply(callback, thisArg, [joint, name, this]);
+      }
       [Symbol.iterator]() { return this.entries(); }
+  }
+  Object.defineProperty(XRHand.prototype, Symbol.iterator, { value: XRHand.prototype.entries, writable: true, configurable: true });
+  Object.defineProperty(XRHand.prototype.forEach, 'length', { value: 1, configurable: true });
+  for (const [C, members] of [[XRHand, ['size', 'get', 'keys', 'values', 'entries', 'forEach']], [XRJointSpace, ['jointName']], [XRJointPose, ['radius']]]) {
+      enumerableMembers(C.prototype, members);
+      Object.defineProperty(C.prototype, Symbol.toStringTag, { value: C.name, configurable: true });
   }
   class XRLightProbe extends EventTarget {
       constructor(_session) {
@@ -26829,6 +26962,7 @@ void main() {
           this.listeners = [];
           this.immersiveSuppressed = false;
           this.visibilityListener = () => this._setVisibility(document.visibilityState);
+          this._hands = new interfaceBrands.handAllocations.HandTracker(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype);
           this._anchors = new Set();
           this._environment = new EnvironmentTracker(this);
           this._depthFormat = 'float32';
@@ -26878,8 +27012,7 @@ void main() {
                           previous._retire();
                           replaced.push(previous);
                       }
-                      const controllerIndex = this._device.gamepadInputSources.findIndex(input => input.inputSource === source);
-                      this.inputWrappers.set(source, new XRInputSource(this, source, controllerIndex));
+                      this.inputWrappers.set(source, new XRInputSource(this, source));
                   }
                   return this.inputWrappers.get(source);
               });
@@ -27273,6 +27406,11 @@ void main() {
           this._assertActive();
           state.session._owns(space);
           state.session._owns(baseSpace);
+          for (const candidate of [space, baseSpace]) {
+              const joint = interfaceBrands.handAllocations.joints.get(candidate);
+              if (joint && !joint.update())
+                  return null;
+          }
           const relative = relativePose(space, baseSpace);
           return relative ? state.pose(relative.matrix, relative.emulated) : null;
       }
@@ -27308,12 +27446,12 @@ void main() {
           }));
       }
       getJointPose(joint, baseSpace) {
-          this._assertActive();
-          this.session._require('hand-tracking');
-          if (!(joint instanceof XRJointSpace))
-              throw new TypeError('Expected XRJointSpace.');
-          const pose = this.getPose(joint, baseSpace);
-          return pose ? new XRJointPose(pose.transform, joint._radius, pose.emulatedPosition, geometryAllocation) : null;
+          frameState(this);
+          if (arguments.length < 2)
+              throw new TypeError('Expected joint and baseSpace.');
+          interfaceValue(joint, jointObjects, 'XRJointSpace');
+          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+          return interfaceBrands.handAllocations.pose(this, joint, baseSpace);
       }
       fillJointRadii(joints, radii) {
           interfaceValue(this, frameObjects, 'XRFrame');
@@ -27328,8 +27466,9 @@ void main() {
               throw new TypeError('Insufficient radii array.');
           let valid = true;
           for (const [index, joint] of list.entries()) {
-              const tracked = joint._update() !== null;
-              radii[index] = tracked ? joint._radius : NaN;
+              const metadata = interfaceBrands.handAllocations.joints.get(joint);
+              const tracked = metadata.update() !== null;
+              radii[index] = tracked ? metadata.radius : NaN;
               if (!tracked)
                   valid = false;
           }
@@ -27406,23 +27545,22 @@ void main() {
       });
       return new XRViewerPose(transform, views, relative.emulated, geometryAllocation);
   }
-  enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
+  enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getJointPose', 'fillPoses', 'fillJointRadii', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
   Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
   class XRInputSource extends interfaceBrands.InputSourceObject {
-      constructor(session, raw, index) {
+      constructor(session, raw) {
           super();
           this.session = session;
           this.raw = raw;
           this.targetWorld = null;
           this.gripWorld = null;
           const active = () => Array.from(session.inputSources).includes(this);
-          this.handValue = session.enabledFeatures.includes('hand-tracking') ? new XRHand(session, index, active) : null;
           this.handednessValue = raw.handedness;
           this.targetRayModeValue = raw.targetRayMode;
           this.rawProfiles = Object.freeze([...raw.profiles]);
-          this.profilesValue = this.handValue ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
+          this.profilesValue = session.enabledFeatures.includes('hand-tracking') ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
           this.hasGamepad = raw.gamepad !== null;
-          this.gamepadState = !this.handValue && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
+          this.gamepadState = !session.enabledFeatures.includes('hand-tracking') && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
           const provider = (type) => () => active() ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
           this.targetSpace = new XRSpace(session, provider('target-ray'));
           this.grip = ['gaze', 'screen'].includes(this.targetRayModeValue) ? null : new XRSpace(session, provider('grip'));
@@ -27435,6 +27573,8 @@ void main() {
       }
       _retire() { var _a; (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.retire(); }
       _updatePose() {
+          if (this.session.enabledFeatures.includes('hand-tracking'))
+              this.session._hands.hand(this, this.raw);
           if (this.gamepadState && this.raw.gamepad)
               this.gamepadState.sample(this.raw.gamepad);
           const world = new XRReferenceSpace(this.session, 'local-floor', () => create$3());
@@ -27444,7 +27584,7 @@ void main() {
           this.targetWorld = target ? clone$1(transformMatrix(target.transform)) : null;
           this.gripWorld = grip ? clone$1(transformMatrix(grip.transform)) : null;
       }
-      get hand() { return this.handValue; }
+      get hand() { var _a; interfaceValue(this, interfaceBrands.inputSources, 'XRInputSource'); return (_a = interfaceBrands.handAllocations.sources.get(this)) !== null && _a !== void 0 ? _a : null; }
       get targetRaySpace() { return this.targetSpace; }
       get handedness() { return this.handednessValue; }
       get targetRayMode() { return this.targetRayModeValue; }
@@ -27453,6 +27593,7 @@ void main() {
       get gamepad() { var _a, _b; return (_b = (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.value) !== null && _b !== void 0 ? _b : null; }
       get skipRendering() { return false; }
   }
+  enumerableMembers(XRInputSource.prototype, ['hand']);
   Object.defineProperty(XRSession.prototype, 'requestReferenceSpace', { enumerable: true });
   Object.setPrototypeOf(XRSession.prototype, EventTarget.prototype);
   Object.setPrototypeOf(XRInputSource.prototype, Object.prototype);

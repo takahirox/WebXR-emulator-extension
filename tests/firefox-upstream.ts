@@ -46,6 +46,10 @@ export async function serveFirefoxFixtures() {
     } else if (pathname === '/favicon.ico') { response.statusCode = 204; response.end(); }
     else {
       response.setHeader('Content-Type', 'text/html');
+      if (pathname === '/hands-isolated') {
+        response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+        response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+      }
       response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' blob: data:; frame-src 'self' http://localhost:*; style-src 'self' 'unsafe-inline'; object-src 'none'");
       response.end('<!doctype html><script src="/fixture.js"></script><body>Firefox WebXR fixture</body>');
     }

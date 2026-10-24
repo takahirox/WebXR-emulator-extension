@@ -168,6 +168,7 @@ export class XRSession extends interfaceBrands.SessionObject {
   private endListener: (id: number) => void;
   private immersiveSuppressed = false;
   private visibilityListener = () => this._setVisibility(document.visibilityState);
+  readonly _hands = new interfaceBrands.handAllocations.HandTracker(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype);
   readonly _anchors = new Set<XRAnchor>();
   readonly _environment = new EnvironmentTracker(this);
   _depthFormat = 'float32';
@@ -420,9 +421,7 @@ export class XRSession extends interfaceBrands.SessionObject {
       const previous = this.inputWrappers.get(source);
       if (!previous || !previous._matches(source)) {
         if (previous) { previous._retire(); replaced.push(previous); }
-        // Active sources can omit earlier controllers; hands need the adapter slot.
-        const controllerIndex = this._device.gamepadInputSources.findIndex(input => input.inputSource === source);
-        this.inputWrappers.set(source, new XRInputSource(this, source, controllerIndex));
+        this.inputWrappers.set(source, new XRInputSource(this, source));
       }
       return this.inputWrappers.get(source)!;
     });
@@ -514,6 +513,13 @@ export class XRFrame extends interfaceBrands.FrameObject {
     // Ownership is checked for both arguments before any unavailable-tracking
     // shortcut or provider call.
     state.session._owns(space); state.session._owns(baseSpace);
+    // Hand Input §3.4 requires all-or-none availability, including a joint
+    // queried relative to itself. Other statically known spaces keep their
+    // existing geometry behavior.
+    for (const candidate of [space, baseSpace]) {
+      const joint = interfaceBrands.handAllocations.joints.get(candidate);
+      if (joint && !joint.update()) return null;
+    }
     const relative = relativePose(space, baseSpace);
     return relative ? state.pose(relative.matrix, relative.emulated) : null;
   }
@@ -537,9 +543,11 @@ export class XRFrame extends interfaceBrands.FrameObject {
     }));
   }
   getJointPose(joint: XRJointSpace, baseSpace: XRSpace) {
-    this._assertActive(); this.session._require('hand-tracking');
-    if (!(joint instanceof XRJointSpace)) throw new TypeError('Expected XRJointSpace.');
-    const pose = this.getPose(joint, baseSpace); return pose ? new XRJointPose(pose.transform, joint._radius, pose.emulatedPosition, geometryAllocation) : null;
+    frameState(this);
+    if (arguments.length < 2) throw new TypeError('Expected joint and baseSpace.');
+    interfaceValue(joint, jointObjects, 'XRJointSpace');
+    interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+    return interfaceBrands.handAllocations.pose(this, joint, baseSpace);
   }
   fillJointRadii(joints: Iterable<XRJointSpace>, radii: Float32Array) {
     interfaceValue(this, frameObjects, 'XRFrame');
@@ -553,8 +561,9 @@ export class XRFrame extends interfaceBrands.FrameObject {
     for (const [index, joint] of list.entries()) {
       // All joints of an emulated hand share the same tracking availability.
       // Query native tracking independently of any reference/base space.
-      const tracked = joint._update() !== null;
-      radii[index] = tracked ? joint._radius : NaN;
+      const metadata = interfaceBrands.handAllocations.joints.get(joint)!;
+      const tracked = metadata.update() !== null;
+      radii[index] = tracked ? metadata.radius : NaN;
       if (!tracked) valid = false;
     }
     return valid;
@@ -614,13 +623,12 @@ function allocateViewerPose(frame: XRFrame, reference: XRReferenceSpace) {
   });
   return new XRViewerPose(transform, views, relative.emulated, geometryAllocation);
 }
-enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
+enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getJointPose', 'fillPoses', 'fillJointRadii', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
 // Share allocation branding while retaining the public prototype's own realm.
 Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
 
 /** Every exposed space and input identity is owned by exactly one session. */
 export class XRInputSource extends interfaceBrands.InputSourceObject {
-  private readonly handValue: XRHand | null;
   private readonly targetSpace: XRSpace;
   private readonly grip: XRSpace | null;
   private readonly handednessValue: string;
@@ -631,16 +639,15 @@ export class XRInputSource extends interfaceBrands.InputSourceObject {
   private readonly gamepadState: SourceGamepad | null;
   private targetWorld: mat4 | null = null;
   private gripWorld: mat4 | null = null;
-  constructor(private session: XRSession, private raw: DeviceInput, index: number) {
+  constructor(private session: XRSession, private raw: DeviceInput) {
     super();
     const active = () => Array.from(session.inputSources).includes(this);
-    this.handValue = session.enabledFeatures.includes('hand-tracking') ? new XRHand(session, index, active) : null;
     this.handednessValue = raw.handedness;
     this.targetRayModeValue = raw.targetRayMode;
     this.rawProfiles = Object.freeze([...raw.profiles]);
-    this.profilesValue = this.handValue ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
+    this.profilesValue = session.enabledFeatures.includes('hand-tracking') ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
     this.hasGamepad = raw.gamepad !== null;
-    this.gamepadState = !this.handValue && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
+    this.gamepadState = !session.enabledFeatures.includes('hand-tracking') && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
     const provider = (type: string) => () => active() ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
     this.targetSpace = new XRSpace(session, provider('target-ray'));
     this.grip = ['gaze', 'screen'].includes(this.targetRayModeValue) ? null : new XRSpace(session, provider('grip'));
@@ -653,6 +660,7 @@ export class XRInputSource extends interfaceBrands.InputSourceObject {
   }
   _retire() { this.gamepadState?.retire(); }
   _updatePose() {
+    if (this.session.enabledFeatures.includes('hand-tracking')) this.session._hands.hand(this, this.raw);
     if (this.gamepadState && this.raw.gamepad) this.gamepadState.sample(this.raw.gamepad);
     const world = new XRReferenceSpace(this.session, 'local-floor', () => mat4.create()); world._update();
     const target = this.session._device.getInputPose(this.raw, world, 'target-ray');
@@ -660,7 +668,7 @@ export class XRInputSource extends interfaceBrands.InputSourceObject {
     this.targetWorld = target ? mat4.clone(transformMatrix(target.transform)) : null;
     this.gripWorld = grip ? mat4.clone(transformMatrix(grip.transform)) : null;
   }
-  get hand() { return this.handValue; }
+  get hand() { interfaceValue(this, interfaceBrands.inputSources, 'XRInputSource'); return interfaceBrands.handAllocations.sources.get(this) ?? null; }
   get targetRaySpace() { return this.targetSpace; }
   get handedness() { return this.handednessValue; }
   get targetRayMode() { return this.targetRayModeValue; }
@@ -669,6 +677,8 @@ export class XRInputSource extends interfaceBrands.InputSourceObject {
   get gamepad() { return this.gamepadState?.value ?? null; }
   get skipRendering() { return false; }
 }
+
+enumerableMembers(XRInputSource.prototype, ['hand']);
 
 // WebIDL regular operations are enumerable, writable and configurable.
 Object.defineProperty(XRSession.prototype, 'requestReferenceSpace', {enumerable: true});

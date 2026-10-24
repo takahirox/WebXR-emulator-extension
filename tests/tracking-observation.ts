@@ -18,7 +18,7 @@ export function observeTracking() {
         record.ends++;
         const layer = session.renderState.baseLayer ?? session.renderState.layers?.[0]?._binding._presentation;
         live.finalCanvas = layer?._presentationCanvas;
-        live.finalPads = (live.sources ?? []).map((v: any) => JSON.stringify([v.source.gamepad.axes, v.source.gamepad.buttons, v.source.gamepad.timestamp]));
+        live.finalPads = (live.sources ?? []).map((v: any) => v.source.gamepad ? JSON.stringify([v.source.gamepad.axes, v.source.gamepad.buttons, v.source.gamepad.timestamp]) : null);
       });
       for (const type of ['selectstart', 'select', 'selectend']) session.addEventListener(type, (event: any) => {
         const source = event.inputSource;

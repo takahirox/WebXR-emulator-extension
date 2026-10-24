@@ -1,4 +1,6 @@
-# WebXR API inventory — revision 17 (2026-10-24)
+# WebXR API inventory — revision 18 (2026-10-24)
+
+Issue [#59](https://github.com/takahirox/WebXR-emulator-extension/issues/59) completes [protected individual hand bindings and reproducible Three.js hand rendering](webxr-hands.md). The focused Chromium/Firefox selections cover Quest VR/MR hand contracts, populated cross-realm borrowing, negative negotiation, controller sessions, coherent individual/bulk articulation and retirement. The unchanged pinned Three.js handinput example is separately executed on Quest VR in both browsers, including both hands, both eyes and end/restart. Virtual joints and radii remain simulated; these results do not change deferred modules or claim unchanged Quest MR application coverage.
 
 Issue [#51](https://github.com/takahirox/WebXR-emulator-extension/issues/51) adds bounded room-plane regions, branded plane bindings, and pinned consumer rendering/placement validation in both browsers; see [plane measurements and reproduction](webxr-planes.md). This also separates document-mirrored inline visibility from immersive frame suspension for [Issue #43](https://github.com/takahirox/WebXR-emulator-extension/issues/43), alongside cancellation of outstanding reference-space requests at shutdown for [Issue #41](https://github.com/takahirox/WebXR-emulator-extension/issues/41), correctly converted, fresh session-realm reference-space requests with queued settlement for [Issue #39](https://github.com/takahirox/WebXR-emulator-extension/issues/39), plus writable, branded, converted `fixedFoveation` accessors for [Issue #35](https://github.com/takahirox/WebXR-emulator-extension/issues/35), dispatch-integrated XR property handlers and converted readonly event data for [Issue #31](https://github.com/takahirox/WebXR-emulator-extension/issues/31), predictable bulk pose/radius conversion, validation and tracking availability for [Issue #29](https://github.com/takahirox/WebXR-emulator-extension/issues/29), stable input metadata and retained Gamepad lifetimes for [Issue #27](https://github.com/takahirox/WebXR-emulator-extension/issues/27), session-request argument conversion and snapshots for [Issue #25](https://github.com/takahirox/WebXR-emulator-extension/issues/25), default/dictionary and numeric render-state updates for [Issue #23](https://github.com/takahirox/WebXR-emulator-extension/issues/23) and simulated bounded-floor support for [Issue #21](https://github.com/takahirox/WebXR-emulator-extension/issues/21) to the consolidated simulation pass for [Issue #19](https://github.com/takahirox/WebXR-emulator-extension/issues/19) and the earlier implementation for [Issue #11](https://github.com/takahirox/WebXR-emulator-extension/issues/11). It describes **simulated capabilities**, not Quest/ARCore hardware certification or a claim of full WPT conformance. The API implementation is maintained in strict TypeScript under `src/polyfill/api/`; the former Git dependency and private `webxr-polyfill` imports have been removed. The packaged entry point remains `polyfill/webxr-polyfill.js` for manifest compatibility.
 
@@ -60,7 +62,7 @@ Additional drafts inspected on 2026-10-20 (source hashes pin the exact reviewed 
 | `hit-test` (plane/mesh room intersections) | — | I | I |
 | `dom-overlay` | — | Opt-in desktop preview only | Opt-in phone/desktop preview only |
 | `anchors` (session lifetime) | — | I | I |
-| `hand-tracking` (deterministic skeletons) | I | I | — |
+| `hand-tracking` ([simulated skeletons and individual bindings](webxr-hands.md)) | I | I | — |
 | `layers` (WebGL2 projection + mono quad) | I | I | I |
 | `fixedFoveation` bindings (also inline base layers; no feature descriptor) | Null / converted no-op | Null / converted no-op | Null / converted no-op |
 | `depth-sensing` (CPU, float32 / unsigned-short / luminance-alpha) | — | I | I |
@@ -73,7 +75,7 @@ Profile declarations in [devices.json](../src/devices.json) are constrained furt
 
 ## Consolidated triage and decisions (Issue #19)
 
-This is the single status matrix for the investigated surface. “Implemented” means useful deterministic simulation within the documented scope, not native hardware conformance. QVR = Quest VR; QMR = Quest MR; AAR = Android AR. All new sensing capabilities exclude inline and QVR. The [publication handoff](issue-19-pr-comment.md) contains the required top-level PR blocker comment text; that local file does **not** satisfy the requirement to post the comment before merge.
+This is the single status matrix for the investigated surface. “Implemented” means useful deterministic simulation within the documented scope, not native hardware conformance. QVR = Quest VR; QMR = Quest MR; AAR = Android AR. Environment sensing capabilities exclude inline and QVR; simulated hand tracking separately supports QVR and QMR as shown above. The [publication handoff](issue-19-pr-comment.md) contains the required top-level PR blocker comment text; that local file does **not** satisfy the requirement to post the comment before merge.
 
 | Module / operation | Applicable modes | Required core behavior | Feasibility and decision |
 | --- | --- | --- | --- |

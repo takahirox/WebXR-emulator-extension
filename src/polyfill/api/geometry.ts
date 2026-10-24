@@ -87,8 +87,8 @@ export class XRSpace extends interfaceBrands.SpaceObject {
   // estimated position can mark it explicitly; self-relative poses stay exact.
   get _emulatedPosition() { return interfaceBrands.spaceRelations.get(this)!.tracking.emulatedPosition; }
   set _emulatedPosition(value: boolean) { interfaceBrands.spaceRelations.get(this)!.tracking.emulatedPosition = value; }
-  constructor(readonly _session: XRSession, private matrixProvider: () => mat4 | null, joint = false) {
-    super(joint);
+  constructor(readonly _session: XRSession, private matrixProvider: () => mat4 | null) {
+    super();
     initializeSpaceRelation(this, matrixProvider, mat4.create());
   }
   get _inverseBaseMatrix() { return this._baseMatrix && mat4.invert(mat4.create(), this._baseMatrix); }
