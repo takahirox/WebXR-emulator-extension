@@ -9,12 +9,11 @@ export function hitSourceState(value: object) {
   if (!state) throw new TypeError('Expected XRHitTestSource.');
   return state;
 }
-export default class XRHitTestSource {
+export default class XRHitTestSource extends interfaceBrands.hitTestAllocations.HitSourceAllocation {
   constructor(...args: [session: XRSession, options: HitTestOptions, token?: symbol]) {
     const [session, options, token] = args;
     requireHitTestAllocation(token);
-    interfaceBrands.hitSources.set(this, {session, space: options.space, offsetRay: options.offsetRay!,
-      entityTypes: Object.freeze([...options.entityTypes!]), active: true});
+    super(session, options);
   }
   cancel() {
     const state = hitSourceState(this);
@@ -23,7 +22,7 @@ export default class XRHitTestSource {
   }
   _deactivate() {
     const state = hitSourceState(this);
-    state.active = false; state.session._hitSources.delete(this);
+    state.session._hitSources.delete(this);
     state.session._device.removeHitTestSource(this);
   }
   get _space() { return hitSourceState(this).space; }

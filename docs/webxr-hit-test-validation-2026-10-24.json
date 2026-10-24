@@ -2778,5 +2778,10 @@
     "rollup": "4.64.6",
     "playwright": "1.64.0",
     "three": "0.186.1"
+  },
+  "review_fixes": {
+    "evidence": "docs/validation/issue-53/review-fixes-2026-10-24.json",
+    "upstream_checkpoint": "b083300392341b71d1fea853528655969a255f55",
+    "result": "Both findings fixed. Build and 14 environment tests passed; 3,175 focused assertions per browser passed; Android Sample transient-registry/placement/lifetime checks passed in Chromium and Firefox. Earlier results above remain historical."
   }
 }

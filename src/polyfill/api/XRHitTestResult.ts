@@ -10,11 +10,11 @@ function resultState(value: object) {
   if (!state) throw new TypeError('Expected XRHitTestResult.');
   return state;
 }
-export default class XRHitTestResult {
+export default class XRHitTestResult extends interfaceBrands.hitTestAllocations.HitResultAllocation {
   constructor(...args: [frame: XRFrame, transform: XRRigidTransform, token?: symbol]) {
     const [frame, transform, token] = args;
     requireHitTestAllocation(token);
-    interfaceBrands.hitResults.set(this, {frame, transform});
+    super(frame, transform);
   }
   async createAnchor() {
     const {frame, transform} = resultState(this);

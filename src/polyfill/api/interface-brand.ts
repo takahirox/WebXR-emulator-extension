@@ -3,6 +3,7 @@ import type {XRReferenceSpace, XRRigidTransform, XRPose, XRViewerPose, XRView, X
 import type {mat4} from 'gl-matrix';
 import type {EventHandler} from './event-handlers';
 import {createLayerAllocations} from './layer-allocation';
+import {createHitTestAllocations} from './hit-test-allocation';
 
 // Same-origin injections share allocation brands, not writable WeakSets. Only
 // constructors can brand a newly allocated object; borrowing a prototype or
@@ -26,6 +27,11 @@ function createBrands() {
   Object.freeze(SpaceObject.prototype); Object.freeze(SpaceObject);
   Object.freeze(SessionObject.prototype); Object.freeze(SessionObject);
   Object.freeze(InputSourceObject.prototype); Object.freeze(InputSourceObject);
+  const transforms = new WeakMap<object, {
+    position: DOMPointReadOnly; orientation: DOMPointReadOnly; geometry: mat4;
+    matrix: () => Float32Array; inverse: () => XRRigidTransform;
+  }>();
+  const hitTestAllocations = createHitTestAllocations({sessions, spaces, frames, inputSources, transforms});
   return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
     layerAllocations: createLayerAllocations(sessions),
     planeValues: new WeakMap<object, {
@@ -35,18 +41,14 @@ function createBrands() {
     }>(),
     planeSets: new WeakMap<object, Set<import('./environment').XRPlane>>(),
     roomCaptures: new WeakMap<object, () => Promise<void>>(),
-    rays: new WeakMap<object, {
-      origin: DOMPointReadOnly; direction: DOMPointReadOnly; matrix: () => Float32Array;
-    }>(),
-    hitSources: new WeakMap<object, import('../../types/polyfill').HitTestState>(),
-    transientHitSources: new WeakMap<object, import('../../types/polyfill').TransientHitTestState>(),
-    hitResults: new WeakMap<object, {frame: XRFrame; transform: XRRigidTransform}>(),
-    transientHitResults: new WeakMap<object, {inputSource: XRInputSource; results: readonly import('./XRHitTestResult').default[]}>(),
+    hitTestAllocations,
+    rays: hitTestAllocations.rays,
+    hitSources: hitTestAllocations.hitSources,
+    transientHitSources: hitTestAllocations.transientHitSources,
+    hitResults: hitTestAllocations.hitResults,
+    transientHitResults: hitTestAllocations.transientHitResults,
     // Invoke the session realm's operation without consulting public properties.
-    transforms: new WeakMap<object, {
-      position: DOMPointReadOnly; orientation: DOMPointReadOnly; geometry: mat4;
-      matrix: () => Float32Array; inverse: () => XRRigidTransform;
-    }>(),
+    transforms,
     referenceOffsets: new WeakMap<object, (transform: mat4) => XRReferenceSpace>(),
     referenceSpaceRequests: new WeakMap<object, (type: string) => Promise<XRReferenceSpace>>(),
     frameValues: new WeakMap<object, {session: XRSession; predictedDisplayTime: number; pose: (matrix: mat4, emulated: boolean) => XRPose}>(),

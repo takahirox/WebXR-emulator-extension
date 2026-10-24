@@ -9,11 +9,11 @@ function resultState(value: object) {
   if (!state) throw new TypeError('Expected XRTransientInputHitTestResult.');
   return state;
 }
-export default class XRTransientInputHitTestResult {
+export default class XRTransientInputHitTestResult extends interfaceBrands.hitTestAllocations.TransientHitResultAllocation {
   constructor(...args: [frame: XRFrame, results: XRHitTestResult[], inputSource: XRInputSource, token?: symbol]) {
-    const [, results, inputSource, token] = args;
+    const [frame, results, inputSource, token] = args;
     requireHitTestAllocation(token);
-    interfaceBrands.transientHitResults.set(this, {inputSource, results: Object.freeze([...results])});
+    super(frame, results, inputSource);
   }
   get inputSource() { return resultState(this).inputSource; }
   get results() { return resultState(this).results; }

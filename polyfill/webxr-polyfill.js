@@ -1045,6 +1045,97 @@ function WebXRPolyfillInjection() {
       });
   }
 
+  function createHitTestAllocations(brands) {
+      const rays = new WeakMap();
+      const hitSources = new WeakMap();
+      const transientHitSources = new WeakMap();
+      const hitResults = new WeakMap();
+      const transientHitResults = new WeakMap();
+      function sourceRecord(session, options, extra, membership, source) {
+          const offsetRay = options.offsetRay;
+          if (!brands.sessions.has(session) || !rays.has(offsetRay))
+              throw new TypeError('Expected session and ray.');
+          const entityTypes = Object.freeze([...options.entityTypes]);
+          if (entityTypes.some(type => !['plane', 'mesh', 'point'].includes(type)))
+              throw new TypeError('Invalid entity type.');
+          return Object.freeze({ ...extra, session, offsetRay, entityTypes,
+              get active() { return membership.has(source); } });
+      }
+      class RayAllocation {
+          constructor(p, d) {
+              p = { x: +p.x, y: +p.y, z: +p.z, w: +p.w };
+              d = { x: +d.x, y: +d.y, z: +d.z, w: +d.w };
+              if (p.w !== 1 || d.w !== 0 || ![d.x, d.y, d.z].every(Number.isFinite) || (d.x === 0 && d.y === 0 && d.z === 0))
+                  throw new TypeError('Invalid ray.');
+              const scale = Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
+              const length = Math.hypot(d.x / scale, d.y / scale, d.z / scale);
+              d.x = d.x / scale / length;
+              d.y = d.y / scale / length;
+              d.z = d.z / scale / length;
+              const origin = Object.freeze(new DOMPointReadOnly(p.x, p.y, p.z, p.w));
+              const direction = Object.freeze(new DOMPointReadOnly(d.x, d.y, d.z, d.w));
+              let matrix;
+              rays.set(this, Object.freeze({ origin, direction, matrix: () => {
+                      if (!matrix || matrix.buffer.byteLength === 0) {
+                          const rotation = create$3();
+                          const sine = Math.hypot(d.x, d.y);
+                          if (sine > 0) {
+                              fromRotation(rotation, Math.atan2(sine, -d.z), [d.y / sine, -d.x / sine, 0]);
+                          }
+                          else if (d.z > 0)
+                              fromRotation(rotation, Math.PI, [1, 0, 0]);
+                          rotation[12] = p.x;
+                          rotation[13] = p.y;
+                          rotation[14] = p.z;
+                          matrix = new Float32Array(rotation);
+                      }
+                      return matrix;
+                  } }));
+          }
+      }
+      class HitSourceAllocation {
+          constructor(session, options) {
+              const space = options.space;
+              if (!brands.spaces.has(space))
+                  throw new TypeError('Expected XRSpace.');
+              hitSources.set(this, sourceRecord(session, options, { space }, session._hitSources, this));
+          }
+      }
+      class TransientHitSourceAllocation {
+          constructor(session, options) {
+              const profile = `${options.profile}`;
+              transientHitSources.set(this, sourceRecord(session, options, { profile }, session._transientSources, this));
+          }
+      }
+      class HitResultAllocation {
+          constructor(frame, transform) {
+              if (!brands.frames.has(frame) || !brands.transforms.has(transform))
+                  throw new TypeError('Expected frame and transform.');
+              hitResults.set(this, Object.freeze({ frame, transform }));
+          }
+      }
+      class TransientHitResultAllocation {
+          constructor(frame, results, inputSource) {
+              if (!brands.frames.has(frame) || !brands.inputSources.has(inputSource))
+                  throw new TypeError('Expected frame and input source.');
+              const snapshot = [...results];
+              if (snapshot.some(result => { var _a; return ((_a = hitResults.get(result)) === null || _a === void 0 ? void 0 : _a.frame) !== frame; }))
+                  throw new TypeError('Expected frame hit results.');
+              transientHitResults.set(this, Object.freeze({ inputSource, results: Object.freeze(snapshot) }));
+          }
+      }
+      function reader(map) {
+          return Object.freeze({ get: (value) => map.get(value), has: (value) => map.has(value) });
+      }
+      for (const C of [RayAllocation, HitSourceAllocation, TransientHitSourceAllocation, HitResultAllocation, TransientHitResultAllocation]) {
+          Object.freeze(C.prototype);
+          Object.freeze(C);
+      }
+      return Object.freeze({ RayAllocation, HitSourceAllocation, TransientHitSourceAllocation, HitResultAllocation, TransientHitResultAllocation,
+          rays: reader(rays), hitSources: reader(hitSources), transientHitSources: reader(transientHitSources),
+          hitResults: reader(hitResults), transientHitResults: reader(transientHitResults) });
+  }
+
   function createBrands() {
       const frames = new WeakSet(), spaces = new WeakSet(), joints = new WeakSet();
       const sessions = new WeakSet(), inputSources = new WeakSet();
@@ -1069,17 +1160,20 @@ function WebXRPolyfillInjection() {
       Object.freeze(SessionObject);
       Object.freeze(InputSourceObject.prototype);
       Object.freeze(InputSourceObject);
+      const transforms = new WeakMap();
+      const hitTestAllocations = createHitTestAllocations({ sessions, spaces, frames, inputSources, transforms });
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
           layerAllocations: createLayerAllocations(sessions),
           planeValues: new WeakMap(),
           planeSets: new WeakMap(),
           roomCaptures: new WeakMap(),
-          rays: new WeakMap(),
-          hitSources: new WeakMap(),
-          transientHitSources: new WeakMap(),
-          hitResults: new WeakMap(),
-          transientHitResults: new WeakMap(),
-          transforms: new WeakMap(),
+          hitTestAllocations,
+          rays: hitTestAllocations.rays,
+          hitSources: hitTestAllocations.hitSources,
+          transientHitSources: hitTestAllocations.transientHitSources,
+          hitResults: hitTestAllocations.hitResults,
+          transientHitResults: hitTestAllocations.transientHitResults,
+          transforms,
           referenceOffsets: new WeakMap(),
           referenceSpaceRequests: new WeakMap(),
           frameValues: new WeakMap(),
@@ -25907,7 +26001,7 @@ void main() {
           throw new TypeError('Expected XRRay.');
       return state;
   }
-  class XRRay {
+  class XRRay extends interfaceBrands.hitTestAllocations.RayAllocation {
       constructor(origin = {}, direction = {}) {
           let p, d;
           if (arguments.length === 1 && transformObjects.has(origin)) {
@@ -25921,29 +26015,7 @@ void main() {
           }
           if (p.w !== 1 || d.w !== 0 || (d.x === 0 && d.y === 0 && d.z === 0))
               throw new TypeError('Invalid ray origin or direction.');
-          const scale = Math.max(Math.abs(d.x), Math.abs(d.y), Math.abs(d.z));
-          const length = Math.hypot(d.x / scale, d.y / scale, d.z / scale);
-          d.x = d.x / scale / length;
-          d.y = d.y / scale / length;
-          d.z = d.z / scale / length;
-          const position = Object.freeze(new DOMPointReadOnly(p.x, p.y, p.z, p.w));
-          const vector = Object.freeze(new DOMPointReadOnly(d.x, d.y, d.z, d.w));
-          let matrix;
-          interfaceBrands.rays.set(this, { origin: position, direction: vector, matrix: () => {
-                  if (!matrix || matrix.buffer.byteLength === 0) {
-                      const axis = [d.y, -d.x, 0];
-                      const cos = -d.z, rotation = create$3();
-                      if (cos > -1 && cos < 1)
-                          fromRotation(rotation, Math.acos(cos), axis);
-                      else if (cos === -1)
-                          fromRotation(rotation, Math.PI, [1, 0, 0]);
-                      rotation[12] = p.x;
-                      rotation[13] = p.y;
-                      rotation[14] = p.z;
-                      matrix = new Float32Array(rotation);
-                  }
-                  return matrix;
-              } });
+          super(p, d);
       }
       get origin() { return rayState(this).origin; }
       get direction() { return rayState(this).direction; }
@@ -26143,12 +26215,11 @@ void main() {
           throw new TypeError('Expected XRHitTestSource.');
       return state;
   }
-  class XRHitTestSource {
+  class XRHitTestSource extends interfaceBrands.hitTestAllocations.HitSourceAllocation {
       constructor(...args) {
           const [session, options, token] = args;
           requireHitTestAllocation(token);
-          interfaceBrands.hitSources.set(this, { session, space: options.space, offsetRay: options.offsetRay,
-              entityTypes: Object.freeze([...options.entityTypes]), active: true });
+          super(session, options);
       }
       cancel() {
           const state = hitSourceState(this);
@@ -26158,7 +26229,6 @@ void main() {
       }
       _deactivate() {
           const state = hitSourceState(this);
-          state.active = false;
           state.session._hitSources.delete(this);
           state.session._device.removeHitTestSource(this);
       }
@@ -26177,12 +26247,11 @@ void main() {
           throw new TypeError('Expected XRTransientInputHitTestSource.');
       return state;
   }
-  class XRTransientInputHitTestSource {
+  class XRTransientInputHitTestSource extends interfaceBrands.hitTestAllocations.TransientHitSourceAllocation {
       constructor(...args) {
           const [session, options, token] = args;
           requireHitTestAllocation(token);
-          interfaceBrands.transientHitSources.set(this, { session, profile: options.profile, offsetRay: options.offsetRay,
-              entityTypes: Object.freeze([...options.entityTypes]), active: true });
+          super(session, options);
       }
       cancel() {
           const state = transientHitSourceState(this);
@@ -26192,7 +26261,6 @@ void main() {
       }
       _deactivate() {
           const state = transientHitSourceState(this);
-          state.active = false;
           state.session._transientSources.delete(this);
           state.session._device.removeHitTestSource(this);
       }
@@ -26211,11 +26279,11 @@ void main() {
           throw new TypeError('Expected XRHitTestResult.');
       return state;
   }
-  class XRHitTestResult {
+  class XRHitTestResult extends interfaceBrands.hitTestAllocations.HitResultAllocation {
       constructor(...args) {
           const [frame, transform, token] = args;
           requireHitTestAllocation(token);
-          interfaceBrands.hitResults.set(this, { frame, transform });
+          super(frame, transform);
       }
       async createAnchor() {
           const { frame, transform } = resultState$1(this);
@@ -26242,11 +26310,11 @@ void main() {
           throw new TypeError('Expected XRTransientInputHitTestResult.');
       return state;
   }
-  class XRTransientInputHitTestResult {
+  class XRTransientInputHitTestResult extends interfaceBrands.hitTestAllocations.TransientHitResultAllocation {
       constructor(...args) {
-          const [, results, inputSource, token] = args;
+          const [frame, results, inputSource, token] = args;
           requireHitTestAllocation(token);
-          interfaceBrands.transientHitResults.set(this, { inputSource, results: Object.freeze([...results]) });
+          super(frame, results, inputSource);
       }
       get inputSource() { return resultState(this).inputSource; }
       get results() { return resultState(this).results; }

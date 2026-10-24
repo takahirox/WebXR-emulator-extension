@@ -1,0 +1,2024 @@
+{
+  "issue": 53,
+  "upstream_checkpoint": "b083300392341b71d1fea853528655969a255f55",
+  "scope": "Only the two agent-fixable review findings: near-opposite ray matrices and exposed mutable hit-test brand/state maps.",
+  "fixes": [
+    "Ray matrices use a unit rotation axis and atan2(sine, cosine), including when cosine rounds to an endpoint. Matrix regeneration uses the same retained geometry.",
+    "Hit-test maps are closure-private. Shared allocation constructors initialize their new objects with validated backing interfaces and immutable records; shared map readers have no registration or mutation operations. Source activity derives from session membership instead of a writable retained flag."
+  ],
+  "validation": [
+    {
+      "command": "npm ci",
+      "status": "passed",
+      "result": "54 packages installed; audit reported no vulnerabilities"
+    },
+    {
+      "command": "npm run build:firefox",
+      "status": "passed",
+      "result": "typecheck, emitted build, browser bundles and Firefox package"
+    },
+    {
+      "command": "npm run test:environment",
+      "status": "passed",
+      "tests": 14
+    }
+  ],
+  "historical_local_failures": [
+    {
+      "command": "npm run typecheck",
+      "result": "Initial allocation-factory return inference introduced a TypeScript circular dependency. Explicit return/record types corrected it before the final build; no runtime assertion failed."
+    }
+  ],
+  "requirement_changes": "None. Existing pinned specifications and acceptance remain unchanged.",
+  "instrumentation": "Existing genuine extension/panel drivers and pinned WPT ray bodies. New page-side assertions inspect registry reader facets and attempt brand-copy/retained-record writes. The Android application observer inspects real transient groups without changing application requests, results, exceptions, rendering or input routes.",
+  "not_rerun": "The other six application/browser/profile combinations and unrelated regressions were not rerun for these two findings. Prior eight-combination execution evidence remains historical and separate.",
+  "post_merge_verification": "None required.",
+  "runs": [
+    {
+      "status": "passed",
+      "startedAt": "2026-10-24T03:30:40.271Z",
+      "completedAt": "2026-10-24T03:30:48.650Z",
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "failures": [],
+      "skips": [],
+      "cleanup": {
+        "contextClosed": true,
+        "profileRemoved": true
+      },
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "390af496c54d5bc4a6d9ee85cec7e791f1438fc4435ebb793ffd923bb69e7e55",
+        "src/polyfill/api/interface-brand.ts": "65463ad3fceaac922dfcccf3ee9f33ee28ed58031c54ed18eba57f66510b9265",
+        "src/polyfill/api/hit-test-allocation.ts": "fa8e4a8e0d28e53f02a718e0fff12c720b73fe8fd229f17bdd5bf1afbb0cbfe3",
+        "src/polyfill/api/geometry.ts": "3c4ab7a879249113f45c030d52e14726f0ee87223f8ff939ee0c9ec53db22d81",
+        "src/polyfill/api/XRRay.ts": "cd106e56ebba49bde156bb23bf43ba2cbbb311d7754a031db3218651f1d28378",
+        "src/polyfill/api/XRHitTestResult.ts": "eaf1ab626cefe6d1657ea3c11201bd0fb0a6b238876b49114c1fb0913b490b02",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "c013fbb129d7549d5d15cf0f18d6d5edda9e8b048449c9e534f35f2555e1de8d",
+        "src/polyfill/EmulatedXRDevice.ts": "17bd94c1cf1ab817866f0995c16ea4d8ff0753ad11820ed2e0cdf80d5049ab51",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "9c1264bba294d1bec3152a6a86079688f667f347850a57a4012bda8d5ac88693",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "fb30908337a61927206a916411d01a791904af3d33704bd2f1df9c718aba5589",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "83c432a6b0a7e27e6f8fec7d2ba5e33b73e54d35eed8326143e0132a352cb9a1",
+        "src/polyfill/api/environment.ts": "499b1d4057a292e5ad1bee8d49024c16cfad52463178695763802a7d3810bfca",
+        "src/polyfill/api/plane-regions.ts": "a1de5284126873847132dc455032e8a8cc93bfa4e4548bdfaaa3dcec88412129",
+        "tests/planes.ts": "3f9458012c23de65d710b0411545ed09fd18de5d1b7b55502bd2e69de6981c8e",
+        "tests/plane-applications.ts": "e44123587b11bf2dd60c657a78806b7731c11af74b4bc82c69b324c2e5ed9a12",
+        "tests/hit-test.ts": "ebd2853d045cbbeffec2688e9a0400dd8232b2cf314b22c9f7844ee5459d6cdf",
+        "tests/hit-test-applications.ts": "187fe8e25510a50b2c33031c0f8d5539cce7d95e4759b83c11a87f75a2619449",
+        "tests/hit-test-sample-observer.js": "dab82d4e7efd2d7030a53996bc07a3549e9494faa78b1619aee280cafaa9abde",
+        "src/polyfill/api/hit-test-options.ts": "c9db0bf944e31e2161a648c90e154f6108d3335c5ff4f840807749ff601b7e6d",
+        "src/polyfill/api/hit-test-geometry.ts": "5eef8b40dfca856bef3af55b8f3e9e834ab8541dfb4d068a76524b35c5ca4465",
+        "src/polyfill/api/XRHitTestSource.ts": "c637b1e1cb0d9870a084a61fa3848ef366c2b2deba822fbb4d28a569fd8b0e17",
+        "src/polyfill/api/XRTransientInputHitTestSource.ts": "4b018c24c70e64fdabe3d060932faff70dbf1c5f192ba482dea0282f54841421",
+        "src/polyfill/api/XRTransientInputHitTestResult.ts": "52c48af21e43b76cbb2774397dccbfee230dba50fa2b461355c268222252e98d",
+        "src/polyfill/ARScene.ts": "de1ad23c50520467a07a313e36239d0b4af67f873b229a435cc45f4358f46750",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "837abf620341963cc4134f1b34e5faa78f01a374e973861aff8504d2db26705c",
+        "polyfill/webxr-polyfill.js": "30b287686d45819c47e3c9ee0397e758be19abc4a38cc0cfa8ba1a196f724516",
+        "build/firefox/polyfill/webxr-polyfill.js": "30b287686d45819c47e3c9ee0397e758be19abc4a38cc0cfa8ba1a196f724516"
+      },
+      "servedSources": [
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/xrRay_constructor.https.html",
+          "sha256": "e68cd415e8034ff44097403c54d420489258369d4eaca02ef761a5dd019d8325",
+          "bytes": 5523
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/resources/webxr_test_constants.js",
+          "sha256": "6fd216e2544b7a15cef6f9b07b5faaf806eacf176b35da067e457a3b1f19668d",
+          "bytes": 6325
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/resources/testharness.js",
+          "sha256": "7a108d7cfa98ac413ddb38f82fd509fb2037dfcc25ccf466567520cbb6bdf1fa",
+          "bytes": 198420
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/resources/webxr_test_asserts.js",
+          "sha256": "4b7a4722f49bb59fc6c28eb06854ce033c06241f143545aff9ee775e0df21274",
+          "bytes": 12553
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/xrRay_matrix.https.html",
+          "sha256": "4199b453da9c9fd40c0c8dbb1ed44b9cfd1907727a4a3da7c47c6367c0882ce3",
+          "bytes": 3806
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/resources/webxr_math_utils.js",
+          "sha256": "aa4adceaec381f243590086f19b0e059b5690cc37e9e1e726b37097195b299f0",
+          "bytes": 2554
+        }
+      ],
+      "command": "npm run test:hit-test:chromium",
+      "report_sha256": "dfbee36989edbf2699162563fd7f3346d1c63e0246f574ce95e03a9cc0ec5b2b",
+      "results": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "immersive-vr",
+          "assertions": 571,
+          "measurements": [
+            {
+              "wpt": "xrRay_constructor",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay constructors work",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            },
+            {
+              "wpt": "xrRay_matrix",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay matrix works",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)"
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 731,
+          "measurements": [
+            {
+              "wpt": "xrRay_constructor",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay constructors work",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            },
+            {
+              "wpt": "xrRay_matrix",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay matrix works",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            },
+            {
+              "planeHits": 1,
+              "meshHits": 1,
+              "distances": [
+                7.215687274932861
+              ],
+              "point": [
+                0,
+                0,
+                -7.215687274932861
+              ],
+              "normal": [
+                0,
+                3.422854177870249e-08,
+                1
+              ]
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)",
+            "retained source record and entity snapshot frozen",
+            "page cannot alter retained subscription data",
+            "page cannot copy source brands (TypeError)",
+            "page cannot replace retained hit geometry",
+            "page cannot copy result brand (TypeError)"
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 731,
+          "measurements": [
+            {
+              "wpt": "xrRay_constructor",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay constructors work",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            },
+            {
+              "wpt": "xrRay_matrix",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay matrix works",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            },
+            {
+              "planeHits": 1,
+              "meshHits": 1,
+              "distances": [
+                7.015687271952629
+              ],
+              "point": [
+                0,
+                0,
+                -7.215687274932861
+              ],
+              "normal": [
+                0,
+                3.422854177870249e-08,
+                1
+              ]
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)",
+            "retained source record and entity snapshot frozen",
+            "page cannot alter retained subscription data",
+            "page cannot copy source brands (TypeError)",
+            "page cannot replace retained hit geometry",
+            "page cannot copy result brand (TypeError)"
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "inline",
+          "assertions": 571,
+          "measurements": [
+            {
+              "wpt": "xrRay_constructor",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay constructors work",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            },
+            {
+              "wpt": "xrRay_matrix",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay matrix works",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)"
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "inline",
+          "assertions": 571,
+          "measurements": [
+            {
+              "wpt": "xrRay_constructor",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay constructors work",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            },
+            {
+              "wpt": "xrRay_matrix",
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "name": "XRRay matrix works",
+                    "status": 0,
+                    "message": null
+                  }
+                ]
+              }
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)"
+          ]
+        }
+      ]
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-24T03:31:25.625Z",
+      "completedAt": "2026-10-24T03:31:35.519Z",
+      "versions": {
+        "browser": "156.0.8078.4",
+        "node": "v24.12.0",
+        "playwright": "1.64.0",
+        "executableSHA256": "c8509aee32abd6977968e9999769980b7a420dea05402d90042d9e5b41db15ef"
+      },
+      "failures": [],
+      "skips": [],
+      "cleanup": {
+        "contextClosed": true,
+        "profileRemoved": true
+      },
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "390af496c54d5bc4a6d9ee85cec7e791f1438fc4435ebb793ffd923bb69e7e55",
+        "src/polyfill/api/interface-brand.ts": "65463ad3fceaac922dfcccf3ee9f33ee28ed58031c54ed18eba57f66510b9265",
+        "src/polyfill/api/hit-test-allocation.ts": "fa8e4a8e0d28e53f02a718e0fff12c720b73fe8fd229f17bdd5bf1afbb0cbfe3",
+        "src/polyfill/api/geometry.ts": "3c4ab7a879249113f45c030d52e14726f0ee87223f8ff939ee0c9ec53db22d81",
+        "src/polyfill/api/XRRay.ts": "cd106e56ebba49bde156bb23bf43ba2cbbb311d7754a031db3218651f1d28378",
+        "src/polyfill/api/XRHitTestResult.ts": "eaf1ab626cefe6d1657ea3c11201bd0fb0a6b238876b49114c1fb0913b490b02",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "c013fbb129d7549d5d15cf0f18d6d5edda9e8b048449c9e534f35f2555e1de8d",
+        "src/polyfill/EmulatedXRDevice.ts": "17bd94c1cf1ab817866f0995c16ea4d8ff0753ad11820ed2e0cdf80d5049ab51",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "9c1264bba294d1bec3152a6a86079688f667f347850a57a4012bda8d5ac88693",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "fb30908337a61927206a916411d01a791904af3d33704bd2f1df9c718aba5589",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "83c432a6b0a7e27e6f8fec7d2ba5e33b73e54d35eed8326143e0132a352cb9a1",
+        "src/polyfill/api/environment.ts": "499b1d4057a292e5ad1bee8d49024c16cfad52463178695763802a7d3810bfca",
+        "src/polyfill/api/plane-regions.ts": "a1de5284126873847132dc455032e8a8cc93bfa4e4548bdfaaa3dcec88412129",
+        "tests/planes.ts": "3f9458012c23de65d710b0411545ed09fd18de5d1b7b55502bd2e69de6981c8e",
+        "tests/plane-applications.ts": "e44123587b11bf2dd60c657a78806b7731c11af74b4bc82c69b324c2e5ed9a12",
+        "tests/hit-test.ts": "ebd2853d045cbbeffec2688e9a0400dd8232b2cf314b22c9f7844ee5459d6cdf",
+        "tests/hit-test-applications.ts": "187fe8e25510a50b2c33031c0f8d5539cce7d95e4759b83c11a87f75a2619449",
+        "tests/hit-test-sample-observer.js": "dab82d4e7efd2d7030a53996bc07a3549e9494faa78b1619aee280cafaa9abde",
+        "src/polyfill/api/hit-test-options.ts": "c9db0bf944e31e2161a648c90e154f6108d3335c5ff4f840807749ff601b7e6d",
+        "src/polyfill/api/hit-test-geometry.ts": "5eef8b40dfca856bef3af55b8f3e9e834ab8541dfb4d068a76524b35c5ca4465",
+        "src/polyfill/api/XRHitTestSource.ts": "c637b1e1cb0d9870a084a61fa3848ef366c2b2deba822fbb4d28a569fd8b0e17",
+        "src/polyfill/api/XRTransientInputHitTestSource.ts": "4b018c24c70e64fdabe3d060932faff70dbf1c5f192ba482dea0282f54841421",
+        "src/polyfill/api/XRTransientInputHitTestResult.ts": "52c48af21e43b76cbb2774397dccbfee230dba50fa2b461355c268222252e98d",
+        "src/polyfill/ARScene.ts": "de1ad23c50520467a07a313e36239d0b4af67f873b229a435cc45f4358f46750",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "837abf620341963cc4134f1b34e5faa78f01a374e973861aff8504d2db26705c",
+        "polyfill/webxr-polyfill.js": "30b287686d45819c47e3c9ee0397e758be19abc4a38cc0cfa8ba1a196f724516",
+        "build/firefox/polyfill/webxr-polyfill.js": "30b287686d45819c47e3c9ee0397e758be19abc4a38cc0cfa8ba1a196f724516"
+      },
+      "servedSources": [
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/hit-test.html",
+          "sha256": "a9cc4b49b9b5e31dde1a84957fded74580d1ea9578212b062f87b1ea9fefcfaa",
+          "bytes": 7592
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/css/common.css",
+          "sha256": "c48cb825f38c76a91059f64307dba35baa2447da724906d0bdbbd2ae6f75543f",
+          "bytes": 1399
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/util/webxr-button.js",
+          "sha256": "dde97b7c00937a5b006e39d33d657aadc9ab8d4e1188d6275e3ba33a99d9bffa",
+          "bytes": 16612
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/scenes/scene.js",
+          "sha256": "c4301324f3e3048746f2601c8d9fb239945e0d5503cf1e3d2958ba5bd2457dc0",
+          "bytes": 11322
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/renderer.js",
+          "sha256": "32bd0e86ff60255154092d033f0d1ae204711356e7dc3a0020e5875d04aed7a7",
+          "bytes": 48809
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/node.js",
+          "sha256": "db2bf44eec53a054c84633858597446e4536cca0e91c084ce90d875874f3414b",
+          "bytes": 11380
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/gltf2.js",
+          "sha256": "c2b0465b27c4b0fefeb5a84f32e3f7915963d42d135506db6f59288992a1ddc9",
+          "bytes": 2590
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/math/gl-matrix.js",
+          "sha256": "46d208aaefac9f7a6318069d5e8ad45cc04261b1e1b82b06a3c4a0baf1b427f1",
+          "bytes": 1983
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/math/ray.js",
+          "sha256": "bfee42564036c994734fb54a7315a4d6f52a7a0f7153a8fe24cbc506a3cda0d4",
+          "bytes": 3793
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/drop-shadow.js",
+          "sha256": "c7732ef4be3b850e48955682671e369c091f4b288ab77fc9899a0648687b3440",
+          "bytes": 3664
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/input-renderer.js",
+          "sha256": "ebae97ac3269e0a6c8c52668e67be46176f6d106b33628fc6ad094c9d4fd24be",
+          "bytes": 16573
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/material.js",
+          "sha256": "5826a3b57e0be4cafe871d17893ebdaa9539000160280ed7a74f95c487d7d121",
+          "bytes": 6569
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/stats-viewer.js",
+          "sha256": "cef054a235391fda1b232b04b4032c913120c7e368070c9d2b3df87b9149fb31",
+          "bytes": 9272
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/program.js",
+          "sha256": "e03b5fb22c773001d20411ace5c1efa3322e8874fea269fcea1c9ccde4e9307b",
+          "bytes": 4899
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/loaders/gltf2.js",
+          "sha256": "ed82ed03853a8bb4b2fcb6aa9ac7db21a01bc8163b6f136c1e471d3984b7da4b",
+          "bytes": 13181
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/texture.js",
+          "sha256": "2de9a0609b542e2a99c2008c9a839b7eade0983f0aa1630d8c3191d79201e76d",
+          "bytes": 5165
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/common.js",
+          "sha256": "b0f9bb0bc31f427496460755e3e31b3d4646e86a0db92f45b25cdef03bf385f0",
+          "bytes": 1166
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat2d.js",
+          "sha256": "41a55e96c03ca2dc3e48f00b7365992289a77cb42838e7725c8955404cee848a",
+          "bytes": 10859
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat2.js",
+          "sha256": "29bf449c52c4e26f7ed79034a078c2d609d945a8eb209c0d7630754e58e91aac",
+          "bytes": 9746
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat3.js",
+          "sha256": "c710530d89bc3b4575ae390f191612ef1134e3196541f857997d7196b4a9da0c",
+          "bytes": 18477
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat4.js",
+          "sha256": "07366167394e53cd7e445c951d1dedc8b0cfed1aae1ef487c6c5455d6bddb7fa",
+          "bytes": 47268
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/quat2.js",
+          "sha256": "43a7eee9928b0a10ceba9cddce47259ab11617bc6007d342ab3941fd62c07ad7",
+          "bytes": 21654
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/quat.js",
+          "sha256": "2233a07eb77a1badf378e9c1a828084a63c5d0003bbaba74be6a27841303bd01",
+          "bytes": 16022
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec2.js",
+          "sha256": "8338dd76a3cd05a62893b5aad5487c544c4e07d19deddafa300490b675227d34",
+          "bytes": 13681
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec3.js",
+          "sha256": "75f3bf3fb8086611bd8713b46edcf9e469de010a6f5a0816ee466ff9e5554388",
+          "bytes": 18370
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/primitive.js",
+          "sha256": "bb29fce08b2587a16da4d9558ebb1860f2ac1b4e70d0348f738cfe1d9becfd98",
+          "bytes": 2175
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec4.js",
+          "sha256": "0755ef3edc3a924ded08714c4e8b540e6a5a684bf46c4edad0a2afc8a12293fe",
+          "bytes": 13948
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/geometry/primitive-stream.js",
+          "sha256": "dab4b181bebca431c4592bda18de6c5eaaa5f4c3eb0c9166399ae95f47d50607",
+          "bytes": 7627
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/materials/pbr.js",
+          "sha256": "24ff40accb92ce643d4b4615ae0571c64ecd5fb880480d4650ac0f531596f772",
+          "bytes": 7768
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/seven-segment-text.js",
+          "sha256": "371e89192f2ee967110b983afbd846cd8e782e3fcba09bef70bb1dda550f8697",
+          "bytes": 6318
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/favicon-32x32.png",
+          "sha256": "fc48a339fe368a190776128ea224deee9f8614c7be976067fc4eb095621818fc",
+          "bytes": 1080
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/sunflower/sunflower.gltf",
+          "sha256": "bbeb23685fba75904fcad8169c07a694bd70044b6f446242659bf54b915f8240",
+          "bytes": 4932
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/reticle/reticle.gltf",
+          "sha256": "65c94ff4ab478b4222728e0eff4321f422b5a6693ca0ce9caf9b3f8c330600b6",
+          "bytes": 3774
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/sunflower/PUSHILIN_sunflower.png",
+          "sha256": "c24d604944d888414071163527fdbb1ae3730a3c60c32648acf3b2f52aec7c75",
+          "bytes": 159079
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/reticle/reticle.bin",
+          "sha256": "e75e72160bec85b8ed4918a493128a669b4b992fe6621b9fb9b8bc84c18bd022",
+          "bytes": 5364
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/sunflower/sunflower.bin",
+          "sha256": "abce43943ead1e3a939911dac5d6d8fafbb5a848809f2fd5b0ebe6bbc31d70b7",
+          "bytes": 23928
+        }
+      ],
+      "command": "WEBXR_HIT_TEST_APP=android:sample npm run test:hit-test-applications:chromium",
+      "report_sha256": "4b8854bc331ad10aa82646c257c7d50daa06861f468111fdddd47ebda96ace65",
+      "results": [
+        {
+          "profile": "android",
+          "device": "Generic Android Phone (ARCore)",
+          "app": "sample",
+          "dependencies": [
+            {
+              "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/motion-controllers@1.0/dist/motion-controllers.module.js",
+              "status": 200,
+              "bytes": 13492,
+              "sha256": "c2d631f67ff39ef82abccb21f680e1f64337b63ebe744d2b39d779e27c28c7bb",
+              "evidence": "browser force-cache reread of dependency requested by the unchanged pinned application"
+            },
+            {
+              "url": "https://fonts.gstatic.com/s/karla/v5/Zi_e6rBgGqv33BWF8WTq8g.woff2",
+              "status": 200,
+              "bytes": 6260,
+              "sha256": "7a42c4a99bde59e3e96a55119ed3a4a97ef97fd6b1f944cebfbed98f3478a002",
+              "evidence": "browser force-cache reread of dependency requested by the unchanged pinned application"
+            }
+          ],
+          "before": {
+            "frames": 36,
+            "last": {
+              "local": [
+                0,
+                -1.079209327697754,
+                -7.215687274932861
+              ],
+              "world": [
+                0,
+                0.520790696144104,
+                -7.215687274932861
+              ],
+              "room": [
+                0,
+                0.5207907324292018,
+                -7.215687274932861
+              ],
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "viewer": [
+                0,
+                0,
+                -0.07500000298023224
+              ],
+              "error": 3.6285097815280665e-08
+            },
+            "reticle": [
+              0,
+              -1.079209327697754,
+              -7.215687274932861
+            ],
+            "placements": [],
+            "select": null,
+            "errors": []
+          },
+          "moved": {
+            "frames": 62,
+            "last": {
+              "local": [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570638179779053
+              ],
+              "world": [
+                0.30000001192092896,
+                0,
+                -5.570638179779053
+              ],
+              "room": [
+                0.30000001192092896,
+                -4.8979935218795845e-08,
+                -5.570638108600722
+              ],
+              "normal": [
+                -2.3970043658462238e-09,
+                1,
+                0
+              ],
+              "viewer": [
+                0.30000001192092896,
+                0.10000002384185791,
+                -0.07500000298023224
+              ],
+              "error": 8.640248160423767e-08
+            },
+            "reticle": [
+              0.30000001192092896,
+              -1.600000023841858,
+              -5.570638179779053
+            ],
+            "placements": [],
+            "select": null,
+            "errors": []
+          },
+          "placement": {
+            "frames": 93,
+            "last": {
+              "local": [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570638179779053
+              ],
+              "world": [
+                0.30000001192092896,
+                0,
+                -5.570638179779053
+              ],
+              "room": [
+                0.30000001192092896,
+                -4.8979935218795845e-08,
+                -5.570638108600722
+              ],
+              "normal": [
+                -2.3970043658462238e-09,
+                1,
+                0
+              ],
+              "viewer": [
+                0.30000001192092896,
+                0.10000002384185791,
+                -0.07500000298023224
+              ],
+              "error": 8.640248160423767e-08
+            },
+            "reticle": [
+              0.30000001192092896,
+              -1.600000023841858,
+              -5.570638179779053
+            ],
+            "placements": [
+              {
+                "position": [
+                  0.30000001192092896,
+                  -1.600000023841858,
+                  -5.570638179779053
+                ],
+                "visible": true,
+                "renderables": 2
+              }
+            ],
+            "select": {
+              "last": {
+                "local": [
+                  0.30000001192092896,
+                  -1.600000023841858,
+                  -5.570638179779053
+                ],
+                "world": [
+                  0.30000001192092896,
+                  0,
+                  -5.570638179779053
+                ],
+                "room": [
+                  0.30000001192092896,
+                  -4.8979935218795845e-08,
+                  -5.570638108600722
+                ],
+                "normal": [
+                  -2.3970043658462238e-09,
+                  1,
+                  0
+                ],
+                "viewer": [
+                  0.30000001192092896,
+                  0.10000002384185791,
+                  -0.07500000298023224
+                ],
+                "error": 8.640248160423767e-08
+              },
+              "reticle": [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570638179779053
+              ]
+            },
+            "errors": []
+          },
+          "pixels": {
+            "width": 1080,
+            "height": 1920,
+            "regions": [
+              {
+                "width": 1080,
+                "height": 1920,
+                "colored": 3345,
+                "transparent": 2070255,
+                "colors": 823
+              }
+            ],
+            "layer": "base"
+          },
+          "presented": [
+            {
+              "expected": [
+                237,
+                231,
+                79,
+                255
+              ],
+              "closest": [
+                221,
+                213,
+                73,
+                255
+              ],
+              "difference": 18,
+              "nearbyRoom": [
+                101,
+                95,
+                91,
+                255
+              ],
+              "foregroundContrast": 120,
+              "correlation": 32584,
+              "room": [
+                152,
+                143,
+                138,
+                255
+              ]
+            }
+          ],
+          "state": {
+            "requests": [
+              {
+                "mode": "immersive-ar",
+                "requiredFeatures": [
+                  "local",
+                  "hit-test"
+                ]
+              }
+            ],
+            "enabled": [
+              "viewer",
+              "local",
+              "hit-test"
+            ],
+            "views": [
+              {
+                "eye": "none",
+                "width": 1080,
+                "height": 1920
+              }
+            ],
+            "frames": 275,
+            "sourceCount": 1
+          },
+          "shutdown": {
+            "frames": 276,
+            "ends": 1,
+            "sources": 0,
+            "transient": 0,
+            "backend": 0,
+            "maps": 0,
+            "callbacks": 0,
+            "layers": 0,
+            "connected": false
+          },
+          "restart": {
+            "fresh": true,
+            "oldAbsent": true,
+            "freshInputs": true,
+            "last": {
+              "local": [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570638179779053
+              ],
+              "world": [
+                0.30000001192092896,
+                0,
+                -5.570638179779053
+              ],
+              "room": [
+                0.30000001192092896,
+                -4.8979935218795845e-08,
+                -5.570638108600722
+              ],
+              "normal": [
+                -2.3970043658462238e-09,
+                1,
+                0
+              ],
+              "viewer": [
+                0.30000001192092896,
+                0.10000002384185791,
+                -0.07500000298023224
+              ],
+              "error": 8.640248160423767e-08
+            },
+            "reticle": [
+              0.30000001192092896,
+              -1.600000023841858,
+              -5.570638179779053
+            ],
+            "errors": []
+          },
+          "cleanup": {
+            "ends": 2,
+            "backend": 0,
+            "maps": 0,
+            "callbacks": 0,
+            "layers": 0
+          },
+          "transient": {
+            "errors": [],
+            "assertions": 1027,
+            "cancelled": true,
+            "laterInvalid": 10,
+            "trace_entries": 63,
+            "entries_with_groups": 33,
+            "input_identities": [
+              1,
+              2,
+              3
+            ],
+            "distinct_hit_positions": [
+              [
+                -0.10258757323026657,
+                -1.600000023841858,
+                -5.564778804779053
+              ],
+              [
+                0.6882097721099854,
+                -1.600000023841858,
+                -5.5647783279418945
+              ],
+              [
+                0.1562197208404541,
+                -1.600000023841858,
+                -5.5647783279418945
+              ],
+              [
+                0.026814905926585197,
+                -1.600000023841858,
+                -5.5647783279418945
+              ],
+              [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570536136627197
+              ],
+              [
+                0.42940250039100647,
+                -1.600000023841858,
+                -5.564777851104736
+              ],
+              [
+                -0.2319900393486023,
+                -1.600000023841858,
+                -5.564777851104736
+              ],
+              [
+                0.8319900631904602,
+                -1.600000023841858,
+                -5.564777851104736
+              ],
+              [
+                0.5588072538375854,
+                -1.600000023841858,
+                -5.564777374267578
+              ]
+            ]
+          },
+          "capture": {
+            "path": "docs/validation/issue-53/review-fix-chromium-android-sample-placed.png",
+            "sha256": "34b755d6d9a0d6967caa10d7bfe92a6e1174e79b06dbbaf00990dea7926ca166"
+          }
+        }
+      ]
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-24T03:29:28.248Z",
+      "completedAt": "2026-10-24T03:29:43.258Z",
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "failures": [],
+      "skips": [],
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      },
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "390af496c54d5bc4a6d9ee85cec7e791f1438fc4435ebb793ffd923bb69e7e55",
+        "src/polyfill/api/interface-brand.ts": "65463ad3fceaac922dfcccf3ee9f33ee28ed58031c54ed18eba57f66510b9265",
+        "src/polyfill/api/hit-test-allocation.ts": "fa8e4a8e0d28e53f02a718e0fff12c720b73fe8fd229f17bdd5bf1afbb0cbfe3",
+        "src/polyfill/api/geometry.ts": "3c4ab7a879249113f45c030d52e14726f0ee87223f8ff939ee0c9ec53db22d81",
+        "src/polyfill/api/XRRay.ts": "cd106e56ebba49bde156bb23bf43ba2cbbb311d7754a031db3218651f1d28378",
+        "src/polyfill/api/XRHitTestResult.ts": "eaf1ab626cefe6d1657ea3c11201bd0fb0a6b238876b49114c1fb0913b490b02",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "c013fbb129d7549d5d15cf0f18d6d5edda9e8b048449c9e534f35f2555e1de8d",
+        "src/polyfill/EmulatedXRDevice.ts": "17bd94c1cf1ab817866f0995c16ea4d8ff0753ad11820ed2e0cdf80d5049ab51",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "9c1264bba294d1bec3152a6a86079688f667f347850a57a4012bda8d5ac88693",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "fb30908337a61927206a916411d01a791904af3d33704bd2f1df9c718aba5589",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "83c432a6b0a7e27e6f8fec7d2ba5e33b73e54d35eed8326143e0132a352cb9a1",
+        "src/polyfill/api/environment.ts": "499b1d4057a292e5ad1bee8d49024c16cfad52463178695763802a7d3810bfca",
+        "src/polyfill/api/plane-regions.ts": "a1de5284126873847132dc455032e8a8cc93bfa4e4548bdfaaa3dcec88412129",
+        "tests/planes.ts": "3f9458012c23de65d710b0411545ed09fd18de5d1b7b55502bd2e69de6981c8e",
+        "tests/plane-applications.ts": "e44123587b11bf2dd60c657a78806b7731c11af74b4bc82c69b324c2e5ed9a12",
+        "tests/hit-test.ts": "ebd2853d045cbbeffec2688e9a0400dd8232b2cf314b22c9f7844ee5459d6cdf",
+        "tests/hit-test-applications.ts": "187fe8e25510a50b2c33031c0f8d5539cce7d95e4759b83c11a87f75a2619449",
+        "tests/hit-test-sample-observer.js": "dab82d4e7efd2d7030a53996bc07a3549e9494faa78b1619aee280cafaa9abde",
+        "src/polyfill/api/hit-test-options.ts": "c9db0bf944e31e2161a648c90e154f6108d3335c5ff4f840807749ff601b7e6d",
+        "src/polyfill/api/hit-test-geometry.ts": "5eef8b40dfca856bef3af55b8f3e9e834ab8541dfb4d068a76524b35c5ca4465",
+        "src/polyfill/api/XRHitTestSource.ts": "c637b1e1cb0d9870a084a61fa3848ef366c2b2deba822fbb4d28a569fd8b0e17",
+        "src/polyfill/api/XRTransientInputHitTestSource.ts": "4b018c24c70e64fdabe3d060932faff70dbf1c5f192ba482dea0282f54841421",
+        "src/polyfill/api/XRTransientInputHitTestResult.ts": "52c48af21e43b76cbb2774397dccbfee230dba50fa2b461355c268222252e98d",
+        "src/polyfill/ARScene.ts": "de1ad23c50520467a07a313e36239d0b4af67f873b229a435cc45f4358f46750",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "837abf620341963cc4134f1b34e5faa78f01a374e973861aff8504d2db26705c",
+        "polyfill/webxr-polyfill.js": "30b287686d45819c47e3c9ee0397e758be19abc4a38cc0cfa8ba1a196f724516",
+        "build/firefox/polyfill/webxr-polyfill.js": "30b287686d45819c47e3c9ee0397e758be19abc4a38cc0cfa8ba1a196f724516"
+      },
+      "servedSources": [
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/xrRay_constructor.https.html",
+          "sha256": "e68cd415e8034ff44097403c54d420489258369d4eaca02ef761a5dd019d8325",
+          "bytes": 5523
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/resources/webxr_test_constants.js",
+          "sha256": "6fd216e2544b7a15cef6f9b07b5faaf806eacf176b35da067e457a3b1f19668d",
+          "bytes": 6325
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/resources/webxr_test_asserts.js",
+          "sha256": "4b7a4722f49bb59fc6c28eb06854ce033c06241f143545aff9ee775e0df21274",
+          "bytes": 12553
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/resources/testharness.js",
+          "sha256": "7a108d7cfa98ac413ddb38f82fd509fb2037dfcc25ccf466567520cbb6bdf1fa",
+          "bytes": 198420
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/hit-test/xrRay_matrix.https.html",
+          "sha256": "4199b453da9c9fd40c0c8dbb1ed44b9cfd1907727a4a3da7c47c6367c0882ce3",
+          "bytes": 3806
+        },
+        {
+          "url": "https://raw.githubusercontent.com/web-platform-tests/wpt/e1859580b5fcf74940a18d2f783296b4961035e3/webxr/resources/webxr_math_utils.js",
+          "sha256": "aa4adceaec381f243590086f19b0e059b5690cc37e9e1e726b37097195b299f0",
+          "bytes": 2554
+        }
+      ],
+      "command": "WEBXR_FIREFOX_EXECUTABLE=\"$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox\" WEBXR_GECKODRIVER=\"$PWD/test-results/browser-tools/geckodriver\" npm run test:hit-test:firefox",
+      "report_sha256": "ac1df16e387e4fd69c2ac47489aa96a6993df222ed15ae667ae281bf982dada7",
+      "results": [
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "immersive-vr",
+          "assertions": 571,
+          "measurements": [
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay constructors work",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_constructor"
+            },
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay matrix works",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_matrix"
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)"
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 731,
+          "measurements": [
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay constructors work",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_constructor"
+            },
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay matrix works",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_matrix"
+            },
+            {
+              "distances": [
+                7.215687274932861
+              ],
+              "meshHits": 1,
+              "normal": [
+                0,
+                3.422854177870249e-08,
+                1
+              ],
+              "planeHits": 1,
+              "point": [
+                0,
+                0,
+                -7.215687274932861
+              ]
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)",
+            "retained source record and entity snapshot frozen",
+            "page cannot alter retained subscription data",
+            "page cannot copy source brands (TypeError)",
+            "page cannot replace retained hit geometry",
+            "page cannot copy result brand (TypeError)"
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "immersive-ar",
+          "assertions": 731,
+          "measurements": [
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay constructors work",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_constructor"
+            },
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay matrix works",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_matrix"
+            },
+            {
+              "distances": [
+                7.015687271952629
+              ],
+              "meshHits": 1,
+              "normal": [
+                0,
+                3.422854177870249e-08,
+                1
+              ],
+              "planeHits": 1,
+              "point": [
+                0,
+                0,
+                -7.215687274932861
+              ]
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)",
+            "retained source record and entity snapshot frozen",
+            "page cannot alter retained subscription data",
+            "page cannot copy source brands (TypeError)",
+            "page cannot replace retained hit geometry",
+            "page cannot copy result brand (TypeError)"
+          ]
+        },
+        {
+          "device": "Meta Quest 3",
+          "selected": "immersive-vr",
+          "mode": "inline",
+          "assertions": 571,
+          "measurements": [
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay constructors work",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_constructor"
+            },
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay matrix works",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_matrix"
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)"
+          ]
+        },
+        {
+          "device": "Generic Android Phone (ARCore)",
+          "selected": "immersive-ar",
+          "mode": "inline",
+          "assertions": 571,
+          "measurements": [
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay constructors work",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_constructor"
+            },
+            {
+              "result": {
+                "status": 0,
+                "tests": [
+                  {
+                    "message": null,
+                    "name": "XRRay matrix works",
+                    "status": 0
+                  }
+                ]
+              },
+              "wpt": "xrRay_matrix"
+            }
+          ],
+          "errors": [],
+          "new_regressions": [
+            "shared rays registry has no writers",
+            "page cannot install registry writer",
+            "shared hitSources registry has no writers",
+            "shared transientHitSources registry has no writers",
+            "shared hitResults registry has no writers",
+            "shared transientHitResults registry has no writers",
+            "regenerated matrix represents near-opposite and near-forward directions",
+            "page cannot alter retained ray state",
+            "page cannot copy a ray brand onto a proxy (TypeError)"
+          ]
+        }
+      ]
+    },
+    {
+      "status": "passed",
+      "startedAt": "2026-10-24T03:30:11.331Z",
+      "completedAt": "2026-10-24T03:30:23.470Z",
+      "versions": {
+        "browser": "157.0",
+        "buildID": "20260924084938",
+        "geckodriver": "geckodriver 0.37.1 (300705c65d1b 2026-07-17 09:25 +0000)",
+        "executableSHA256": "729e0ae83fca74cf143bbef68836c195b340fcc09566461243a075be9e6b959a",
+        "driverSHA256": "5d82307edc8549124bd4e7b6f275e1228e0a530e5abbfb294be3f310486561a4",
+        "platform": "mac",
+        "platformVersion": "25.6.0",
+        "node": "v24.12.0"
+      },
+      "failures": [],
+      "skips": [],
+      "cleanup": {
+        "temporaryAddonRemoved": true,
+        "sessionDeleted": true,
+        "browserStopped": true,
+        "driverStopped": true,
+        "profileRemoved": true
+      },
+      "provenance": {
+        "src/polyfill/api/runtime.ts": "390af496c54d5bc4a6d9ee85cec7e791f1438fc4435ebb793ffd923bb69e7e55",
+        "src/polyfill/api/interface-brand.ts": "65463ad3fceaac922dfcccf3ee9f33ee28ed58031c54ed18eba57f66510b9265",
+        "src/polyfill/api/hit-test-allocation.ts": "fa8e4a8e0d28e53f02a718e0fff12c720b73fe8fd229f17bdd5bf1afbb0cbfe3",
+        "src/polyfill/api/geometry.ts": "3c4ab7a879249113f45c030d52e14726f0ee87223f8ff939ee0c9ec53db22d81",
+        "src/polyfill/api/XRRay.ts": "cd106e56ebba49bde156bb23bf43ba2cbbb311d7754a031db3218651f1d28378",
+        "src/polyfill/api/XRHitTestResult.ts": "eaf1ab626cefe6d1657ea3c11201bd0fb0a6b238876b49114c1fb0913b490b02",
+        "src/polyfill/api/layers.ts": "e613c875f992d0a94e91cc5423d568ec240958e3b0bd471f301b21b1f0c0cd37",
+        "src/polyfill/CustomWebXRPolyfill.ts": "a613c2ec39fa2eb0fb9b2d0a6cbcbf80fb398b7b694dc7a0dfa32a9e0e277682",
+        "tests/firefox-upstream.ts": "c013fbb129d7549d5d15cf0f18d6d5edda9e8b048449c9e534f35f2555e1de8d",
+        "src/polyfill/EmulatedXRDevice.ts": "17bd94c1cf1ab817866f0995c16ea4d8ff0753ad11820ed2e0cdf80d5049ab51",
+        "package-lock.json": "05d71baebad47ac078b5d724fc1810be30690d5ad0bbf3faf3c125f89495e307",
+        "package.json": "9c1264bba294d1bec3152a6a86079688f667f347850a57a4012bda8d5ac88693",
+        "src/polyfill/api/layer-allocation.ts": "9e1c9c99d12b0637b6f56414e6c9589081684a99cf11f3989d1dec064673e316",
+        "tests/environment.ts": "fb30908337a61927206a916411d01a791904af3d33704bd2f1df9c718aba5589",
+        "tests/rigid-transform.ts": "7efdf880b1b7ec1b20728b369fa409bfeb1d90a602ecd2d6cf73ee9cb384694f",
+        "tests/reference-space.ts": "2485d990dad96475cf5ce55461c1d5b4add22379b88b20d4fa846dadaabd326c",
+        "tests/pose-view.ts": "83c432a6b0a7e27e6f8fec7d2ba5e33b73e54d35eed8326143e0132a352cb9a1",
+        "src/polyfill/api/environment.ts": "499b1d4057a292e5ad1bee8d49024c16cfad52463178695763802a7d3810bfca",
+        "src/polyfill/api/plane-regions.ts": "a1de5284126873847132dc455032e8a8cc93bfa4e4548bdfaaa3dcec88412129",
+        "tests/planes.ts": "3f9458012c23de65d710b0411545ed09fd18de5d1b7b55502bd2e69de6981c8e",
+        "tests/plane-applications.ts": "e44123587b11bf2dd60c657a78806b7731c11af74b4bc82c69b324c2e5ed9a12",
+        "tests/hit-test.ts": "ebd2853d045cbbeffec2688e9a0400dd8232b2cf314b22c9f7844ee5459d6cdf",
+        "tests/hit-test-applications.ts": "187fe8e25510a50b2c33031c0f8d5539cce7d95e4759b83c11a87f75a2619449",
+        "tests/hit-test-sample-observer.js": "dab82d4e7efd2d7030a53996bc07a3549e9494faa78b1619aee280cafaa9abde",
+        "src/polyfill/api/hit-test-options.ts": "c9db0bf944e31e2161a648c90e154f6108d3335c5ff4f840807749ff601b7e6d",
+        "src/polyfill/api/hit-test-geometry.ts": "5eef8b40dfca856bef3af55b8f3e9e834ab8541dfb4d068a76524b35c5ca4465",
+        "src/polyfill/api/XRHitTestSource.ts": "c637b1e1cb0d9870a084a61fa3848ef366c2b2deba822fbb4d28a569fd8b0e17",
+        "src/polyfill/api/XRTransientInputHitTestSource.ts": "4b018c24c70e64fdabe3d060932faff70dbf1c5f192ba482dea0282f54841421",
+        "src/polyfill/api/XRTransientInputHitTestResult.ts": "52c48af21e43b76cbb2774397dccbfee230dba50fa2b461355c268222252e98d",
+        "src/polyfill/ARScene.ts": "de1ad23c50520467a07a313e36239d0b4af67f873b229a435cc45f4358f46750",
+        "src/polyfill/api/sensing.ts": "941bcd43c2d6190051b73d71f45a3ffdfda72ffab8be49f7f9e8238412cb171d",
+        "tests/reference-space-browser.ts": "837abf620341963cc4134f1b34e5faa78f01a374e973861aff8504d2db26705c",
+        "polyfill/webxr-polyfill.js": "30b287686d45819c47e3c9ee0397e758be19abc4a38cc0cfa8ba1a196f724516",
+        "build/firefox/polyfill/webxr-polyfill.js": "30b287686d45819c47e3c9ee0397e758be19abc4a38cc0cfa8ba1a196f724516"
+      },
+      "servedSources": [
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/hit-test.html",
+          "sha256": "a9cc4b49b9b5e31dde1a84957fded74580d1ea9578212b062f87b1ea9fefcfaa",
+          "bytes": 7592
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/css/common.css",
+          "sha256": "c48cb825f38c76a91059f64307dba35baa2447da724906d0bdbbd2ae6f75543f",
+          "bytes": 1399
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/util/webxr-button.js",
+          "sha256": "dde97b7c00937a5b006e39d33d657aadc9ab8d4e1188d6275e3ba33a99d9bffa",
+          "bytes": 16612
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/node.js",
+          "sha256": "db2bf44eec53a054c84633858597446e4536cca0e91c084ce90d875874f3414b",
+          "bytes": 11380
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/scenes/scene.js",
+          "sha256": "c4301324f3e3048746f2601c8d9fb239945e0d5503cf1e3d2958ba5bd2457dc0",
+          "bytes": 11322
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/drop-shadow.js",
+          "sha256": "c7732ef4be3b850e48955682671e369c091f4b288ab77fc9899a0648687b3440",
+          "bytes": 3664
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/gltf2.js",
+          "sha256": "c2b0465b27c4b0fefeb5a84f32e3f7915963d42d135506db6f59288992a1ddc9",
+          "bytes": 2590
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/renderer.js",
+          "sha256": "32bd0e86ff60255154092d033f0d1ae204711356e7dc3a0020e5875d04aed7a7",
+          "bytes": 48809
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/math/gl-matrix.js",
+          "sha256": "46d208aaefac9f7a6318069d5e8ad45cc04261b1e1b82b06a3c4a0baf1b427f1",
+          "bytes": 1983
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/math/ray.js",
+          "sha256": "bfee42564036c994734fb54a7315a4d6f52a7a0f7153a8fe24cbc506a3cda0d4",
+          "bytes": 3793
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat2d.js",
+          "sha256": "41a55e96c03ca2dc3e48f00b7365992289a77cb42838e7725c8955404cee848a",
+          "bytes": 10859
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/common.js",
+          "sha256": "b0f9bb0bc31f427496460755e3e31b3d4646e86a0db92f45b25cdef03bf385f0",
+          "bytes": 1166
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat2.js",
+          "sha256": "29bf449c52c4e26f7ed79034a078c2d609d945a8eb209c0d7630754e58e91aac",
+          "bytes": 9746
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/loaders/gltf2.js",
+          "sha256": "ed82ed03853a8bb4b2fcb6aa9ac7db21a01bc8163b6f136c1e471d3984b7da4b",
+          "bytes": 13181
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat3.js",
+          "sha256": "c710530d89bc3b4575ae390f191612ef1134e3196541f857997d7196b4a9da0c",
+          "bytes": 18477
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/material.js",
+          "sha256": "5826a3b57e0be4cafe871d17893ebdaa9539000160280ed7a74f95c487d7d121",
+          "bytes": 6569
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/geometry/primitive-stream.js",
+          "sha256": "dab4b181bebca431c4592bda18de6c5eaaa5f4c3eb0c9166399ae95f47d50607",
+          "bytes": 7627
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/quat.js",
+          "sha256": "2233a07eb77a1badf378e9c1a828084a63c5d0003bbaba74be6a27841303bd01",
+          "bytes": 16022
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/mat4.js",
+          "sha256": "07366167394e53cd7e445c951d1dedc8b0cfed1aae1ef487c6c5455d6bddb7fa",
+          "bytes": 47268
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/quat2.js",
+          "sha256": "43a7eee9928b0a10ceba9cddce47259ab11617bc6007d342ab3941fd62c07ad7",
+          "bytes": 21654
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec4.js",
+          "sha256": "0755ef3edc3a924ded08714c4e8b540e6a5a684bf46c4edad0a2afc8a12293fe",
+          "bytes": 13948
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec2.js",
+          "sha256": "8338dd76a3cd05a62893b5aad5487c544c4e07d19deddafa300490b675227d34",
+          "bytes": 13681
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/third-party/gl-matrix/src/gl-matrix/vec3.js",
+          "sha256": "75f3bf3fb8086611bd8713b46edcf9e469de010a6f5a0816ee466ff9e5554388",
+          "bytes": 18370
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/input-renderer.js",
+          "sha256": "ebae97ac3269e0a6c8c52668e67be46176f6d106b33628fc6ad094c9d4fd24be",
+          "bytes": 16573
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/stats-viewer.js",
+          "sha256": "cef054a235391fda1b232b04b4032c913120c7e368070c9d2b3df87b9149fb31",
+          "bytes": 9272
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/program.js",
+          "sha256": "e03b5fb22c773001d20411ace5c1efa3322e8874fea269fcea1c9ccde4e9307b",
+          "bytes": 4899
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/texture.js",
+          "sha256": "2de9a0609b542e2a99c2008c9a839b7eade0983f0aa1630d8c3191d79201e76d",
+          "bytes": 5165
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/core/primitive.js",
+          "sha256": "bb29fce08b2587a16da4d9558ebb1860f2ac1b4e70d0348f738cfe1d9becfd98",
+          "bytes": 2175
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/materials/pbr.js",
+          "sha256": "24ff40accb92ce643d4b4615ae0571c64ecd5fb880480d4650ac0f531596f772",
+          "bytes": 7768
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/js/render/nodes/seven-segment-text.js",
+          "sha256": "371e89192f2ee967110b983afbd846cd8e782e3fcba09bef70bb1dda550f8697",
+          "bytes": 6318
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/favicon-32x32.png",
+          "sha256": "fc48a339fe368a190776128ea224deee9f8614c7be976067fc4eb095621818fc",
+          "bytes": 1080
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/sunflower/sunflower.gltf",
+          "sha256": "bbeb23685fba75904fcad8169c07a694bd70044b6f446242659bf54b915f8240",
+          "bytes": 4932
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/reticle/reticle.gltf",
+          "sha256": "65c94ff4ab478b4222728e0eff4321f422b5a6693ca0ce9caf9b3f8c330600b6",
+          "bytes": 3774
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/favicon-96x96.png",
+          "sha256": "b03d633ab6757819148165756379869b1ba3962e9c9d49ed315efcff0f067b96",
+          "bytes": 3254
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/sunflower/PUSHILIN_sunflower.png",
+          "sha256": "c24d604944d888414071163527fdbb1ae3730a3c60c32648acf3b2f52aec7c75",
+          "bytes": 159079
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/sunflower/sunflower.bin",
+          "sha256": "abce43943ead1e3a939911dac5d6d8fafbb5a848809f2fd5b0ebe6bbc31d70b7",
+          "bytes": 23928
+        },
+        {
+          "url": "https://raw.githubusercontent.com/immersive-web/webxr-samples/fb41c3416496974672e2c766a41c6febcba2d07e/media/gltf/reticle/reticle.bin",
+          "sha256": "e75e72160bec85b8ed4918a493128a669b4b992fe6621b9fb9b8bc84c18bd022",
+          "bytes": 5364
+        }
+      ],
+      "command": "WEBXR_FIREFOX_EXECUTABLE=\"$PWD/test-results/browser-tools/Firefox.app/Contents/MacOS/firefox\" WEBXR_GECKODRIVER=\"$PWD/test-results/browser-tools/geckodriver\" WEBXR_HIT_TEST_APP=android:sample npm run test:hit-test-applications:firefox",
+      "report_sha256": "88d3e444e75160adb62d4337db2acebe94bb49a59ba0920931623ceba6c03460",
+      "results": [
+        {
+          "profile": "android",
+          "device": "Generic Android Phone (ARCore)",
+          "app": "sample",
+          "dependencies": [
+            {
+              "bytes": 13492,
+              "evidence": "browser force-cache reread of dependency requested by the unchanged pinned application",
+              "sha256": "c2d631f67ff39ef82abccb21f680e1f64337b63ebe744d2b39d779e27c28c7bb",
+              "status": 200,
+              "url": "https://cdn.jsdelivr.net/npm/@webxr-input-profiles/motion-controllers@1.0/dist/motion-controllers.module.js"
+            },
+            {
+              "bytes": 6260,
+              "evidence": "browser force-cache reread of dependency requested by the unchanged pinned application",
+              "sha256": "7a42c4a99bde59e3e96a55119ed3a4a97ef97fd6b1f944cebfbed98f3478a002",
+              "status": 200,
+              "url": "https://fonts.gstatic.com/s/karla/v5/Zi_e6rBgGqv33BWF8WTq8g.woff2"
+            }
+          ],
+          "before": {
+            "errors": [],
+            "frames": 34,
+            "last": {
+              "error": 3.6285097815280665e-08,
+              "local": [
+                0,
+                -1.079209327697754,
+                -7.215687274932861
+              ],
+              "normal": [
+                0,
+                0,
+                1
+              ],
+              "room": [
+                0,
+                0.5207907324292018,
+                -7.215687274932861
+              ],
+              "viewer": [
+                0,
+                0,
+                -0.07500000298023224
+              ],
+              "world": [
+                0,
+                0.520790696144104,
+                -7.215687274932861
+              ]
+            },
+            "placements": [],
+            "reticle": [
+              0,
+              -1.079209327697754,
+              -7.215687274932861
+            ],
+            "select": null
+          },
+          "moved": {
+            "errors": [],
+            "frames": 58,
+            "last": {
+              "error": 8.640248160423768e-08,
+              "local": [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570638179779053
+              ],
+              "normal": [
+                -2.3970043658462238e-09,
+                1,
+                0
+              ],
+              "room": [
+                0.30000001192092896,
+                -4.897993521879585e-08,
+                -5.570638108600722
+              ],
+              "viewer": [
+                0.30000001192092896,
+                0.10000002384185792,
+                -0.07500000298023224
+              ],
+              "world": [
+                0.30000001192092896,
+                0,
+                -5.570638179779053
+              ]
+            },
+            "placements": [],
+            "reticle": [
+              0.30000001192092896,
+              -1.600000023841858,
+              -5.570638179779053
+            ],
+            "select": null
+          },
+          "placement": {
+            "errors": [],
+            "frames": 87,
+            "last": {
+              "error": 8.640248160423768e-08,
+              "local": [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570638179779053
+              ],
+              "normal": [
+                -2.3970043658462238e-09,
+                1,
+                0
+              ],
+              "room": [
+                0.30000001192092896,
+                -4.897993521879585e-08,
+                -5.570638108600722
+              ],
+              "viewer": [
+                0.30000001192092896,
+                0.10000002384185792,
+                -0.07500000298023224
+              ],
+              "world": [
+                0.30000001192092896,
+                0,
+                -5.570638179779053
+              ]
+            },
+            "placements": [
+              {
+                "position": [
+                  0.30000001192092896,
+                  -1.600000023841858,
+                  -5.570638179779053
+                ],
+                "renderables": 2,
+                "visible": true
+              }
+            ],
+            "reticle": [
+              0.30000001192092896,
+              -1.600000023841858,
+              -5.570638179779053
+            ],
+            "select": {
+              "last": {
+                "error": 8.640248160423768e-08,
+                "local": [
+                  0.30000001192092896,
+                  -1.600000023841858,
+                  -5.570638179779053
+                ],
+                "normal": [
+                  -2.3970043658462238e-09,
+                  1,
+                  0
+                ],
+                "room": [
+                  0.30000001192092896,
+                  -4.897993521879585e-08,
+                  -5.570638108600722
+                ],
+                "viewer": [
+                  0.30000001192092896,
+                  0.10000002384185792,
+                  -0.07500000298023224
+                ],
+                "world": [
+                  0.30000001192092896,
+                  0,
+                  -5.570638179779053
+                ]
+              },
+              "reticle": [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570638179779053
+              ]
+            }
+          },
+          "pixels": {
+            "height": 1920,
+            "layer": "base",
+            "regions": [
+              {
+                "colored": 3345,
+                "colors": 850,
+                "height": 1920,
+                "transparent": 2070255,
+                "width": 1080
+              }
+            ],
+            "width": 1080
+          },
+          "presented": [
+            {
+              "closest": [
+                234,
+                228,
+                78,
+                255
+              ],
+              "correlation": 31348,
+              "difference": 3,
+              "expected": [
+                237,
+                231,
+                79,
+                255
+              ],
+              "foregroundContrast": 123,
+              "nearbyRoom": [
+                111,
+                106,
+                103,
+                255
+              ],
+              "room": [
+                152,
+                143,
+                138,
+                255
+              ]
+            }
+          ],
+          "state": {
+            "enabled": [
+              "viewer",
+              "local",
+              "hit-test"
+            ],
+            "frames": 334,
+            "requests": [
+              {
+                "mode": "immersive-ar",
+                "optionalFeatures": null,
+                "requiredFeatures": [
+                  "local",
+                  "hit-test"
+                ]
+              }
+            ],
+            "sourceCount": 1,
+            "views": [
+              {
+                "eye": "none",
+                "height": 1920,
+                "width": 1080
+              }
+            ]
+          },
+          "shutdown": {
+            "backend": 0,
+            "callbacks": 0,
+            "connected": false,
+            "ends": 1,
+            "frames": 335,
+            "layers": 0,
+            "maps": 0,
+            "sources": 0,
+            "transient": 0
+          },
+          "restart": {
+            "errors": [],
+            "fresh": true,
+            "freshInputs": true,
+            "last": {
+              "error": 8.640248160423768e-08,
+              "local": [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570638179779053
+              ],
+              "normal": [
+                -2.3970043658462238e-09,
+                1,
+                0
+              ],
+              "room": [
+                0.30000001192092896,
+                -4.897993521879585e-08,
+                -5.570638108600722
+              ],
+              "viewer": [
+                0.30000001192092896,
+                0.10000002384185792,
+                -0.07500000298023224
+              ],
+              "world": [
+                0.30000001192092896,
+                0,
+                -5.570638179779053
+              ]
+            },
+            "oldAbsent": true,
+            "reticle": [
+              0.30000001192092896,
+              -1.600000023841858,
+              -5.570638179779053
+            ]
+          },
+          "cleanup": {
+            "backend": 0,
+            "callbacks": 0,
+            "ends": 2,
+            "layers": 0,
+            "maps": 0
+          },
+          "transient": {
+            "assertions": 1328,
+            "cancelled": true,
+            "errors": [],
+            "laterInvalid": 12,
+            "trace_entries": 88,
+            "entries_with_groups": 42,
+            "input_identities": [
+              1,
+              2,
+              3
+            ],
+            "distinct_hit_positions": [
+              [
+                -0.14759543538093567,
+                -1.600000023841858,
+                -5.561061859130859
+              ],
+              [
+                0.03144318610429764,
+                -1.600000023841858,
+                -5.561062335968018
+              ],
+              [
+                0.21048180758953097,
+                -1.600000023841858,
+                -5.561062812805176
+              ],
+              [
+                0.12096134573221208,
+                -1.600000023841858,
+                -5.561062335968018
+              ],
+              [
+                0.30000001192092896,
+                -1.600000023841858,
+                -5.570471286773682
+              ],
+              [
+                0.6580772995948792,
+                -1.600000023841858,
+                -5.561061859130859
+              ],
+              [
+                -0.23711369931697843,
+                -1.600000023841858,
+                -5.561062335968018
+              ],
+              [
+                0.8371137380599976,
+                -1.600000023841858,
+                -5.561062335968018
+              ],
+              [
+                0.5685568451881409,
+                -1.600000023841858,
+                -5.561062335968018
+              ],
+              [
+                0.7475954294204712,
+                -1.600000023841858,
+                -5.561061382293701
+              ],
+              [
+                -0.05807730183005333,
+                -1.600000023841858,
+                -5.561062335968018
+              ],
+              [
+                0.4790386855602264,
+                -1.600000023841858,
+                -5.561062335968018
+              ]
+            ]
+          },
+          "capture": {
+            "path": "docs/validation/issue-53/review-fix-firefox-android-sample-placed.png",
+            "sha256": "242f518b6b4ae39682e4a6926c841e54ae713f94cdf02a4b250d317a1875dc03"
+          }
+        }
+      ]
+    }
+  ],
+  "tested_revision": "Source and generated-bundle SHA-256 values in each run identify the working tree tested; tests preceded this review-fix commit."
+}

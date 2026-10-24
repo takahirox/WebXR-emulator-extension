@@ -9,12 +9,11 @@ export function transientHitSourceState(value: object) {
   if (!state) throw new TypeError('Expected XRTransientInputHitTestSource.');
   return state;
 }
-export default class XRTransientInputHitTestSource {
+export default class XRTransientInputHitTestSource extends interfaceBrands.hitTestAllocations.TransientHitSourceAllocation {
   constructor(...args: [session: XRSession, options: TransientHitTestOptions, token?: symbol]) {
     const [session, options, token] = args;
     requireHitTestAllocation(token);
-    interfaceBrands.transientHitSources.set(this, {session, profile: options.profile, offsetRay: options.offsetRay!,
-      entityTypes: Object.freeze([...options.entityTypes!]), active: true});
+    super(session, options);
   }
   cancel() {
     const state = transientHitSourceState(this);
@@ -23,7 +22,7 @@ export default class XRTransientInputHitTestSource {
   }
   _deactivate() {
     const state = transientHitSourceState(this);
-    state.active = false; state.session._transientSources.delete(this);
+    state.session._transientSources.delete(this);
     state.session._device.removeHitTestSource(this);
   }
   get _profile() { return transientHitSourceState(this).profile; }

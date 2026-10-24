@@ -94,6 +94,11 @@ async function observeTransient() {
           const pose = group.results[0]?.getPose(w.hitReference); item.point = pose && Array.from(pose.transform.matrix).slice(12, 15);
           check(Array.from(session.inputSources).includes(input) && input.profiles.includes('generic-touchscreen'), 'group retains associated actual input');
           check(group.results === group.results && Object.isFrozen(group.results), 'transient FrozenArray identity');
+          const registry = w[Symbol.for('WebXR-emulator.interface-brands')], retained = registry.transientHitResults.get(group);
+          check(Object.isFrozen(registry.transientHitResults) && !registry.transientHitResults.set && Object.isFrozen(retained), 'page cannot write transient result registry');
+          check(!Reflect.set(retained, 'inputSource', {}) && !Reflect.set(retained, 'results', []), 'page cannot replace retained transient data');
+          let forged: any; try { registry.transientHitResults.set(new Proxy(group, {}), {inputSource: {}, results: []}); } catch (e) { forged = e; }
+          check(forged?.name === 'TypeError', 'page cannot forge transient group registration');
           for (const realm of [w, other]) for (const name of ['inputSource', 'results']) {
             const d = Object.getOwnPropertyDescriptor(realm.XRTransientInputHitTestResult.prototype, name)!;
             check(d.get!.call(group) === group[name] && !d.set && d.enumerable && d.configurable, 'cross-realm readonly transient accessor');

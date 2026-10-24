@@ -26,6 +26,11 @@ export async function hitTestCases(mode: SessionMode) {
       check(result.status === 0 && result.tests.length > 0 && result.tests.every((t: any) => t.status === 0), `unchanged pinned WPT ${name}: ${JSON.stringify(result)}`);
       measurements.push({wpt: name, result}); test.remove();
     }
+    const registry = w[Symbol.for('WebXR-emulator.interface-brands')];
+    for (const name of ['rays', 'hitSources', 'transientHitSources', 'hitResults', 'transientHitResults']) {
+      check(Object.isFrozen(registry[name]) && !registry[name].set && !registry[name].delete && !registry[name].clear, 'shared ' + name + ' registry has no writers');
+      check(!Reflect.set(registry[name], 'set', () => {}), 'page cannot install registry writer');
+    }
     for (const realm of [w, other]) {
       for (const name of ['XRHitTestSource', 'XRTransientInputHitTestSource', 'XRHitTestResult', 'XRTransientInputHitTestResult']) {
         throws(() => new realm[name](), 'TypeError', `${name} illegal constructor`); check(realm[name].length === 0, 'nonconstructible interface length');
@@ -52,14 +57,18 @@ export async function hitTestCases(mode: SessionMode) {
       for (const args of [[{w: 0}], [{}, {w: 1}], [{}, {x: 0, y: 0, z: 0}], [{w: null}]]) throws(() => new realm.XRRay(...args), 'TypeError', 'ray homogeneous and zero direction validation');
       const huge = new realm.XRRay({}, {x: 1e308, y: 1e308, z: 1e308});
       check(Math.abs(Math.hypot(huge.direction.x, huge.direction.y, huge.direction.z) - 1) < 1e-12, 'large finite direction normalizes');
-      for (const d of [{x: 0, z: 1}, {x: 1, z: 0}, {x: 1, y: 2, z: -3}]) {
+      for (const d of [{x: 0, z: 1}, {x: 1, z: 0}, {x: 1, y: 2, z: -3}, {x: 1e-7, z: 1}, {x: -1e-7, z: 1}, {y: 1e-7, z: 1}, {x: 1e-12, z: 1}, {x: 1e-12, z: -1}, {y: -1e-12, z: -1}]) {
         const r = new realm.XRRay({x: 2, y: 3, z: 4}, d), m = r.matrix;
-        check([r.direction.x, r.direction.y, r.direction.z].every((v, i) => Math.abs(v + m[8 + i]) < 1e-6) && m[12] === 2, 'translated rotated/opposite ray matrix');
+        check([r.direction.x, r.direction.y, r.direction.z].every((v, i) => Math.abs(v + m[8 + i]) < Math.max(1e-12, Math.abs(v) * 1e-6)) && m[12] === 2, 'translated rotated/opposite ray matrix');
         check(r.origin === r.origin && r.direction === r.direction && r.matrix === m, 'readonly point and cached matrix identity');
         m[12] = 999; const point = r.origin;
         check(point.x === 2 && r.matrix === m, 'exported matrix writes preserve ray geometry');
         structuredClone(m, {transfer: [m.buffer]});
         check(m.byteLength === 0 && r.matrix !== m && r.matrix[12] === 2 && r.origin === point, 'detached matrix regenerated from retained geometry');
+        check([r.direction.x, r.direction.y, r.direction.z].every((v, i) => Math.abs(v + r.matrix[8 + i]) < Math.max(1e-12, Math.abs(v) * 1e-6)), 'regenerated matrix represents near-opposite and near-forward directions');
+        const retained = registry.rays.get(r), proxy = new Proxy(r, {});
+        check(Object.isFrozen(retained) && !Reflect.set(retained, 'direction', new DOMPointReadOnly(0, 0, 1, 0)), 'page cannot alter retained ray state');
+        throws(() => registry.rays.set(proxy, retained), 'TypeError', 'page cannot copy a ray brand onto a proxy');
         for (const key of ['origin', 'direction', 'matrix']) {
           const descriptor = Object.getOwnPropertyDescriptor(realm.XRRay.prototype, key)!;
           check(descriptor.enumerable && descriptor.configurable && !descriptor.set, 'ray readonly enumerable accessor');
@@ -111,6 +120,12 @@ export async function hitTestCases(mode: SessionMode) {
     const nullProfile = await session.requestHitTestSourceForTransientInput({profile: null}); check(nullProfile._profile === 'null', 'null profile is DOMString null'); nullProfile.cancel();
     const mutable = ['plane'], ray = new other.XRRay();
     const source = await session.requestHitTestSource({space: viewer, entityTypes: mutable, offsetRay: ray}); mutable.length = 0; ray.matrix.fill(999);
+    for (const [name, genuine] of [['hitSources', source], ['transientHitSources', transient]] as const) {
+      const retained = registry[name].get(genuine);
+      check(Object.isFrozen(retained) && Object.isFrozen(retained.entityTypes), 'retained source record and entity snapshot frozen');
+      check(!Reflect.set(retained, 'active', false) && !Reflect.set(retained, 'offsetRay', new w.XRRay()), 'page cannot alter retained subscription data');
+      throws(() => registry[name].set(new Proxy(genuine, {}), retained), 'TypeError', 'page cannot copy source brands');
+    }
     const defaults = await session.requestHitTestSource({space: viewer});
     const crossSpace = new other.XRSpace(session, () => viewer._update());
     const crossSpaceSource = await session.requestHitTestSource({space: crossSpace});
@@ -160,6 +175,9 @@ export async function hitTestCases(mode: SessionMode) {
         for (const bad of [null, {}, new Proxy(source, {})]) throws(() => realm.XRHitTestSource.prototype.cancel.call(bad), 'TypeError', 'source cancel receiver brand');
         for (const bad of [null, {}, new Proxy(transient, {})]) throws(() => realm.XRTransientInputHitTestSource.prototype.cancel.call(bad), 'TypeError', 'transient cancel receiver brand');
       }
+      const record = registry.hitResults.get(hits[0]);
+      check(Object.isFrozen(record) && !Reflect.set(record, 'transform', new w.XRRigidTransform({x: 999})), 'page cannot replace retained hit geometry');
+      throws(() => registry.hitResults.set(new Proxy(hits[0], {}), record), 'TypeError', 'page cannot copy result brand');
       const saved = hits[0]; hits.length = 0; check(f.getHitTestResults(source)[0] === saved, 'sequence mutation cannot corrupt frame map');
       const p = reference.matrixProvider; reference.matrixProvider = () => null;
       try { check(saved.getPose(reference) === null, 'unavailable result base pose returns null'); } finally { reference.matrixProvider = p; }
