@@ -24,7 +24,7 @@ export default class CustomWebXRPolyfill {
       };
       window.addEventListener('webxr-device-init', init);
     });
-    this.xr = new runtime.XRSystem(device);
+    this.xr = new runtime.XRSystem(device, geometry.geometryAllocation);
     Object.defineProperty(navigator, 'xr', {value: this.xr, configurable: true});
     installWebGLCompatibility();
   }

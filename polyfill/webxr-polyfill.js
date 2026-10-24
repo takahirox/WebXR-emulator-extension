@@ -24610,6 +24610,40 @@ void main() {
 
   const jointNames = Object.freeze(['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
       ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))]);
+  function hasBackendSession(session) {
+      var _a;
+      const pending = [window], visited = new Set();
+      while (pending.length) {
+          const realm = pending.pop();
+          if (visited.has(realm))
+              continue;
+          visited.add(realm);
+          try {
+              const constructor = realm.XRSession;
+              const getter = constructor && ((_a = Object.getOwnPropertyDescriptor(constructor.prototype, 'inputSources')) === null || _a === void 0 ? void 0 : _a.get);
+              if (getter) {
+                  try {
+                      getter.call(session);
+                      return true;
+                  }
+                  catch ( _b) {  }
+              }
+              for (let index = 0; index < realm.frames.length; index++)
+                  pending.push(realm.frames[index]);
+          }
+          catch ( _c) {  }
+          try {
+              pending.push(realm.parent);
+          }
+          catch ( _d) {  }
+          try {
+              if (realm.opener)
+                  pending.push(realm.opener);
+          }
+          catch ( _e) {  }
+      }
+      return false;
+  }
   function createHandAllocations(sessions, inputs, frames) {
       const hands = new WeakMap();
       const joints = new WeakMap();
@@ -24654,11 +24688,10 @@ void main() {
       }
       class HandTracker {
           constructor(session, hand, joint, pose) {
-              var _a;
-              if (!sessions.has(session) || !((_a = session._device) === null || _a === void 0 ? void 0 : _a.sessions.has(session._id)))
-                  throw new TypeError('Expected backend XRSession.');
               let backend = backends.get(session);
               if (!backend) {
+                  if (!sessions.has(session) || !hasBackendSession(session))
+                      throw new TypeError('Expected backend XRSession.');
                   backend = { session, hand, joint, pose };
                   backends.set(session, backend);
               }
@@ -26785,6 +26818,8 @@ void main() {
           });
   }
 
+  const systemDevices = new WeakMap();
+  const sessionInputs = new WeakMap();
   class XREventTarget extends EventTarget {
       _emit(event) { this.dispatchEvent(event); }
   }
@@ -26838,94 +26873,101 @@ void main() {
       return init;
   }
   class XRSystem extends XREventTarget {
-      constructor(devicePromise) {
+      constructor(devicePromise, token = undefined) {
+          requireGeometryAllocation(token);
           super();
-          this.devicePromise = devicePromise;
           this.immersive = null;
           this.requesting = false;
           this.sessions = new Set();
+          this.supports = async (mode) => {
+              return (await systemDevices.get(this)).isSessionSupported(mode);
+          };
+          this.request = async (mode, options) => {
+              var _a, _b, _c, _d, _e, _f, _g;
+              const overlayRoot = (_a = options.domOverlay) === null || _a === void 0 ? void 0 : _a.root;
+              const needsActivation = mode !== 'inline' || [...((_b = options.requiredFeatures) !== null && _b !== void 0 ? _b : []), ...((_c = options.optionalFeatures) !== null && _c !== void 0 ? _c : [])].some(feature => feature !== 'inline-stereo');
+              if (needsActivation && !navigator.userActivation.isActive)
+                  throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
+              if (mode !== 'inline' && (this.immersive || this.requesting))
+                  invalidState('An immersive session is already pending or active.');
+              if (mode !== 'inline')
+                  this.requesting = true;
+              try {
+                  const device = await systemDevices.get(this);
+                  if (!device.isSessionSupported(mode))
+                      unsupported('The selected profile/mode does not support this session mode.');
+                  const required = new Set(['viewer', ...(mode === 'inline' ? [] : ['local']), ...((_d = options.requiredFeatures) !== null && _d !== void 0 ? _d : [])]);
+                  const enabled = new Set();
+                  for (const feature of new Set([...required, ...((_e = options.optionalFeatures) !== null && _e !== void 0 ? _e : [])])) {
+                      let supported = device.isFeatureSupported(feature, mode);
+                      if (feature === 'dom-overlay')
+                          supported = supported && device.canPresentDOMOverlay(overlayRoot);
+                      if (feature === 'depth-sensing') {
+                          if (!options.depthSensing) {
+                              supported = false;
+                          }
+                          else {
+                              const { usagePreference, dataFormatPreference } = options.depthSensing;
+                              supported = supported && (!usagePreference.length || usagePreference.includes('cpu-optimized')) && (!dataFormatPreference.length || dataFormatPreference.some(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format)));
+                          }
+                      }
+                      if (!supported && required.has(feature))
+                          unsupported(`Required feature ${feature} is unavailable in ${mode}.`);
+                      if (supported)
+                          enabled.add(feature);
+                  }
+                  const depthFormat = (_g = (_f = options.depthSensing) === null || _f === void 0 ? void 0 : _f.dataFormatPreference.find(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format))) !== null && _g !== void 0 ? _g : 'float32';
+                  const id = await device.requestSession(mode, enabled);
+                  const session = new XRSession(device, mode, id, enabled, () => {
+                      this.sessions.delete(session);
+                      if (this.immersive === session) {
+                          this.immersive = null;
+                          for (const inline of this.sessions)
+                              inline._setImmersiveSuppressed(false);
+                      }
+                  }, geometryAllocation);
+                  session._depthFormat = depthFormat;
+                  if (enabled.has('dom-overlay')) {
+                      try {
+                          session._startDOMOverlay(overlayRoot);
+                      }
+                      catch (_h) {
+                          if (required.has('dom-overlay')) {
+                              await session.end();
+                              unsupported('The DOM Overlay Preview root could not be presented.');
+                          }
+                          enabled.delete('dom-overlay');
+                          session._omitDOMOverlay();
+                      }
+                  }
+                  this.sessions.add(session);
+                  if (mode === 'inline' && this.immersive)
+                      session._setImmersiveSuppressed(true);
+                  if (mode !== 'inline') {
+                      this.immersive = session;
+                      for (const other of this.sessions)
+                          if (other !== session)
+                              other._setImmersiveSuppressed(true);
+                  }
+                  return session;
+              }
+              finally {
+                  if (mode !== 'inline')
+                      this.requesting = false;
+              }
+          };
+          systemDevices.set(this, devicePromise);
           window.addEventListener('webxr-device', () => this._emit(new Event('devicechange')));
           window.addEventListener('webxr-exit-immersive', () => { var _a; void ((_a = this.immersive) === null || _a === void 0 ? void 0 : _a.end()); });
       }
       async isSessionSupported(value) {
           const mode = convertSessionMode(value);
-          return (await this.devicePromise).isSessionSupported(mode);
+          return this.supports(mode);
       }
       async requestSession(value, dictionary) {
-          var _a, _b, _c, _d, _e, _f, _g;
           const mode = convertSessionMode(value);
           const options = convertSessionInit(dictionary);
-          const overlayRoot = (_a = options.domOverlay) === null || _a === void 0 ? void 0 : _a.root;
-          const needsActivation = mode !== 'inline' || [...((_b = options.requiredFeatures) !== null && _b !== void 0 ? _b : []), ...((_c = options.optionalFeatures) !== null && _c !== void 0 ? _c : [])].some(feature => feature !== 'inline-stereo');
-          if (needsActivation && !navigator.userActivation.isActive)
-              throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
-          if (mode !== 'inline' && (this.immersive || this.requesting))
-              invalidState('An immersive session is already pending or active.');
-          if (mode !== 'inline')
-              this.requesting = true;
-          try {
-              const device = await this.devicePromise;
-              if (!device.isSessionSupported(mode))
-                  unsupported('The selected profile/mode does not support this session mode.');
-              const required = new Set(['viewer', ...(mode === 'inline' ? [] : ['local']), ...((_d = options.requiredFeatures) !== null && _d !== void 0 ? _d : [])]);
-              const enabled = new Set();
-              for (const feature of new Set([...required, ...((_e = options.optionalFeatures) !== null && _e !== void 0 ? _e : [])])) {
-                  let supported = device.isFeatureSupported(feature, mode);
-                  if (feature === 'dom-overlay')
-                      supported = supported && device.canPresentDOMOverlay(overlayRoot);
-                  if (feature === 'depth-sensing') {
-                      if (!options.depthSensing) {
-                          supported = false;
-                      }
-                      else {
-                          const { usagePreference, dataFormatPreference } = options.depthSensing;
-                          supported = supported && (!usagePreference.length || usagePreference.includes('cpu-optimized')) && (!dataFormatPreference.length || dataFormatPreference.some(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format)));
-                      }
-                  }
-                  if (!supported && required.has(feature))
-                      unsupported(`Required feature ${feature} is unavailable in ${mode}.`);
-                  if (supported)
-                      enabled.add(feature);
-              }
-              const depthFormat = (_g = (_f = options.depthSensing) === null || _f === void 0 ? void 0 : _f.dataFormatPreference.find(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format))) !== null && _g !== void 0 ? _g : 'float32';
-              const id = await device.requestSession(mode, enabled);
-              const session = new XRSession(device, mode, id, enabled, () => {
-                  this.sessions.delete(session);
-                  if (this.immersive === session) {
-                      this.immersive = null;
-                      for (const inline of this.sessions)
-                          inline._setImmersiveSuppressed(false);
-                  }
-              });
-              session._depthFormat = depthFormat;
-              if (enabled.has('dom-overlay')) {
-                  try {
-                      session._startDOMOverlay(overlayRoot);
-                  }
-                  catch (_h) {
-                      if (required.has('dom-overlay')) {
-                          await session.end();
-                          unsupported('The DOM Overlay Preview root could not be presented.');
-                      }
-                      enabled.delete('dom-overlay');
-                      session._omitDOMOverlay();
-                  }
-              }
-              this.sessions.add(session);
-              if (mode === 'inline' && this.immersive)
-                  session._setImmersiveSuppressed(true);
-              if (mode !== 'inline') {
-                  this.immersive = session;
-                  for (const other of this.sessions)
-                      if (other !== session)
-                          other._setImmersiveSuppressed(true);
-              }
-              return session;
-          }
-          finally {
-              if (mode !== 'inline')
-                  this.requesting = false;
-          }
+          return this.request(mode, options);
       }
   }
   const inputEvents = ['select-start', 'select-end', 'squeeze-start', 'squeeze-end'];
@@ -26937,7 +26979,8 @@ void main() {
           this.overlayState = Object.freeze({ type: 'screen' });
       }
       _omitDOMOverlay() { this.features = Object.freeze(this.features.filter(feature => feature !== 'dom-overlay')); }
-      constructor(_device, _mode, _id, enabled, onShutdown) {
+      constructor(_device, _mode, _id, enabled, onShutdown, token = undefined) {
+          requireGeometryAllocation(token);
           super();
           this._device = _device;
           this._mode = _mode;
@@ -26957,12 +27000,10 @@ void main() {
           this.pendingReferenceRequests = new Set();
           this.visibility = document.visibilityState;
           this.sources = Object.freeze([]);
-          this.inputSourceArray = new XRInputSourceArray(() => this.sources);
           this.signals = [];
           this.listeners = [];
           this.immersiveSuppressed = false;
           this.visibilityListener = () => this._setVisibility(document.visibilityState);
-          this._hands = new interfaceBrands.handAllocations.HandTracker(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype);
           this._anchors = new Set();
           this._environment = new EnvironmentTracker(this);
           this._depthFormat = 'float32';
@@ -27099,6 +27140,8 @@ void main() {
           };
           this.features = Object.freeze([...enabled]);
           this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
+          sessionInputs.set(this, new XRInputSourceArray(() => this.sources));
+          this._hands = new interfaceBrands.handAllocations.HandTracker(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype);
           this.activeRenderState = new XRRenderState({ inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null });
           const viewerMatrix = () => clone$1(_device.getBasePoseMatrix());
           this._viewer = new XRReferenceSpace(this, 'viewer', viewerMatrix);
@@ -27175,7 +27218,12 @@ void main() {
       get ended() { return this.endedValue; }
       get renderState() { return this.activeRenderState; }
       get visibilityState() { return this.visibility; }
-      get inputSources() { return this.inputSourceArray; }
+      get inputSources() {
+          const inputs = sessionInputs.get(this);
+          if (!inputs)
+              throw new TypeError('Expected backend XRSession.');
+          return inputs;
+      }
       assertDepthConfiguration() { if (!this.enabledFeatures.includes('depth-sensing'))
           invalidState('Depth sensing was not enabled.'); }
       assertDepthFrame() {
@@ -32560,7 +32608,7 @@ void main() {
               };
               window.addEventListener('webxr-device-init', init);
           });
-          this.xr = new XRSystem(device);
+          this.xr = new XRSystem(device, geometryAllocation);
           Object.defineProperty(navigator, 'xr', { value: this.xr, configurable: true });
           installWebGLCompatibility();
       }

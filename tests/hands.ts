@@ -11,7 +11,7 @@ export async function handCases(mode: SessionMode) {
   async function rejects(p:Promise<any>,name:string,label:string) {let e:any;try{await p;}catch(error){e=error;}check(e?.name===name,label);}
   function request(options:any,realm:any=w) {return new Promise<any>((resolve,reject)=>{
     const b=document.createElement('button');b.id='reference-space-session';b.textContent='Start hand contract';b.style.cssText='position:fixed;top:0;left:0;z-index:2147483647';
-    b.onclick=()=>{b.remove();realm.navigator.xr.requestSession(mode,options).then(resolve,reject);};document.body.append(b);
+    b.onclick=()=>{b.remove();const binding=realm===w?other:w;binding.XRSystem.prototype.requestSession.call(realm.navigator.xr,mode,options).then(resolve,reject);};document.body.append(b);
   });}
   const sessions:any[]=[],canvases:any[]=[],child=document.createElement('iframe');child.src='/hands-isolated';
   const ready=new Promise<void>(resolve=>{child.onload=()=>resolve();});document.body.append(child);await ready;const other=child.contentWindow as any;
@@ -96,6 +96,14 @@ export async function handCases(mode: SessionMode) {
       throws(()=>new C(),'TypeError','public constructor rejected');throws(()=>C(),'TypeError','public interface call rejected');
       for(const args of [[],[{},'wrist',.01,()=>{throw Error('untrusted provider');},Symbol('allocation')]])for(const target of [C,class extends C{}])throws(()=>Reflect.construct(C,args,target),'TypeError','reflective constructor rejected');
     }
+    for(const realm of [w,other]) {
+      for(const [C,args] of [[realm.XRSession,[{},mode,1,new Set(['hand-tracking']),()=>{}]],[realm.XRSystem,[Promise.resolve({})]]] as const) {
+        for(const token of [undefined,Symbol('geometry allocation')])for(const target of [C,class extends C{}])throws(()=>Reflect.construct(C,[...args,token],target),'TypeError','runtime construction requires private allocation permission');
+      }
+      await rejects(realm.XRSystem.prototype.requestSession.call({devicePromise:Promise.resolve({})},'inline'),'TypeError','borrowed request cannot substitute caller-owned backend promise');
+      const binding=realm===w?other:w;
+      check(await binding.XRSystem.prototype.isSessionSupported.call(realm.navigator.xr,'inline'),'borrowed system binding retains genuine backend permission');
+    }
     const controller=await setup({});await frame(controller.s,f=>{check(!controller.s.enabledFeatures.includes('hand-tracking'),'controller session feature absent');check([...controller.s.inputSources].every((s:any)=>s.hand===null),'controller session null hands');if(mode!=='inline'&&!controller.s._device.handheld)check(controller.s.inputSources.length===2,'controller session retains two sources');if(mode!=='inline')check([...controller.s.inputSources].every((s:any)=>s.gamepad&&s.targetRaySpace),'existing controller behavior retained');});await controller.s.end();
     const supported=mode!=='inline'&&!controller.s._device.handheld;
     if(!supported) {
@@ -138,6 +146,21 @@ export async function handCases(mode: SessionMode) {
         const tracker=new registry.handAllocations.HandTracker(own.s,{}, {}, {});
         check(tracker.hand(own.s.inputSources[0])===own.s.inputSources[0].hand,'registry tracker retrieves canonical existing hand');
         throws(()=>new registry.handAllocations.HandTracker(new registry.SessionObject(),{},{},{}),'TypeError','shared superclass cannot manufacture a hand backend');
+        // Regression: a branded superclass instance with a complete caller-owned
+        // backend used to pass the sessions.has(_id) test and allocate 25 joints.
+        const raw={},fakeSource=new registry.InputSourceObject(),fakeSession=new registry.SessionObject(),id=123456;
+        Object.assign(fakeSession,{_id:id,ended:false,enabledFeatures:['hand-tracking'],inputSources:[fakeSource],_device:{
+          global:realm,sessions:new Map([[id,{}]]),gamepadInputSources:[{inputSource:raw}],
+          gamepads:[{hand:'left',pose:{position:[0,1,0],orientation:[0,0,0,1]},buttons:[{pressed:false}]}],
+        }});
+        check(registry.sessions.has(fakeSession)&&registry.inputSources.has(fakeSource)&&fakeSession._device.sessions.has(id),'populated fake backend satisfies former public-property checks');
+        for(const target of [realm.XRSession,class extends realm.XRSession{}])throws(()=>Reflect.construct(realm.XRSession,[own.s._device,mode,own.s._id,new Set(['hand-tracking']),()=>{}],target),'TypeError','public runtime construction cannot reuse a genuine backend');
+        for(const prototype of [registry.SessionObject.prototype,realm.XRSession.prototype,borrowed.XRSession.prototype]) {
+          Object.setPrototypeOf(fakeSession,prototype);
+          throws(()=>new registry.handAllocations.HandTracker(fakeSession,realm.XRHand.prototype,realm.XRJointSpace.prototype,realm.XRJointPose.prototype).hand(fakeSource,raw),'TypeError','populated fake backend cannot register or allocate joints');
+          for(const api of [realm,borrowed])throws(()=>Object.getOwnPropertyDescriptor(api.XRSession.prototype,'inputSources')!.get!.call(fakeSession),'TypeError','fake backend has no private session allocation');
+        }
+        check(!registry.handAllocations.sources.get(fakeSource)&&Object.getOwnPropertyDescriptor(realm.XRInputSource.prototype,'hand')!.get!.call(fakeSource)===null,'rejected fake source acquires no hand');
         const fake=new registry.InputSourceObject();throws(()=>tracker.hand(fake),'InvalidStateError','unattached source cannot acquire hand identity');
         const out=new Float32Array(402),radii=new Float32Array(28);out.fill(12345);radii.fill(12345);
         check(f.fillPoses([joint,joint],own.base,out.subarray(1,33))&&out[0]===12345&&out[33]===12345,'bulk offsets duplicates and untouched capacity');

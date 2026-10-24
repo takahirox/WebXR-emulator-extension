@@ -21,6 +21,11 @@ import {XRSessionEvent, XRInputSourceEvent, XRInputSourcesChangeEvent} from './e
 import {installEventHandlers, type EventHandler} from './event-handlers';
 export {XRInputSourceArray, XRSessionEvent, XRInputSourceEvent, XRInputSourcesChangeEvent};
 
+// Backend permission is module-private, separate from the publicly reachable
+// shared interface constructors and from diagnostic properties on their objects.
+const systemDevices = new WeakMap<XRSystem, Promise<EmulatedXRDevice>>();
+const sessionInputs = new WeakMap<XRSession, XRInputSourceArray>();
+
 export class XREventTarget extends EventTarget {
   _emit(event: Event) { this.dispatchEvent(event); }
 }
@@ -76,25 +81,36 @@ export class XRSystem extends XREventTarget {
   private immersive: XRSession | null = null;
   private requesting = false;
   private sessions = new Set<XRSession>();
-  constructor(private devicePromise: Promise<EmulatedXRDevice>) {
+  constructor(devicePromise: Promise<EmulatedXRDevice>, token: symbol | undefined = undefined) {
+    requireGeometryAllocation(token);
     super();
+    systemDevices.set(this, devicePromise);
     window.addEventListener('webxr-device', () => this._emit(new Event('devicechange')));
     window.addEventListener('webxr-exit-immersive', () => { void this.immersive?.end(); });
   }
   async isSessionSupported(value?: unknown) {
     const mode = convertSessionMode(value);
-    return (await this.devicePromise).isSessionSupported(mode);
+    return this.supports(mode);
   }
+  // Bound operations keep backend permission with its system, even when the
+  // public binding is borrowed from another injection or an internal operation
+  // is extracted. A caller-controlled receiver never reaches session allocation.
+  private supports = async (mode: SessionMode) => {
+    return (await systemDevices.get(this)!).isSessionSupported(mode);
+  };
   async requestSession(value?: unknown, dictionary?: unknown) {
     const mode = convertSessionMode(value);
     const options = convertSessionInit(dictionary);
+    return this.request(mode, options);
+  }
+  private request = async (mode: SessionMode, options: ReturnType<typeof convertSessionInit>) => {
     const overlayRoot = options.domOverlay?.root;
     const needsActivation = mode !== 'inline' || [...(options.requiredFeatures ?? []), ...(options.optionalFeatures ?? [])].some(feature => feature !== 'inline-stereo');
     if (needsActivation && !navigator.userActivation.isActive) throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
     if (mode !== 'inline' && (this.immersive || this.requesting)) invalidState('An immersive session is already pending or active.');
     if (mode !== 'inline') this.requesting = true;
     try {
-      const device = await this.devicePromise;
+      const device = await systemDevices.get(this)!;
       if (!device.isSessionSupported(mode)) unsupported('The selected profile/mode does not support this session mode.');
       const required = new Set(['viewer', ...(mode === 'inline' ? [] : ['local']), ...(options.requiredFeatures ?? [])]);
       const enabled = new Set<string>();
@@ -119,7 +135,7 @@ export class XRSystem extends XREventTarget {
           this.immersive = null;
           for (const inline of this.sessions) inline._setImmersiveSuppressed(false);
         }
-      });
+      }, geometryAllocation);
       session._depthFormat = depthFormat;
       if (enabled.has('dom-overlay')) {
         try { session._startDOMOverlay(overlayRoot as HTMLElement); }
@@ -140,7 +156,7 @@ export class XRSystem extends XREventTarget {
       }
       return session;
     } finally { if (mode !== 'inline') this.requesting = false; }
-  }
+  };
 }
 
 type Callback = (time: number, frame: XRFrame) => void;
@@ -162,13 +178,12 @@ export class XRSession extends interfaceBrands.SessionObject {
   private pendingReferenceRequests = new Set<() => void>();
   private visibility: 'visible' | 'visible-blurred' | 'hidden' = document.visibilityState;
   private sources: readonly XRInputSource[] = Object.freeze([]);
-  private readonly inputSourceArray = new XRInputSourceArray(() => this.sources);
   private signals: {type: typeof inputEvents[number]; source: DeviceInput}[] = [];
   private listeners: [string, (detail: InputSignal) => void][] = [];
   private endListener: (id: number) => void;
   private immersiveSuppressed = false;
   private visibilityListener = () => this._setVisibility(document.visibilityState);
-  readonly _hands = new interfaceBrands.handAllocations.HandTracker(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype);
+  readonly _hands: InstanceType<typeof interfaceBrands.handAllocations.HandTracker>;
   readonly _anchors = new Set<XRAnchor>();
   readonly _environment = new EnvironmentTracker(this);
   _depthFormat = 'float32';
@@ -198,8 +213,11 @@ export class XRSession extends interfaceBrands.SessionObject {
   declare onsqueezestart: EventHandler;
   declare onsqueeze: EventHandler;
   declare onsqueezeend: EventHandler;
-  constructor(readonly _device: EmulatedXRDevice, readonly _mode: SessionMode, readonly _id: number, enabled: Set<string>, private onShutdown: () => void) {
+  constructor(readonly _device: EmulatedXRDevice, readonly _mode: SessionMode, readonly _id: number, enabled: Set<string>, private onShutdown: () => void, token: symbol | undefined = undefined) {
+    requireGeometryAllocation(token);
     super(); this.features = Object.freeze([...enabled]); this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
+    sessionInputs.set(this, new XRInputSourceArray(() => this.sources));
+    this._hands = new interfaceBrands.handAllocations.HandTracker(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype);
     this.activeRenderState = new XRRenderState({inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null});
     const viewerMatrix = () => mat4.clone(_device.getBasePoseMatrix());
     this._viewer = new XRReferenceSpace(this, 'viewer', viewerMatrix);
@@ -265,7 +283,11 @@ export class XRSession extends interfaceBrands.SessionObject {
   get ended() { return this.endedValue; }
   get renderState() { return this.activeRenderState; }
   get visibilityState() { return this.visibility; }
-  get inputSources() { return this.inputSourceArray; }
+  get inputSources() {
+    const inputs = sessionInputs.get(this);
+    if (!inputs) throw new TypeError('Expected backend XRSession.');
+    return inputs;
+  }
   private assertDepthConfiguration() { if (!this.enabledFeatures.includes('depth-sensing')) invalidState('Depth sensing was not enabled.'); }
   private assertDepthFrame() {
     this._assertLive();

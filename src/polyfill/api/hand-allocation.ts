@@ -7,6 +7,32 @@ import type {DeviceInput} from '../device-adapter';
 export const jointNames = Object.freeze(['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
   ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))]);
 
+// The shared SessionObject constructor supplies an interface brand, not backend
+// allocation permission. Only token-authorized XRSession construction initializes
+// the private input-source slot. Invoke the installed getter from related injected
+// realms, never a getter supplied by the candidate session or its device records.
+// As elsewhere in the polyfill, arbitrary replacement of installed bindings is
+// outside this allocation protection; this is not native security isolation.
+function hasBackendSession(session: XRSession) {
+  const pending: Window[] = [window], visited = new Set<Window>();
+  while (pending.length) {
+    const realm = pending.pop()!;
+    if (visited.has(realm)) continue;
+    visited.add(realm);
+    try {
+      const constructor = (realm as Window & {XRSession?: typeof XRSession}).XRSession;
+      const getter = constructor && Object.getOwnPropertyDescriptor(constructor.prototype, 'inputSources')?.get;
+      if (getter) {
+        try { getter.call(session); return true; } catch { /* different injection or uninitialized session */ }
+      }
+      for (let index = 0; index < realm.frames.length; index++) pending.push(realm.frames[index]);
+    } catch { /* cross-origin or closed */ }
+    try { pending.push(realm.parent); } catch { /* closed */ }
+    try { if (realm.opener) pending.push(realm.opener as Window); } catch { /* closed */ }
+  }
+  return false;
+}
+
 /** Canonical backend allocations. Only frozen readers escape; neither a public
  * constructor nor the shared space superclass can register a joint. Trackers
  * can retrieve an existing source's hand, never accept caller-provided records,
@@ -58,9 +84,11 @@ export function createHandAllocations(sessions: WeakSet<object>, inputs: WeakSet
   }
   class HandTracker {
     constructor(session: XRSession, hand: XRHand, joint: XRJointSpace, pose: XRJointPose) {
-      if (!sessions.has(session) || !session._device?.sessions.has(session._id)) throw new TypeError('Expected backend XRSession.');
       let backend = backends.get(session);
-      if (!backend) { backend = {session, hand, joint, pose}; backends.set(session, backend); }
+      if (!backend) {
+        if (!sessions.has(session) || !hasBackendSession(session)) throw new TypeError('Expected backend XRSession.');
+        backend = {session, hand, joint, pose}; backends.set(session, backend);
+      }
       trackers.set(this, backend);
     }
     hand(source: XRInputSource, raw?: DeviceInput): XRHand {
