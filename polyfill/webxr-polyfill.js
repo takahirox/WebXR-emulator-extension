@@ -24296,8 +24296,9 @@ void main() {
       }
       function updateMesh(mesh, surface, time) {
           const state = meshTracking.get(mesh);
-          if (state.vertices.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - state.vertices[i]) > 1e-5)) {
-              state.vertices = new Float32Array(surface.vertices);
+          const vertices = new Float32Array(surface.vertices);
+          if (state.vertices.length !== vertices.length || vertices.some((v, i) => Math.abs(v - state.vertices[i]) > 1e-5)) {
+              state.vertices = vertices;
               state.indices = new Uint32Array([0, 1, 2]);
               state.changed = time;
           }

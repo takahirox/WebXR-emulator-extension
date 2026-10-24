@@ -38,10 +38,12 @@ export function createMeshAllocations(sessions: WeakSet<object>) {
     const state = meshTracking.get(mesh)!;
     // Mesh 5397685's attribute-change prose excludes pose-only changes, despite
     // its update algorithm assigning timestamps unconditionally. Orientation is
-    // not an XRMesh attribute. Compare with the last published Float32 shape at
-    // 10 micrometres, retaining it until a change exceeds that tolerance.
-    if (state.vertices.length !== surface.vertices.length || surface.vertices.some((v, i) => Math.abs(v - state.vertices[i]) > 1e-5)) {
-      state.vertices = new Float32Array(surface.vertices);
+    // not an XRMesh attribute. Round candidates to their published Float32
+    // precision before comparing with the last published shape at 10 micrometres,
+    // retaining it until a change exceeds that tolerance.
+    const vertices = new Float32Array(surface.vertices);
+    if (state.vertices.length !== vertices.length || vertices.some((v, i) => Math.abs(v - state.vertices[i]) > 1e-5)) {
+      state.vertices = vertices;
       state.indices = new Uint32Array([0, 1, 2]);
       state.changed = time;
     }

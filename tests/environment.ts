@@ -311,6 +311,26 @@ test('hit testing filters independently classified plane and mesh fixtures', asy
 });
 
 
+test('unchanged mesh geometry at Float32 precision retains its publication timestamp', () => {
+  const room = new Group();
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute([0, 0, 0, 512, 0, 0, 0, 0, 512], 3));
+  room.add(new Mesh(geometry));
+  const session = fixtureSession({_device: {arScene: {room}}, enabledFeatures: ['mesh-detection'], ended: false});
+  const tracker = new EnvironmentTracker(session);
+  tracker.update(1);
+  const mesh = [...tracker.snapshot().meshes][0];
+  const vertices = mesh.vertices, indices = mesh.indices;
+  assert(roomSurfaces(room)[0].vertices.some((value, i) => Math.abs(value - vertices[i]) > 1e-5),
+    'fixture exercises rounding greater than the publication tolerance');
+  for (let time = 2; time <= 10; time++) {
+    tracker.update(time);
+    assert.deepEqual(mesh.vertices, vertices);
+    assert.deepEqual(mesh.indices, indices);
+    assert.equal(mesh.lastChangedTime, 1, 'identical Float32 geometry must not notify a shape change');
+  }
+});
+
 test('mesh publication retains the published baseline and isolates writable arrays', () => {
   const room=new Group(),floor=rectangle(-2,-2,2,2);room.add(floor);
   const session=fixtureSession({_device:{arScene:{room}},enabledFeatures:['mesh-detection'],ended:false});
