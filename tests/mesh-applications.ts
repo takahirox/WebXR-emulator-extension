@@ -11,7 +11,7 @@ import type {Driver} from './plane-applications';
  * geometry. No application call, geometry, result or exception is replaced. */
 export function observeMeshes() {
   const w=window as any;
-  w.meshProbe={frames:0,count:0,matched:0,rebuilds:0,notifications:0,disposed:0};
+  w.meshProbe={frames:0,observedFrame:0,count:0,matched:0,rebuilds:0,notifications:0,disposed:0};
   const records=new Map<any,any>();let session:any;
   const world=(m:ArrayLike<number>,p:number[])=>[0,1,2].map(i=>m[i]*p[0]+m[4+i]*p[1]+m[8+i]*p[2]+m[12+i]);
   const distance=(a:number[],b:number[])=>Math.hypot(...a.map((v,i)=>v-b[i]));
@@ -69,6 +69,7 @@ export function observeMeshes() {
       p.centers=meshes.slice(0,3).map((mesh:any)=>Array.from(f.getPose(mesh.meshSpace,w.meshReference).transform.matrix).slice(12,15));
       p.geometryIds=objects.map((o:any)=>o.geometry.id);p.times=meshes.map((m:any)=>m.lastChangedTime);
       p.visible=objects.filter((o:any)=>o.visible).length;
+      p.observedFrame=p.frames;
       return result;
     }]);
   };
@@ -114,9 +115,11 @@ export async function runMeshApplications(driver:Driver) {
     assert(moved.maxRoomError<1e-4);await capture('viewer-moved');
     // Disclosed virtual-backend controls: preserve original application calls
     // and let its timestamp-dependent processMeshes rebuild the actual scene.
-    await driver.evaluate(`const room=window.firefoxSession._device.arScene.room;window.meshRoom=room;window.meshOriginal={position:room.position.clone(),rotation:room.rotation.clone(),scale:room.scale.clone()};room.position.x+=0.2;room.rotation.x+=0.05;`);
-    await eventually(aligned,p=>p.frames>moved.frames+20,'backend rigid pose propagated');
-    const poseOnly=await aligned();console.log('mesh phase','pose only');assert.deepEqual(poseOnly.times,moved.times);assert.deepEqual(poseOnly.geometryIds,moved.geometryIds);assert(poseOnly.maxRoomError<1e-4);
+    // Screenshot work can advance frames. Capture the mutation's marker in the
+    // same task, and wait for a full (every fifth frame) observation after it.
+    const poseMutationFrame=await driver.evaluate(`const room=window.firefoxSession._device.arScene.room;window.meshRoom=room;window.meshOriginal={position:room.position.clone(),rotation:room.rotation.clone(),scale:room.scale.clone()};room.position.x+=0.2;room.rotation.x+=0.05;return window.meshProbe.frames;`);
+    const poseOnly=await eventually(aligned,p=>p.observedFrame>poseMutationFrame && ready(p) && p.maxApiError<1e-4 && p.maxRoomError<1e-4 && p.centers.some((center:number[],i:number)=>Math.hypot(...center.map((v,j)=>v-moved.centers[i][j]))>1e-4),'backend rigid pose observed with moved centers and room alignment');
+    console.log('mesh phase','pose only');assert.deepEqual(poseOnly.times,moved.times);assert.deepEqual(poseOnly.geometryIds,moved.geometryIds);assert(poseOnly.maxRoomError<1e-4);
     assert.notDeepEqual(poseOnly.centers,moved.centers);await capture('pose-only');
     await driver.evaluate('window.meshRoom.scale.multiplyScalar(1.1)');
     await eventually(aligned,p=>p.frames>poseOnly.frames+20 && p.rebuilds>=p.count,'Sample rebuilt geometry after shape change',60000);
@@ -143,7 +146,7 @@ export async function runMeshApplications(driver:Driver) {
     const finalShutdown=await driver.evaluate(`return {ends:window.firefoxXR.ends,meshes:window.firefoxSession._environment.snapshot().meshes.size,callbacks:window.firefoxSession.callbacks.size,layers:window.firefoxSession._webglLayers.size}`);
     assert.deepEqual(finalShutdown,{ends:2,meshes:0,callbacks:0,layers:0});
     const dependencies=await driver.evaluate(`return Promise.all([...new Set(performance.getEntriesByType('resource').map(e=>e.name).filter(url=>url.startsWith('https://cdn.jsdelivr.net/npm/three@0.152.2/')))].map(async url=>{const response=await fetch(url,{cache:'force-cache'}),bytes=await response.arrayBuffer(),hash=await crypto.subtle.digest('SHA-256',bytes);return {url,status:response.status,bytes:bytes.byteLength,sha256:[...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join(''),evidence:'browser force-cache reread of immutable pinned dependency'};}));`);
-    results.push({profile,device,app:'sample',before,moved,poseOnly,shape,removed,reacquired,pixels,sessionState,shutdown,restart,finalShutdown,dependencies,captures,rendering});
+    results.push({profile,device,app:'sample',before,moved,poseMutationFrame,poseOnly,shape,removed,reacquired,pixels,sessionState,shutdown,restart,finalShutdown,dependencies,captures,rendering});
     await writeFile(`test-results/mesh-applications-${driver.browser}-progress.json`,JSON.stringify(results,null,2));
   }
   return results;
