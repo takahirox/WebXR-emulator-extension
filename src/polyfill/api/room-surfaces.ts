@@ -39,4 +39,3 @@ export function roomSurfaces(room: Object3D | null): Surface[] {
   }
   return surfaces;
 }
-
