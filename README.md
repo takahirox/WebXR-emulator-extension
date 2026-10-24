@@ -142,7 +142,7 @@ Chrome uses a service worker and two manifest-declared `document_start` content 
 
 `npm run test:firefox` validates the generated Firefox package using explicitly selected **official Firefox 157.0 / geckodriver 0.37.1**, a fresh profile, temporary installation and the genuine WebXR DevTools panel. It runs pinned Samples and official Three.js applications on Quest VR, Quest MR and Android AR, including presented pixels, tracked/screen input and cleanup. See [Firefox runtime setup and evidence](docs/firefox-runtime.md) for executable selection, downloads, observations and remaining coverage. `npm run test:extension-lifetime` is the focused Chromium background-suspension/unload regression.
 
-`npm run test:tracking:chromium` and `npm run test:tracking:firefox` select the four pinned Quest VR Input Tracking/Three.js dragging scenarios. See [tracking reproduction, measured results and upstream blockers](docs/webxr-tracking.md); both commands currently exit 1 because the unchanged Sample has cursor/grip rendering defects.
+`npm run test:tracking:chromium` and `npm run test:tracking:firefox` select the four pinned Quest VR Input Selection/Three.js dragging scenarios. The recorded runs pass all four reconciled scenarios, with both commands exiting 0. See [tracking reproduction, measured results and source reconciliation](docs/webxr-tracking.md), which retains the original Input Tracking cursor/grip failures as historical evidence.
 
 ### Simulated room geometry and navigation
 
