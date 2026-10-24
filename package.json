@@ -15,7 +15,9 @@
     "test:visibility:chromium": "tsx tests/visibility-browser.ts chromium",
     "test:visibility:firefox": "tsx tests/visibility-browser.ts firefox",
     "test:reference-space:chromium": "tsx tests/reference-space-browser.ts chromium",
-    "test:reference-space:firefox": "tsx tests/reference-space-browser.ts firefox"
+    "test:reference-space:firefox": "tsx tests/reference-space-browser.ts firefox",
+    "test:tracking:chromium": "tsx tests/tracking.ts chromium",
+    "test:tracking:firefox": "tsx tests/tracking.ts firefox"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",
