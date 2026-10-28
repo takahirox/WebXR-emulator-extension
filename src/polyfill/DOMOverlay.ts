@@ -1,12 +1,13 @@
 import {Matrix4, Vector3} from 'three';
 import type ARScene from './ARScene';
+import type {PolyfillGlobal} from '../types/polyfill';
 
 /** Live single-view presentation. No DOM copies, HTML serialization or capture permissions. */
 export default class DOMOverlay {
-  static available() {
-    return typeof HTMLElement.prototype.showPopover === 'function';
+  static available(realm: PolyfillGlobal = window) {
+    return typeof realm.HTMLElement.prototype.showPopover === 'function';
   }
-  static accepts(root: Element | undefined): root is HTMLElement {
+  static accepts(root: Element | undefined, document: Document = window.document): root is HTMLElement {
     return root?.namespaceURI === 'http://www.w3.org/1999/xhtml' && root.ownerDocument === document && root.isConnected &&
       root.getRootNode() === document && document.body?.contains(root) && !document.querySelector(':modal') && !root.matches('canvas, video, audio, img, input, select, textarea') && root !== document.documentElement && !root.closest('[inert]') && !root.matches('iframe, frame, object, embed, :modal') && !root.hasAttribute('popover') &&
       typeof (root as HTMLElement).showPopover === 'function';
@@ -14,19 +15,21 @@ export default class DOMOverlay {
 
   private readonly style: string | null;
   private readonly parent: Node | null;
-  private readonly events = new AbortController();
+  private readonly events = new this.realm.AbortController();
   private readonly observer: MutationObserver;
   private disposed = false;
   private toggleTimer = 0;
   private visible = false;
   private readonly display: string;
   private flat: boolean;
-  private dpr = window.devicePixelRatio;
+  private dpr = this.realm.devicePixelRatio;
   private matrix = new Matrix4();
   private readonly corners = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
 
   constructor(readonly root: HTMLElement, private scene: ARScene, private width: number, private height: number,
-    private invalidate: () => void, flat = false) {
+    private invalidate: () => void, flat = false, private realm: PolyfillGlobal = window) {
+    const window = this.realm, document = window.document;
+    const {HTMLElement, DOMException, MutationObserver} = window, getComputedStyle = window.getComputedStyle.bind(window);
     this.style = root.getAttribute('style'); this.parent = root.parentNode;
     // Fixed descendants and body-wide layouts use the readable desktop fallback.
     this.flat = flat || root === document.body || Array.from(root.querySelectorAll('*')).some(node => getComputedStyle(node).position === 'fixed');
@@ -67,20 +70,22 @@ export default class DOMOverlay {
   }
 
   private valid() {
+    const document = this.realm.document;
     return this.root.isConnected && this.root.ownerDocument === document && this.root.parentNode === this.parent;
   }
   private toggle = (event: Event) => {
     // Finish the browser's top-layer transition before removing popover state.
     // Synchronous teardown in beforetoggle makes the caller's hidePopover throw.
-    if ((event as ToggleEvent).newState === 'closed') this.toggleTimer = window.setTimeout(() => { if (!this.disposed) this.invalidate(); }, 0);
+    if ((event as ToggleEvent).newState === 'closed') this.toggleTimer = this.realm.setTimeout(() => { if (!this.disposed) this.invalidate(); }, 0);
   };
   private visibility = () => { this.update(); };
   update() {
+    const window = this.realm, document = window.document;
     if (this.disposed) return;
     if (!this.valid()) { this.invalidate(); return; }
     if (this.flat) {
-      this.root.style.setProperty('width', `${Math.max(1, Math.min(560, innerWidth - 48))}px`, 'important');
-      this.root.style.setProperty('height', `${Math.max(1, innerHeight - 48)}px`, 'important');
+      this.root.style.setProperty('width', `${Math.max(1, Math.min(560, window.innerWidth - 48))}px`, 'important');
+      this.root.style.setProperty('height', `${Math.max(1, window.innerHeight - 48)}px`, 'important');
       this.root.style.setProperty('transform', 'translate(24px, 24px)', 'important');
       this.root.style.setProperty('display', document.hidden ? 'none' : this.display, 'important');
       return;
@@ -117,7 +122,7 @@ export default class DOMOverlay {
   }
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; window.clearTimeout(this.toggleTimer); this.events.abort(); this.observer.disconnect();
+    this.disposed = true; this.realm.clearTimeout(this.toggleTimer); this.events.abort(); this.observer.disconnect();
     if (this.root.matches(':popover-open')) this.root.hidePopover();
     this.root.removeAttribute('popover');
     // Flush pending CSSOM serialization before restoring an absent attribute.

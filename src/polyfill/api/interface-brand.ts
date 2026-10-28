@@ -11,6 +11,8 @@ import {createHandAllocations} from './hand-allocation';
 // Same-origin injections share allocation brands, not writable WeakSets. Only
 // constructors can brand a newly allocated object; borrowing a prototype or
 // wrapping an instance in a Proxy cannot acquire its brand.
+export let initializeHandBackend: ReturnType<typeof createHandAllocations>['initialize'] | undefined;
+
 function createBrands() {
   const frames = new WeakSet<object>(), spaces = new WeakSet<object>();
   const sessions = new WeakSet<object>(), inputSources = new WeakSet<object>();
@@ -37,7 +39,9 @@ function createBrands() {
   const hitTestAllocations = createHitTestAllocations({sessions, spaces, frames, inputSources, transforms});
   const planeAllocations = createPlaneAllocations(sessions);
   const frameValues = new WeakMap<object, {session: XRSession; predictedDisplayTime: number; pose: (matrix: mat4, emulated: boolean) => XRPose}>();
-  const handAllocations = createHandAllocations(sessions, inputSources, frameValues);
+  const poseValues = new WeakMap<object, {transform: XRRigidTransform; emulatedPosition: boolean}>();
+  const {bindings: handAllocations, initialize} = createHandAllocations(inputSources, poseValues);
+  initializeHandBackend = initialize;
   return Object.freeze({FrameObject, SpaceObject, SessionObject, InputSourceObject,
     handAllocations,
     layerAllocations: createLayerAllocations(sessions),
@@ -58,7 +62,7 @@ function createBrands() {
     referenceSpaceRequests: new WeakMap<object, (type: string) => Promise<XRReferenceSpace>>(),
     frameValues,
     viewerPoses: new WeakMap<object, (frame: XRFrame, reference: XRReferenceSpace) => XRViewerPose | null>(),
-    poses: new WeakMap<object, {transform: XRRigidTransform; emulatedPosition: boolean}>(),
+    poses: poseValues,
     viewerViews: new WeakMap<object, readonly XRView[]>(),
     views: new WeakMap<object, {frame: XRFrame; eye: 'none' | 'left' | 'right'; index: number; world: mat4}>(),
     viewGeometry: new WeakMap<object, {transform: XRRigidTransform; projection: mat4; array: () => Float32Array}>(),
@@ -108,7 +112,8 @@ const shared = host as unknown as {[key: symbol]: ReturnType<typeof createBrands
 if (!Object.prototype.hasOwnProperty.call(shared, key)) {
   Object.defineProperty(shared, key, {value: createBrands()});
 }
-export const interfaceBrands = shared[key];
+export const interfaceBrands: ReturnType<typeof createBrands> = shared[key];
+export const brandHost = host;
 
 // All injections use the same complete allocation constructors and private
 // membership records. Never discover or invoke predicates from frame properties.

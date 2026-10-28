@@ -1,0 +1,29 @@
+
+> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:hands:chromium
+> tsx tests/reference-space-browser.ts chromium hands
+
+scenario chromium Meta Quest 3 immersive-vr
+{"status":"failed","browser":"chromium","scenarios":0,"assertions":0,"failures":["AssertionError [ERR_ASSERTION]: Error: immersive-vr: attached untrusted getter cannot authorize allocation: [{\"phase\":\"attached\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25},{\"phase\":\"attached\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25},{\"phase\":\"removed\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25},{\"phase\":\"removed\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25}]\nError: immersive-vr: attached untrusted getter cannot authorize allocation: [{\"phase\":\"attached\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25},{\"phase\":\"attached\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25},{\"phase\":\"removed\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25},{\"phase\":\"removed\",\"error\":null,\"getterCalls\":1,\"predicateCalls\":0,\"registeredJoints\":25}]\n    at check (eval at evaluate (:370:30), <anonymous>:2:405)\n    at eval (eval at evaluate (:370:30), <anonymous>:2:19172)\n    at eval (eval at evaluate (:370:30), <anonymous>:2:1630)\n    at XRSession.tick (chrome-extension://lanjjddgofcajhkemopgefnlcahphhbb/polyfill/webxr-polyfill.js:27115:27)\n\n'failed' !== 'passed'\n"]}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Error: immersive-vr: attached untrusted getter cannot authorize allocation: [{"phase":"attached","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25},{"phase":"attached","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25},{"phase":"removed","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25},{"phase":"removed","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25}]
+Error: immersive-vr: attached untrusted getter cannot authorize allocation: [{"phase":"attached","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25},{"phase":"attached","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25},{"phase":"removed","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25},{"phase":"removed","error":null,"getterCalls":1,"predicateCalls":0,"registeredJoints":25}]
+    at check (eval at evaluate (:370:30), <anonymous>:2:405)
+    at eval (eval at evaluate (:370:30), <anonymous>:2:19172)
+    at eval (eval at evaluate (:370:30), <anonymous>:2:1630)
+    at XRSession.tick (chrome-extension://lanjjddgofcajhkemopgefnlcahphhbb/polyfill/webxr-polyfill.js:27115:27)
+
+'failed' !== 'passed'
+
+    at <anonymous> (/private/var/folders/_t/12j6tqzx6wv4z2l__ttncdxc0000gn/T/gitweave-e30e4b80-1l75fvfu/gitweave-e30e4b80-1l75fvfu/tests/reference-space-browser.ts:194:14) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'failed',
+  expected: 'passed',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.12.0

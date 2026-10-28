@@ -24610,41 +24610,8 @@ void main() {
 
   const jointNames = Object.freeze(['wrist', 'thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip',
       ...['index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'].flatMap(finger => ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'].map(bone => `${finger}-${bone}`))]);
-  function hasBackendSession(session) {
-      var _a;
-      const pending = [window], visited = new Set();
-      while (pending.length) {
-          const realm = pending.pop();
-          if (visited.has(realm))
-              continue;
-          visited.add(realm);
-          try {
-              const constructor = realm.XRSession;
-              const getter = constructor && ((_a = Object.getOwnPropertyDescriptor(constructor.prototype, 'inputSources')) === null || _a === void 0 ? void 0 : _a.get);
-              if (getter) {
-                  try {
-                      getter.call(session);
-                      return true;
-                  }
-                  catch ( _b) {  }
-              }
-              for (let index = 0; index < realm.frames.length; index++)
-                  pending.push(realm.frames[index]);
-          }
-          catch ( _c) {  }
-          try {
-              pending.push(realm.parent);
-          }
-          catch ( _d) {  }
-          try {
-              if (realm.opener)
-                  pending.push(realm.opener);
-          }
-          catch ( _e) {  }
-      }
-      return false;
-  }
-  function createHandAllocations(sessions, inputs, frames) {
+  function createHandAllocations(inputs, poseValues) {
+      const frames = new WeakMap();
       const hands = new WeakMap();
       const joints = new WeakMap();
       const poses = new WeakMap();
@@ -24688,13 +24655,9 @@ void main() {
       }
       class HandTracker {
           constructor(session, hand, joint, pose) {
-              let backend = backends.get(session);
-              if (!backend) {
-                  if (!sessions.has(session) || !hasBackendSession(session))
-                      throw new TypeError('Expected backend XRSession.');
-                  backend = { session, hand, joint, pose };
-                  backends.set(session, backend);
-              }
+              const backend = backends.get(session);
+              if (!backend)
+                  throw new TypeError('Expected allocated hand backend.');
               trackers.set(this, backend);
           }
           hand(source, raw) {
@@ -24707,12 +24670,7 @@ void main() {
                       invalidState('Foreign hand source.');
                   return existing;
               }
-              if (backend.session.ended || !backend.session.enabledFeatures.includes('hand-tracking') || !Array.from(backend.session.inputSources).includes(source))
-                  invalidState('Source is not an active hand source.');
-              const controller = backend.session._device.gamepadInputSources.findIndex(input => input.inputSource === raw);
-              if (controller < 0)
-                  throw new TypeError('Expected connected backend input.');
-              return allocateHand(backend, source, controller);
+              return invalidState('Source has no allocated hand.');
           }
       }
       function pose(frame, joint, base) {
@@ -24727,14 +24685,15 @@ void main() {
           const relative = relativePose(joint, base);
           if (!relative)
               return null;
-          const result = state.pose(relative.matrix, relative.emulated);
-          Object.setPrototypeOf(result, backends.get(state.session).pose);
+          const geometry = state.pose(relative.matrix, relative.emulated);
+          const result = Object.create(backends.get(state.session).pose);
+          poseValues.set(result, { transform: geometry.transform, emulatedPosition: geometry.emulatedPosition });
           poses.set(result, metadata.radius);
           return result;
       }
       Object.freeze(HandTracker.prototype);
       Object.freeze(HandTracker);
-      return Object.freeze({ HandTracker, pose,
+      const bindings = Object.freeze({ HandTracker, pose,
           iterator: (hand, kind, prototype) => {
               const state = hands.get(hand);
               if (!state)
@@ -24753,8 +24712,18 @@ void main() {
           hands: Object.freeze({ get: (value) => hands.get(value) }),
           joints: Object.freeze({ get: (value) => joints.get(value), has: (value) => joints.has(value) }),
           poses: Object.freeze({ get: (value) => poses.get(value) }) });
+      const initialize = (session, hand, joint, pose) => {
+          if (backends.has(session))
+              throw new TypeError('Hand backend already allocated.');
+          const backend = { session, hand, joint, pose };
+          backends.set(session, backend);
+          return { hand: (source, controller) => { var _a; return (_a = sourceHands.get(source)) !== null && _a !== void 0 ? _a : allocateHand(backend, source, controller); },
+              frame: (frame, pose) => { frames.set(frame, { session, pose }); } };
+      };
+      return { bindings, initialize };
   }
 
+  let initializeHandBackend;
   function createBrands() {
       const frames = new WeakSet(), spaces = new WeakSet();
       const sessions = new WeakSet(), inputSources = new WeakSet();
@@ -24782,7 +24751,9 @@ void main() {
       const hitTestAllocations = createHitTestAllocations({ sessions, spaces, frames, inputSources, transforms });
       const planeAllocations = createPlaneAllocations(sessions);
       const frameValues = new WeakMap();
-      const handAllocations = createHandAllocations(sessions, inputSources, frameValues);
+      const poseValues = new WeakMap();
+      const { bindings: handAllocations, initialize } = createHandAllocations(inputSources, poseValues);
+      initializeHandBackend = initialize;
       return Object.freeze({ FrameObject, SpaceObject, SessionObject, InputSourceObject,
           handAllocations,
           layerAllocations: createLayerAllocations(sessions),
@@ -24802,7 +24773,7 @@ void main() {
           referenceSpaceRequests: new WeakMap(),
           frameValues,
           viewerPoses: new WeakMap(),
-          poses: new WeakMap(),
+          poses: poseValues,
           viewerViews: new WeakMap(),
           views: new WeakMap(),
           viewGeometry: new WeakMap(),
@@ -24854,6 +24825,7 @@ void main() {
       Object.defineProperty(shared, key, { value: createBrands() });
   }
   const interfaceBrands = shared[key];
+  const brandHost = host;
   const layerBrands = interfaceBrands.layerAllocations;
 
   const sessionObjects = interfaceBrands.sessions;
@@ -26255,148 +26227,6 @@ void main() {
     roomSurfaces: roomSurfaces
   });
 
-  function point(value, direction = false) {
-      if (value !== null && value !== undefined && Object(value) !== value)
-          throw new TypeError('Expected point dictionary.');
-      const input = value;
-      const out = { w: direction ? 0 : 1, x: 0, y: 0, z: direction ? -1 : 0 };
-      for (const key of ['w', 'x', 'y', 'z']) {
-          const member = input === null || input === void 0 ? void 0 : input[key];
-          if (member !== undefined)
-              out[key] = +member;
-          if (direction && !Number.isFinite(out[key]))
-              throw new TypeError('Direction members must be finite doubles.');
-      }
-      return out;
-  }
-  function rayState(value) {
-      const state = interfaceBrands.rays.get(value);
-      if (!state)
-          throw new TypeError('Expected XRRay.');
-      return state;
-  }
-  class XRRay extends interfaceBrands.hitTestAllocations.RayAllocation {
-      constructor(origin = {}, direction = {}) {
-          let p, d;
-          if (arguments.length === 1 && transformObjects.has(origin)) {
-              const m = transformMatrix(origin);
-              p = { x: m[12], y: m[13], z: m[14], w: 1 };
-              d = { x: -m[8], y: -m[9], z: -m[10], w: 0 };
-          }
-          else {
-              p = point(origin);
-              d = point(direction, true);
-          }
-          if (p.w !== 1 || d.w !== 0 || (d.x === 0 && d.y === 0 && d.z === 0))
-              throw new TypeError('Invalid ray origin or direction.');
-          super(p, d);
-      }
-      get origin() { return rayState(this).origin; }
-      get direction() { return rayState(this).direction; }
-      get matrix() { return rayState(this).matrix(); }
-  }
-  enumerableMembers(XRRay.prototype, ['origin', 'direction', 'matrix']);
-  Object.defineProperty(XRRay.prototype, Symbol.toStringTag, { value: 'XRRay', configurable: true });
-
-  var _a;
-  const typedArray = Object.getPrototypeOf(Float32Array.prototype);
-  const arrayName = Object.getOwnPropertyDescriptor(typedArray, Symbol.toStringTag).get;
-  const arrayBuffer = Object.getOwnPropertyDescriptor(typedArray, 'buffer').get;
-  const arrayLength = Object.getOwnPropertyDescriptor(typedArray, 'length').get;
-  const bufferLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
-  const bufferResizable = (_a = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'resizable')) === null || _a === void 0 ? void 0 : _a.get;
-  function isObject$1(value) { return Object(value) === value; }
-  function interfaceValue(value, brand, name) {
-      if (!isObject$1(value) || !brand.has(value))
-          throw new TypeError(`Expected ${name}.`);
-      return value;
-  }
-  function interfaceSequence(value, brand, name) {
-      if (!isObject$1(value))
-          throw new TypeError('Expected iterable sequence.');
-      const method = value[Symbol.iterator];
-      if (typeof method !== 'function')
-          throw new TypeError('Expected iterable sequence.');
-      const iterator = Reflect.apply(method, value, []);
-      if (!isObject$1(iterator))
-          throw new TypeError('Expected iterator object.');
-      const next = iterator.next;
-      const list = [];
-      while (true) {
-          const step = Reflect.apply(next, iterator, []);
-          if (!isObject$1(step))
-              throw new TypeError('Expected iterator result object.');
-          if (step.done)
-              return list;
-          list.push(interfaceValue(step.value, brand, name));
-      }
-  }
-  function float32Output(value) {
-      if (arrayName.call(value) !== 'Float32Array')
-          throw new TypeError('Expected Float32Array.');
-      const buffer = arrayBuffer.call(value);
-      bufferLength.call(buffer);
-      if (bufferResizable === null || bufferResizable === void 0 ? void 0 : bufferResizable.call(buffer))
-          throw new TypeError('Resizable buffers are not supported.');
-      return arrayLength.call(value);
-  }
-
-  const hitTestAllocation = Symbol('hit test allocation');
-  function requireHitTestAllocation(token) {
-      if (token !== hitTestAllocation)
-          throw new TypeError('Illegal constructor.');
-  }
-  function dictionary$1(value) {
-      if (value === undefined || value === null)
-          return {};
-      if (Object(value) !== value)
-          throw new TypeError('Expected hit-test options dictionary.');
-      return value;
-  }
-  function common(value) {
-      const member = value.entityTypes;
-      let entityTypes = ['plane'];
-      if (member !== undefined) {
-          if (member === null || Object(member) !== member)
-              throw new TypeError('Expected entity type sequence.');
-          const method = member[Symbol.iterator];
-          if (typeof method !== 'function')
-              throw new TypeError('Expected entity type sequence.');
-          const iterator = Reflect.apply(method, member, []);
-          if (Object(iterator) !== iterator)
-              throw new TypeError('Expected iterator object.');
-          const next = iterator.next;
-          entityTypes = [];
-          while (true) {
-              const step = Reflect.apply(next, iterator, []);
-              if (Object(step) !== step)
-                  throw new TypeError('Expected iterator result.');
-              if (step.done)
-                  break;
-              const type = `${step.value}`;
-              if (!['plane', 'point', 'mesh'].includes(type))
-                  throw new TypeError('Invalid hit-test entity type.');
-              entityTypes.push(type);
-          }
-      }
-      const offset = value.offsetRay;
-      if (offset !== undefined)
-          rayState(offset);
-      return { entityTypes, offsetRay: offset === undefined ? new XRRay() : offset };
-  }
-  function convertHitTestOptions(value) {
-      const input = dictionary$1(value), converted = common(input);
-      const space = input.space;
-      return { ...converted, space: interfaceValue(space, spaceObjects, 'XRSpace') };
-  }
-  function convertTransientHitTestOptions(value) {
-      const input = dictionary$1(value), converted = common(input);
-      const profile = input.profile;
-      if (profile === undefined)
-          throw new TypeError('profile is required.');
-      return { ...converted, profile: `${profile}` };
-  }
-
   class DeviceAdapter {
       constructor(global) {
           this.global = global;
@@ -26476,1208 +26306,48 @@ void main() {
       retire() { this.connected = false; }
   }
 
-  const HALL_PLAY_AREA = Object.freeze([
-      Object.freeze([-1, 0, -1]),
-      Object.freeze([1, 0, -1]),
-      Object.freeze([1, 0, 1]),
-      Object.freeze([-1, 0, 1]),
-  ]);
-
-  function hitSourceState(value) {
-      const state = interfaceBrands.hitSources.get(value);
+  function point(value, direction = false) {
+      if (value !== null && value !== undefined && Object(value) !== value)
+          throw new TypeError('Expected point dictionary.');
+      const input = value;
+      const out = { w: direction ? 0 : 1, x: 0, y: 0, z: direction ? -1 : 0 };
+      for (const key of ['w', 'x', 'y', 'z']) {
+          const member = input === null || input === void 0 ? void 0 : input[key];
+          if (member !== undefined)
+              out[key] = +member;
+          if (direction && !Number.isFinite(out[key]))
+              throw new TypeError('Direction members must be finite doubles.');
+      }
+      return out;
+  }
+  function rayState(value) {
+      const state = interfaceBrands.rays.get(value);
       if (!state)
-          throw new TypeError('Expected XRHitTestSource.');
+          throw new TypeError('Expected XRRay.');
       return state;
   }
-  class XRHitTestSource extends interfaceBrands.hitTestAllocations.HitSourceAllocation {
-      constructor(...args) {
-          const [session, options, token] = args;
-          requireHitTestAllocation(token);
-          super(session, options);
-      }
-      cancel() {
-          const state = hitSourceState(this);
-          if (!state.active)
-              invalidState('Source is inactive.');
-          this._deactivate();
-      }
-      _deactivate() {
-          const state = hitSourceState(this);
-          state.session._hitSources.delete(this);
-          state.session._device.removeHitTestSource(this);
-      }
-      get _space() { return hitSourceState(this).space; }
-      get _session() { return hitSourceState(this).session; }
-      get _offsetRay() { return hitSourceState(this).offsetRay; }
-      get _entityTypes() { return hitSourceState(this).entityTypes; }
-      get _active() { return hitSourceState(this).active; }
-  }
-  enumerableMembers(XRHitTestSource.prototype, ['cancel']);
-  Object.defineProperty(XRHitTestSource.prototype, Symbol.toStringTag, { value: 'XRHitTestSource', configurable: true });
-
-  function transientHitSourceState(value) {
-      const state = interfaceBrands.transientHitSources.get(value);
-      if (!state)
-          throw new TypeError('Expected XRTransientInputHitTestSource.');
-      return state;
-  }
-  class XRTransientInputHitTestSource extends interfaceBrands.hitTestAllocations.TransientHitSourceAllocation {
-      constructor(...args) {
-          const [session, options, token] = args;
-          requireHitTestAllocation(token);
-          super(session, options);
-      }
-      cancel() {
-          const state = transientHitSourceState(this);
-          if (!state.active)
-              invalidState('Source is inactive.');
-          this._deactivate();
-      }
-      _deactivate() {
-          const state = transientHitSourceState(this);
-          state.session._transientSources.delete(this);
-          state.session._device.removeHitTestSource(this);
-      }
-      get _profile() { return transientHitSourceState(this).profile; }
-      get _session() { return transientHitSourceState(this).session; }
-      get _offsetRay() { return transientHitSourceState(this).offsetRay; }
-      get _entityTypes() { return transientHitSourceState(this).entityTypes; }
-      get _active() { return transientHitSourceState(this).active; }
-  }
-  enumerableMembers(XRTransientInputHitTestSource.prototype, ['cancel']);
-  Object.defineProperty(XRTransientInputHitTestSource.prototype, Symbol.toStringTag, { value: 'XRTransientInputHitTestSource', configurable: true });
-
-  function resultState$1(value) {
-      const state = interfaceBrands.hitResults.get(value);
-      if (!state)
-          throw new TypeError('Expected XRHitTestResult.');
-      return state;
-  }
-  class XRHitTestResult extends interfaceBrands.hitTestAllocations.HitResultAllocation {
-      constructor(...args) {
-          const [frame, transform, token] = args;
-          requireHitTestAllocation(token);
-          super(frame, transform);
-      }
-      async createAnchor() {
-          const { frame, transform } = resultState$1(this);
-          frame._assertActive();
-          const space = new XRSpace(frame.session, () => clone$1(transformMatrix(transform)));
-          return frame.createAnchor(new XRRigidTransform(), space);
-      }
-      getPose(baseSpace) {
-          const { frame, transform } = resultState$1(this);
-          if (arguments.length < 1)
-              throw new TypeError('Expected baseSpace.');
-          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
-          frame._assertActive();
-          const space = new XRSpace(frame.session, () => clone$1(transformMatrix(transform)));
-          return frame.getPose(space, baseSpace);
-      }
-  }
-  enumerableMembers(XRHitTestResult.prototype, ['getPose', 'createAnchor']);
-  Object.defineProperty(XRHitTestResult.prototype, Symbol.toStringTag, { value: 'XRHitTestResult', configurable: true });
-
-  function resultState(value) {
-      const state = interfaceBrands.transientHitResults.get(value);
-      if (!state)
-          throw new TypeError('Expected XRTransientInputHitTestResult.');
-      return state;
-  }
-  class XRTransientInputHitTestResult extends interfaceBrands.hitTestAllocations.TransientHitResultAllocation {
-      constructor(...args) {
-          const [frame, results, inputSource, token] = args;
-          requireHitTestAllocation(token);
-          super(frame, results, inputSource);
-      }
-      get inputSource() { return resultState(this).inputSource; }
-      get results() { return resultState(this).results; }
-  }
-  enumerableMembers(XRTransientInputHitTestResult.prototype, ['inputSource', 'results']);
-  Object.defineProperty(XRTransientInputHitTestResult.prototype, Symbol.toStringTag, { value: 'XRTransientInputHitTestResult', configurable: true });
-
-  const providers = new WeakMap();
-  const isIndex = (key) => typeof key === 'string' && /^(0|[1-9]\d*)$/.test(key) && Number(key) < 0xffffffff;
-  const isReadonly = (key) => key === 'length' || isIndex(key);
-  class XRInputSourceArray {
-      constructor(provider) {
-          const collection = new Proxy(this, {
-              get: (target, key, receiver) => isIndex(key) ? provider()[Number(key)] : Reflect.get(target, key, receiver),
-              has: (target, key) => isIndex(key) ? Number(key) < provider().length : Reflect.has(target, key),
-              ownKeys: target => [...[...provider().keys()].map(String), ...Reflect.ownKeys(target)],
-              getOwnPropertyDescriptor: (target, key) => isIndex(key)
-                  ? (Number(key) < provider().length ? { value: provider()[Number(key)], writable: false, enumerable: true, configurable: true } : undefined)
-                  : Reflect.getOwnPropertyDescriptor(target, key),
-              set: (target, key, value, receiver) => !isReadonly(key) && Reflect.set(target, key, value, receiver),
-              defineProperty: (target, key, descriptor) => !isReadonly(key) && Reflect.defineProperty(target, key, descriptor),
-              deleteProperty: (target, key) => !isReadonly(key) && Reflect.deleteProperty(target, key),
-              preventExtensions: () => false,
-          });
-          providers.set(collection, provider);
-          return collection;
-      }
-      get length() { return providers.get(this)().length; }
-      get [Symbol.toStringTag]() { return 'XRInputSourceArray'; }
-      *values() { for (let index = 0; index < this.length; index++)
-          yield this[index]; }
-      *keys() { for (let index = 0; index < this.length; index++)
-          yield index; }
-      *entries() { for (const index of this.keys())
-          yield [index, this[index]]; }
-      forEach(callback, thisArg) {
-          if (typeof callback !== 'function')
-              throw new TypeError('Expected callback.');
-          for (const [index, value] of this.entries())
-              callback.call(thisArg, value, index, this);
-      }
-      [Symbol.iterator]() { return this.values(); }
-  }
-
-  function isObject(value) {
-      return Object(value) === value;
-  }
-  function dictionary(value) {
-      if (value === null || value === undefined)
-          return Object.create(null);
-      if (!isObject(value))
-          throw new TypeError('Expected session initialization dictionary.');
-      return value;
-  }
-  function domString(value) {
-      return `${value}`;
-  }
-  function enumeration(value, allowed) {
-      const string = domString(value);
-      if (!allowed.includes(string))
-          throw new TypeError('Invalid session initialization enum.');
-      return string;
-  }
-  function sequence(value, convert) {
-      if (!isObject(value))
-          throw new TypeError('Expected session initialization sequence.');
-      const method = value[Symbol.iterator];
-      if (typeof method !== 'function')
-          throw new TypeError('Expected iterable sequence.');
-      const iterator = Reflect.apply(method, value, []);
-      if (!isObject(iterator))
-          throw new TypeError('Expected iterator object.');
-      const next = iterator.next;
-      const values = [];
-      while (true) {
-          const step = Reflect.apply(next, iterator, []);
-          if (!isObject(step))
-              throw new TypeError('Expected iterator result object.');
-          if (step.done)
-              return values;
-          values.push(convert(step.value));
-      }
-  }
-  const depthFormats = ['float32', 'unsigned-short', 'luminance-alpha'];
-  function depthInit(value) {
-      const input = dictionary(value);
-      const dataFormatPreference = sequence(input.dataFormatPreference, entry => enumeration(entry, depthFormats));
-      const depthType = input.depthTypeRequest;
-      const depthTypeRequest = depthType === undefined ? undefined : sequence(depthType, entry => enumeration(entry, ['raw', 'smooth']));
-      const match = input.matchDepthView;
-      const matchDepthView = match === undefined ? true : Boolean(match);
-      const usagePreference = sequence(input.usagePreference, entry => enumeration(entry, ['cpu-optimized', 'gpu-optimized']));
-      return { dataFormatPreference, depthTypeRequest, matchDepthView, usagePreference };
-  }
-  function convertSessionMode(value) {
-      return enumeration(value, ['inline', 'immersive-vr', 'immersive-ar']);
-  }
-  function convertSessionInit(value) {
-      const input = dictionary(value);
-      const init = Object.create(null);
-      const depthSensing = input.depthSensing;
-      if (depthSensing !== undefined)
-          init.depthSensing = depthInit(depthSensing);
-      const domOverlay = input.domOverlay;
-      if (domOverlay !== undefined) {
-          if (domOverlay === null)
-              init.domOverlay = null;
+  class XRRay extends interfaceBrands.hitTestAllocations.RayAllocation {
+      constructor(origin = {}, direction = {}) {
+          let p, d;
+          if (arguments.length === 1 && transformObjects.has(origin)) {
+              const m = transformMatrix(origin);
+              p = { x: m[12], y: m[13], z: m[14], w: 1 };
+              d = { x: -m[8], y: -m[9], z: -m[10], w: 0 };
+          }
           else {
-              const root = dictionary(domOverlay).root;
-              Element.prototype.hasAttribute.call(root, '');
-              init.domOverlay = { root: root };
+              p = point(origin);
+              d = point(direction, true);
           }
+          if (p.w !== 1 || d.w !== 0 || (d.x === 0 && d.y === 0 && d.z === 0))
+              throw new TypeError('Invalid ray origin or direction.');
+          super(p, d);
       }
-      const optionalFeatures = input.optionalFeatures;
-      if (optionalFeatures !== undefined)
-          init.optionalFeatures = sequence(optionalFeatures, domString);
-      const requiredFeatures = input.requiredFeatures;
-      if (requiredFeatures !== undefined)
-          init.requiredFeatures = sequence(requiredFeatures, domString);
-      return init;
+      get origin() { return rayState(this).origin; }
+      get direction() { return rayState(this).direction; }
+      get matrix() { return rayState(this).matrix(); }
   }
-
-  function eventArguments(count, type, value) {
-      if (count < 2)
-          throw new TypeError('Expected type and eventInitDict.');
-      const name = `${type}`;
-      if (value != null && Object(value) !== value)
-          throw new TypeError('Expected event dictionary.');
-      const dictionary = (value !== null && value !== void 0 ? value : {});
-      const init = { bubbles: Boolean(dictionary.bubbles), cancelable: Boolean(dictionary.cancelable), composed: Boolean(dictionary.composed) };
-      return { name, dictionary, init };
-  }
-  function required(dictionary, key) {
-      const value = dictionary[key];
-      if (value === undefined)
-          throw new TypeError(`Missing required ${key}.`);
-      return value;
-  }
-  function data(map, receiver) {
-      const value = map.get(receiver);
-      if (!value)
-          throw new TypeError('Invalid XR event receiver.');
-      return value;
-  }
-  const { eventSessions: sessions, eventInputs: inputs, eventChanges: changes } = interfaceBrands;
-  class XRSessionEvent extends Event {
-      constructor(type, eventInitDict) {
-          const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
-          const session = interfaceValue(required(dictionary, 'session'), interfaceBrands.sessions, 'XRSession');
-          super(name, init);
-          sessions.set(this, { session });
-      }
-      get session() { return data(sessions, this).session; }
-  }
-  class XRInputSourceEvent extends Event {
-      constructor(type, eventInitDict) {
-          const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
-          const frame = interfaceValue(required(dictionary, 'frame'), interfaceBrands.frames, 'XRFrame');
-          const inputSource = interfaceValue(required(dictionary, 'inputSource'), interfaceBrands.inputSources, 'XRInputSource');
-          super(name, init);
-          inputs.set(this, { frame, inputSource });
-      }
-      get frame() { return data(inputs, this).frame; }
-      get inputSource() { return data(inputs, this).inputSource; }
-  }
-  class XRInputSourcesChangeEvent extends Event {
-      constructor(type, eventInitDict) {
-          const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
-          const added = interfaceSequence(required(dictionary, 'added'), interfaceBrands.inputSources, 'XRInputSource');
-          const removed = interfaceSequence(required(dictionary, 'removed'), interfaceBrands.inputSources, 'XRInputSource');
-          const session = interfaceValue(required(dictionary, 'session'), interfaceBrands.sessions, 'XRSession');
-          super(name, init);
-          changes.set(this, { session, added: Object.freeze(added), removed: Object.freeze(removed) });
-      }
-      get session() { return data(changes, this).session; }
-      get added() { return data(changes, this).added; }
-      get removed() { return data(changes, this).removed; }
-  }
-  for (const [prototype, keys] of [
-      [XRSessionEvent.prototype, ['session']],
-      [XRInputSourceEvent.prototype, ['frame', 'inputSource']],
-      [XRInputSourcesChangeEvent.prototype, ['session', 'added', 'removed']],
-  ])
-      for (const key of keys)
-          Object.defineProperty(prototype, key, { ...Object.getOwnPropertyDescriptor(prototype, key), enumerable: true });
-
-  const handlers = interfaceBrands.eventHandlers;
-  const add = EventTarget.prototype.addEventListener;
-  const remove = EventTarget.prototype.removeEventListener;
-  const preventDefault = Event.prototype.preventDefault;
-  function installEventHandlers(prototype, names, brand) {
-      for (const name of names)
-          Object.defineProperty(prototype, `on${name}`, {
-              enumerable: true, configurable: true,
-              get() {
-                  var _a, _b, _c;
-                  if (!brand(this))
-                      throw new TypeError('Invalid XR event-handler receiver.');
-                  return (_c = (_b = (_a = handlers.get(this)) === null || _a === void 0 ? void 0 : _a.get(name)) === null || _b === void 0 ? void 0 : _b.value) !== null && _c !== void 0 ? _c : null;
-              },
-              set(value) {
-                  if (!brand(this))
-                      throw new TypeError('Invalid XR event-handler receiver.');
-                  const converted = Object(value) === value ? value : null;
-                  let map = handlers.get(this);
-                  const existing = map === null || map === void 0 ? void 0 : map.get(name);
-                  if (converted === null) {
-                      if (existing) {
-                          remove.call(this, name, existing.listener);
-                          map.delete(name);
-                      }
-                  }
-                  else if (existing)
-                      existing.value = converted;
-                  else {
-                      if (!map)
-                          handlers.set(this, map = new Map());
-                      const handler = { value: converted, listener: event => {
-                              const callback = handler.value;
-                              if (typeof callback === 'function' && Reflect.apply(callback, this, [event]) === false)
-                                  preventDefault.call(event);
-                          } };
-                      map.set(name, handler);
-                      add.call(this, name, handler.listener);
-                  }
-              },
-          });
-  }
-
-  const systemDevices = new WeakMap();
-  const sessionInputs = new WeakMap();
-  class XREventTarget extends EventTarget {
-      _emit(event) { this.dispatchEvent(event); }
-  }
-  class XRRenderState {
-      constructor(init = {}) {
-          var _a, _b, _c;
-          this.depthNear = (_a = init.depthNear) !== null && _a !== void 0 ? _a : 0.1;
-          this.depthFar = (_b = init.depthFar) !== null && _b !== void 0 ? _b : 1000;
-          this.inlineVerticalFieldOfView = init.inlineVerticalFieldOfView === undefined ? null : init.inlineVerticalFieldOfView;
-          this.baseLayer = (_c = init.baseLayer) !== null && _c !== void 0 ? _c : null;
-          this.layers = init.layers ? Object.freeze([...init.layers]) : null;
-          Object.freeze(this);
-      }
-  }
-  const minimumDepthNear = 0.01;
-  const maximumDepthFar = 10000;
-  const minimumInlineFov = 0.01;
-  const maximumInlineFov = 3.13;
-  function convertRenderStateInit(value) {
-      if (value == null)
-          return {};
-      if (typeof value !== 'object' && typeof value !== 'function')
-          throw new TypeError('Expected XRRenderStateInit dictionary.');
-      const dictionary = value;
-      const init = {};
-      const baseLayer = dictionary.baseLayer;
-      if (baseLayer !== undefined) {
-          if (baseLayer !== null && !(baseLayer instanceof XRWebGLLayer$1))
-              throw new TypeError('Expected XRWebGLLayer.');
-          init.baseLayer = baseLayer;
-      }
-      for (const key of ['depthFar', 'depthNear', 'inlineVerticalFieldOfView']) {
-          const member = dictionary[key];
-          if (member === undefined)
-              continue;
-          const number = +member;
-          if (!Number.isFinite(number))
-              throw new TypeError(`${key} must be a finite double.`);
-          init[key] = number;
-      }
-      const layers = dictionary.layers;
-      if (layers !== undefined) {
-          if (layers === null)
-              init.layers = null;
-          else {
-              if ((typeof layers !== 'object' && typeof layers !== 'function') || !(Symbol.iterator in layers))
-                  throw new TypeError('Expected layer sequence.');
-              init.layers = Array.from(layers);
-          }
-      }
-      return init;
-  }
-  class XRSystem extends XREventTarget {
-      constructor(devicePromise, token = undefined) {
-          requireGeometryAllocation(token);
-          super();
-          this.immersive = null;
-          this.requesting = false;
-          this.sessions = new Set();
-          this.supports = async (mode) => {
-              return (await systemDevices.get(this)).isSessionSupported(mode);
-          };
-          this.request = async (mode, options) => {
-              var _a, _b, _c, _d, _e, _f, _g;
-              const overlayRoot = (_a = options.domOverlay) === null || _a === void 0 ? void 0 : _a.root;
-              const needsActivation = mode !== 'inline' || [...((_b = options.requiredFeatures) !== null && _b !== void 0 ? _b : []), ...((_c = options.optionalFeatures) !== null && _c !== void 0 ? _c : [])].some(feature => feature !== 'inline-stereo');
-              if (needsActivation && !navigator.userActivation.isActive)
-                  throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
-              if (mode !== 'inline' && (this.immersive || this.requesting))
-                  invalidState('An immersive session is already pending or active.');
-              if (mode !== 'inline')
-                  this.requesting = true;
-              try {
-                  const device = await systemDevices.get(this);
-                  if (!device.isSessionSupported(mode))
-                      unsupported('The selected profile/mode does not support this session mode.');
-                  const required = new Set(['viewer', ...(mode === 'inline' ? [] : ['local']), ...((_d = options.requiredFeatures) !== null && _d !== void 0 ? _d : [])]);
-                  const enabled = new Set();
-                  for (const feature of new Set([...required, ...((_e = options.optionalFeatures) !== null && _e !== void 0 ? _e : [])])) {
-                      let supported = device.isFeatureSupported(feature, mode);
-                      if (feature === 'dom-overlay')
-                          supported = supported && device.canPresentDOMOverlay(overlayRoot);
-                      if (feature === 'depth-sensing') {
-                          if (!options.depthSensing) {
-                              supported = false;
-                          }
-                          else {
-                              const { usagePreference, dataFormatPreference } = options.depthSensing;
-                              supported = supported && (!usagePreference.length || usagePreference.includes('cpu-optimized')) && (!dataFormatPreference.length || dataFormatPreference.some(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format)));
-                          }
-                      }
-                      if (!supported && required.has(feature))
-                          unsupported(`Required feature ${feature} is unavailable in ${mode}.`);
-                      if (supported)
-                          enabled.add(feature);
-                  }
-                  const depthFormat = (_g = (_f = options.depthSensing) === null || _f === void 0 ? void 0 : _f.dataFormatPreference.find(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format))) !== null && _g !== void 0 ? _g : 'float32';
-                  const id = await device.requestSession(mode, enabled);
-                  const session = new XRSession(device, mode, id, enabled, () => {
-                      this.sessions.delete(session);
-                      if (this.immersive === session) {
-                          this.immersive = null;
-                          for (const inline of this.sessions)
-                              inline._setImmersiveSuppressed(false);
-                      }
-                  }, geometryAllocation);
-                  session._depthFormat = depthFormat;
-                  if (enabled.has('dom-overlay')) {
-                      try {
-                          session._startDOMOverlay(overlayRoot);
-                      }
-                      catch (_h) {
-                          if (required.has('dom-overlay')) {
-                              await session.end();
-                              unsupported('The DOM Overlay Preview root could not be presented.');
-                          }
-                          enabled.delete('dom-overlay');
-                          session._omitDOMOverlay();
-                      }
-                  }
-                  this.sessions.add(session);
-                  if (mode === 'inline' && this.immersive)
-                      session._setImmersiveSuppressed(true);
-                  if (mode !== 'inline') {
-                      this.immersive = session;
-                      for (const other of this.sessions)
-                          if (other !== session)
-                              other._setImmersiveSuppressed(true);
-                  }
-                  return session;
-              }
-              finally {
-                  if (mode !== 'inline')
-                      this.requesting = false;
-              }
-          };
-          systemDevices.set(this, devicePromise);
-          window.addEventListener('webxr-device', () => this._emit(new Event('devicechange')));
-          window.addEventListener('webxr-exit-immersive', () => { var _a; void ((_a = this.immersive) === null || _a === void 0 ? void 0 : _a.end()); });
-      }
-      async isSessionSupported(value) {
-          const mode = convertSessionMode(value);
-          return this.supports(mode);
-      }
-      async requestSession(value, dictionary) {
-          const mode = convertSessionMode(value);
-          const options = convertSessionInit(dictionary);
-          return this.request(mode, options);
-      }
-  }
-  const inputEvents = ['select-start', 'select-end', 'squeeze-start', 'squeeze-end'];
-  class XRSession extends interfaceBrands.SessionObject {
-      _emit(event) { this.dispatchEvent(event); }
-      _startDOMOverlay(root) {
-          this.overlay = this._device.startDOMOverlay(root, () => { if (!this.ended)
-              void this.end(); });
-          this.overlayState = Object.freeze({ type: 'screen' });
-      }
-      _omitDOMOverlay() { this.features = Object.freeze(this.features.filter(feature => feature !== 'dom-overlay')); }
-      constructor(_device, _mode, _id, enabled, onShutdown, token = undefined) {
-          requireGeometryAllocation(token);
-          super();
-          this._device = _device;
-          this._mode = _mode;
-          this._id = _id;
-          this.onShutdown = onShutdown;
-          this.callbacks = new Map();
-          this.nextCallback = 0;
-          this.frameHandle = 0;
-          this.currentCallbacks = null;
-          this.animationFrame = null;
-          this._webglLayers = new Set();
-          this._inAnimationCallback = false;
-          this.pendingRenderState = null;
-          this.presentation = null;
-          this.presentationChanged = false;
-          this.endedValue = false;
-          this.pendingReferenceRequests = new Set();
-          this.visibility = document.visibilityState;
-          this.sources = Object.freeze([]);
-          this.signals = [];
-          this.listeners = [];
-          this.immersiveSuppressed = false;
-          this.visibilityListener = () => this._setVisibility(document.visibilityState);
-          this._anchors = new Set();
-          this._environment = new EnvironmentTracker(this);
-          this._depthFormat = 'float32';
-          this.roomCaptureCompleted = false;
-          this.inputWrappers = new Map();
-          this.rawSources = [];
-          this.depthRunning = true;
-          this.overlay = null;
-          this.overlayState = null;
-          this.isSystemKeyboardSupported = false;
-          this._hitSources = new Set();
-          this._transientSources = new Set();
-          this.tick = (time) => {
-              var _a, _b, _c, _d, _e;
-              if (this.ended)
-                  return;
-              this.frameHandle = this._device.requestAnimationFrame(this.tick);
-              if (this.visibility === 'hidden' || this.immersiveSuppressed)
-                  return;
-              if (this.pendingRenderState) {
-                  const previous = this.presentation;
-                  const state = this.pendingRenderState;
-                  this.activeRenderState = new XRRenderState({ ...state,
-                      depthNear: Math.max(minimumDepthNear, state.depthNear),
-                      depthFar: Math.min(maximumDepthFar, state.depthFar),
-                      inlineVerticalFieldOfView: state.inlineVerticalFieldOfView === null ? null : Math.max(minimumInlineFov, Math.min(maximumInlineFov, state.inlineVerticalFieldOfView)),
-                  });
-                  this.pendingRenderState = null;
-                  this.presentation = (_d = (_a = this.renderState.baseLayer) !== null && _a !== void 0 ? _a : (_c = (_b = this.renderState.layers) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c._binding._presentation) !== null && _d !== void 0 ? _d : null;
-                  if (this.presentation && this.presentation !== previous) {
-                      this.presentationChanged = true;
-                      this._device.onBaseLayerSet(this._id, this.presentation);
-                  }
-              }
-              if (!this.presentation || this.presentation.context.isContextLost())
-                  return;
-              this._viewer._update();
-              for (const source of this._hitSources)
-                  source._space._update();
-              this._device.onFrameStart(this._id, { depthNear: this.renderState.depthNear, depthFar: this.renderState.depthFar, inlineVerticalFieldOfView: (_e = this.renderState.inlineVerticalFieldOfView) !== null && _e !== void 0 ? _e : Math.PI / 2 });
-              this.rawSources = this._mode === 'inline' ? [] : this._device.getInputSources();
-              const replaced = [];
-              const next = this.rawSources.map(source => {
-                  const previous = this.inputWrappers.get(source);
-                  if (!previous || !previous._matches(source)) {
-                      if (previous) {
-                          previous._retire();
-                          replaced.push(previous);
-                      }
-                      this.inputWrappers.set(source, new XRInputSource(this, source));
-                  }
-                  return this.inputWrappers.get(source);
-              });
-              const added = next.filter(source => !this.sources.includes(source));
-              const removed = this.sources.filter(source => !next.includes(source) && !replaced.includes(source));
-              this.sources = Object.freeze([...next, ...removed]);
-              for (const source of next)
-                  source._updatePose();
-              if (added.length || replaced.length)
-                  this._emit(new XRInputSourcesChangeEvent('inputsourceschange', { session: this, added, removed: replaced }));
-              if (this.ended)
-                  return;
-              for (const signal of this.signals.splice(0)) {
-                  if (this.ended)
-                      break;
-                  const source = this.inputWrappers.get(signal.source);
-                  if (!source)
-                      continue;
-                  const prefix = signal.type.startsWith('squeeze') ? 'squeeze' : 'select';
-                  const starting = signal.type.endsWith('start');
-                  if (!starting)
-                      this.emitInput(prefix, source, time);
-                  this.emitInput(`${prefix}${starting ? 'start' : 'end'}`, source, time);
-              }
-              if (this.ended)
-                  return;
-              this.sources = Object.freeze(next.slice());
-              for (const source of removed)
-                  source._retire();
-              if (removed.length)
-                  this._emit(new XRInputSourcesChangeEvent('inputsourceschange', { session: this, added: [], removed: [...removed] }));
-              if (this.ended)
-                  return;
-              for (const [raw, wrapper] of this.inputWrappers)
-                  if (removed.includes(wrapper))
-                      this.inputWrappers.delete(raw);
-              this._device.computeHitTests(this._id);
-              if (this.enabledFeatures.some(feature => feature === 'plane-detection' || feature === 'mesh-detection'))
-                  this._environment.update(time);
-              const frame = new XRFrame(this, time, true, geometryAllocation);
-              const layers = this.renderState.layers;
-              if (layers === null || layers === void 0 ? void 0 : layers.length)
-                  layers[0]._binding._prepare(layers);
-              const callbacks = this.currentCallbacks = this.callbacks;
-              this.callbacks = new Map();
-              frame._active = true;
-              this.animationFrame = frame;
-              for (const layer of this._webglLayers)
-                  layer._clear();
-              try {
-                  for (const [id, callback] of callbacks) {
-                      if (this.ended)
-                          break;
-                      callbacks.delete(id);
-                      this._inAnimationCallback = true;
-                      for (const layer of this._webglLayers)
-                          layer._activate(true);
-                      try {
-                          callback(time, frame);
-                      }
-                      catch (error) {
-                          window.dispatchEvent(new ErrorEvent('error', { error, message: String(error) }));
-                      }
-                      finally {
-                          this._inAnimationCallback = false;
-                          for (const layer of this._webglLayers)
-                              layer._activate(false);
-                      }
-                  }
-                  if (!this.ended && !this.presentation.context.isContextLost()) {
-                      if (layers === null || layers === void 0 ? void 0 : layers.length)
-                          layers[0]._binding._compose(frame, layers);
-                      this.presentation._present(this.presentationChanged);
-                      this.presentationChanged = false;
-                  }
-              }
-              finally {
-                  frame._active = false;
-                  this.animationFrame = null;
-                  this.currentCallbacks = null;
-                  if (!this.ended)
-                      this._device.onFrameEnd(this._id);
-              }
-          };
-          this.features = Object.freeze([...enabled]);
-          this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
-          sessionInputs.set(this, new XRInputSourceArray(() => this.sources));
-          this._hands = new interfaceBrands.handAllocations.HandTracker(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype);
-          this.activeRenderState = new XRRenderState({ inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null });
-          const viewerMatrix = () => clone$1(_device.getBasePoseMatrix());
-          this._viewer = new XRReferenceSpace(this, 'viewer', viewerMatrix);
-          interfaceBrands.roomCaptures.set(this, async () => {
-              this._assertLive();
-              if (this.roomCaptureCompleted)
-                  invalidState('Room capture already completed.');
-              this._require('plane-detection');
-              this.roomCaptureCompleted = true;
-          });
-          interfaceBrands.viewerPoses.set(this, (frame, reference) => allocateViewerPose(frame, reference));
-          interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
-              let settled = false;
-              let task;
-              const settle = (action) => {
-                  if (settled)
-                      return;
-                  settled = true;
-                  if (task !== undefined)
-                      clearTimeout(task);
-                  this.pendingReferenceRequests.delete(cancel);
-                  try {
-                      action();
-                  }
-                  catch (error) {
-                      reject(error);
-                  }
-              };
-              const cancel = () => settle(() => reject(new DOMException('The session has ended.', 'InvalidStateError')));
-              if (!this.ended)
-                  this.pendingReferenceRequests.add(cancel);
-              const queue = (action) => {
-                  if (settled)
-                      return;
-                  task = setTimeout(() => settle(action), 0);
-              };
-              if (!enabled.has(type)) {
-                  queue(() => reject(new DOMException(`Reference space ${type} was not enabled.`, 'NotSupportedError')));
-                  return;
-              }
-              try {
-                  const ready = type === 'viewer' ? Promise.resolve(null) : _device.requestFrameOfReferenceTransform(type, undefined);
-                  void ready.then(inverse => {
-                      queue(() => {
-                          if (type === 'viewer') {
-                              resolve(new XRReferenceSpace(this, type, viewerMatrix));
-                          }
-                          else {
-                              const world = invert(create$3(), inverse);
-                              resolve(type === 'bounded-floor'
-                                  ? new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA)
-                                  : new XRReferenceSpace(this, type, () => world));
-                          }
-                      });
-                  }, error => { queue(() => reject(error)); });
-              }
-              catch (error) {
-                  queue(() => reject(error));
-              }
-          }));
-          for (const type of inputEvents) {
-              const listener = (detail) => { if (detail.sessionId === _id)
-                  this.signals.push({ type, source: detail.inputSource }); };
-              this.listeners.push([`@@webxr-polyfill/input-${type}`, listener]);
-              _device.addEventListener(`@@webxr-polyfill/input-${type}`, listener);
-          }
-          this.endListener = id => { if (id === _id)
-              this._finish(); };
-          _device.addEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
-          document.addEventListener('visibilitychange', this.visibilityListener);
-          this.frameHandle = _device.requestAnimationFrame(this.tick);
-      }
-      get enabledFeatures() { return this.features; }
-      get ended() { return this.endedValue; }
-      get renderState() { return this.activeRenderState; }
-      get visibilityState() { return this.visibility; }
-      get inputSources() {
-          const inputs = sessionInputs.get(this);
-          if (!inputs)
-              throw new TypeError('Expected backend XRSession.');
-          return inputs;
-      }
-      assertDepthConfiguration() { if (!this.enabledFeatures.includes('depth-sensing'))
-          invalidState('Depth sensing was not enabled.'); }
-      assertDepthFrame() {
-          var _a;
-          this._assertLive();
-          if (!((_a = this.animationFrame) === null || _a === void 0 ? void 0 : _a._active))
-              invalidState('Depth sensing can only be changed during an active animation frame.');
-          this._require('depth-sensing');
-      }
-      get depthUsage() { this.assertDepthConfiguration(); return 'cpu-optimized'; }
-      get depthDataFormat() { this.assertDepthConfiguration(); return this._depthFormat; }
-      get depthType() { this.assertDepthConfiguration(); return 'smooth'; }
-      get depthActive() { this.assertDepthConfiguration(); return this.depthRunning; }
-      pauseDepthSensing() { this.assertDepthFrame(); this.depthRunning = false; }
-      resumeDepthSensing() { this.assertDepthFrame(); this.depthRunning = true; }
-      get preferredReflectionFormat() { return 'srgba8'; }
-      get persistentAnchors() { return Object.freeze([]); }
-      async restorePersistentAnchor(_uuid) { this._require('anchors'); return unsupported('Persistent anchors are not simulated.'); }
-      async deletePersistentAnchor(_uuid) { this._require('anchors'); unsupported('Persistent anchors are not simulated.'); }
-      async requestLightProbe(options = {}) {
-          this._require('light-estimation');
-          if (options.reflectionFormat && !['srgba8', 'rgba16f'].includes(options.reflectionFormat))
-              throw new TypeError('Invalid XRReflectionFormat.');
-          if (options.reflectionFormat === 'rgba16f')
-              unsupported('Only srgba8 reflection format is supported.');
-          return new XRLightProbe(this);
-      }
-      get environmentBlendMode() { return this._mode === 'immersive-ar' ? 'alpha-blend' : 'opaque'; }
-      get domOverlayState() { return this.overlayState; }
-      get _currentAnimationFrame() { return this.animationFrame; }
-      _assertLive() { if (this.ended)
-          invalidState('The session has ended.'); }
-      _require(feature) { this._assertLive(); if (!this.enabledFeatures.includes(feature))
-          unsupported(`${feature} was not enabled.`); }
-      _owns(space) {
-          interfaceValue(space, spaceObjects, 'XRSpace');
-          if (space._session !== this)
-              invalidState('Space belongs to a different session.');
-      }
-      _setVisibility(value) {
-          if (this.ended || value === this.visibility)
-              return;
-          this.visibility = value;
-          this._emit(new XRSessionEvent('visibilitychange', { session: this }));
-      }
-      _setImmersiveSuppressed(value) {
-          this.immersiveSuppressed = value;
-      }
-      initiateRoomCapture() {
-          try {
-              const capture = interfaceBrands.roomCaptures.get(this);
-              if (!capture)
-                  throw new TypeError('Expected XRSession receiver.');
-              return capture();
-          }
-          catch (error) {
-              return Promise.reject(error);
-          }
-      }
-      requestReferenceSpace(type) {
-          try {
-              if (!sessionObjects.has(this))
-                  throw new TypeError('Expected XRSession receiver.');
-              const request = interfaceBrands.referenceSpaceRequests.get(this);
-              if (!request)
-                  throw new TypeError('Expected XRSession receiver.');
-              if (arguments.length === 0)
-                  throw new TypeError('XRReferenceSpaceType is required.');
-              const converted = `${type}`;
-              if (!['viewer', 'local', 'local-floor', 'bounded-floor', 'unbounded'].includes(converted))
-                  throw new TypeError('Invalid XRReferenceSpaceType.');
-              return request(converted);
-          }
-          catch (error) {
-              return Promise.reject(error);
-          }
-      }
-      updateRenderState(value = {}) {
-          var _a;
-          const init = convertRenderStateInit(value);
-          this._assertLive();
-          if (init.baseLayer && (!(init.baseLayer instanceof XRWebGLLayer$1) || init.baseLayer._session !== this))
-              invalidState('Layer belongs to a different session.');
-          if (init.inlineVerticalFieldOfView !== undefined && this._mode !== 'inline')
-              invalidState('Immersive sessions cannot set inlineVerticalFieldOfView.');
-          if (Object.keys(init).length === 0)
-              return;
-          if (init.baseLayer !== undefined && init.layers !== undefined)
-              unsupported('baseLayer and layers cannot both be supplied.');
-          if (init.layers !== undefined && init.layers !== null) {
-              if (!this.enabledFeatures.includes('layers') && (init.layers.length > 1 || init.layers.some(layer => !(layer instanceof XRProjectionLayer))))
-                  unsupported('Only a single projection layer is supported without the layers feature.');
-              if (new Set(init.layers).size !== init.layers.length)
-                  throw new TypeError('Duplicate composition layers.');
-              for (const layer of init.layers)
-                  if (!(layer instanceof XRCompositionLayer) || layer._binding._session !== this || layer._destroyed)
-                      invalidState('Invalid composition layer.');
-              if (init.layers.some(layer => layer._binding._context !== init.layers[0]._binding._context))
-                  unsupported('All layers must share one WebGL context.');
-          }
-          const state = { ...((_a = this.pendingRenderState) !== null && _a !== void 0 ? _a : this.renderState), ...init };
-          if (init.baseLayer !== undefined)
-              state.layers = null;
-          if (init.layers !== undefined)
-              state.baseLayer = null;
-          this.pendingRenderState = new XRRenderState(state);
-      }
-      _removeLayer(layer) {
-          var _a, _b;
-          const state = (_a = this.pendingRenderState) !== null && _a !== void 0 ? _a : this.renderState;
-          if (!((_b = state.layers) === null || _b === void 0 ? void 0 : _b.includes(layer)))
-              return;
-          this.pendingRenderState = new XRRenderState({ ...state, layers: state.layers.filter(entry => entry !== layer) });
-      }
-      requestAnimationFrame(callback) { if (typeof callback !== 'function')
-          throw new TypeError('Expected callback.'); if (this.ended)
-          return 0; const id = ++this.nextCallback; this.callbacks.set(id, callback); return id; }
-      cancelAnimationFrame(id) { var _a; this.callbacks.delete(id); (_a = this.currentCallbacks) === null || _a === void 0 ? void 0 : _a.delete(id); }
-      async end() {
-          this._assertLive();
-          this._device.endSession(this._id);
-          this._finish();
-          await new Promise(resolve => setTimeout(resolve, 0));
-      }
-      _finish() {
-          var _a, _b;
-          if (this.ended)
-              return;
-          (_a = this.overlay) === null || _a === void 0 ? void 0 : _a.dispose();
-          this.overlay = null;
-          this.endedValue = true;
-          for (const cancel of this.pendingReferenceRequests)
-              cancel();
-          for (const layer of this._webglLayers)
-              layer._dispose();
-          this._device.cancelAnimationFrame(this.frameHandle);
-          for (const [type, listener] of this.listeners)
-              this._device.removeEventListener(type, listener);
-          this._device.removeEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
-          document.removeEventListener('visibilitychange', this.visibilityListener);
-          for (const anchor of this._anchors)
-              anchor.delete();
-          this._environment.clear();
-          for (const source of this.inputWrappers.values())
-              source._retire();
-          this.inputWrappers.clear();
-          this.callbacks.clear();
-          (_b = this.currentCallbacks) === null || _b === void 0 ? void 0 : _b.clear();
-          this.signals = [];
-          this.sources = Object.freeze([]);
-          for (const source of [...this._hitSources, ...this._transientSources])
-              source._deactivate();
-          this._hitSources.clear();
-          this._transientSources.clear();
-          setTimeout(() => this._emit(new XRSessionEvent('end', { session: this })), 0);
-          this.onShutdown();
-      }
-      async requestHitTestSource(value) {
-          interfaceValue(this, sessionObjects, 'XRSession');
-          const options = convertHitTestOptions(value);
-          if (!this.enabledFeatures.includes('hit-test'))
-              unsupported('hit-test was not enabled.');
-          this._assertLive();
-          this._owns(options.space);
-          const source = new XRHitTestSource(this, options, hitTestAllocation);
-          this._hitSources.add(source);
-          this._device.addHitTestSource(source);
-          return source;
-      }
-      async requestHitTestSourceForTransientInput(value) {
-          interfaceValue(this, sessionObjects, 'XRSession');
-          const options = convertTransientHitTestOptions(value);
-          if (!this.enabledFeatures.includes('hit-test'))
-              unsupported('hit-test was not enabled.');
-          this._assertLive();
-          const source = new XRTransientInputHitTestSource(this, options, hitTestAllocation);
-          this._transientSources.add(source);
-          this._device.addHitTestSourceForTransientInput(source);
-          return source;
-      }
-      emitInput(type, inputSource, time) {
-          const frame = new XRFrame(this, time, false, geometryAllocation);
-          frame._active = true;
-          try {
-              this._emit(new XRInputSourceEvent(type, { frame, inputSource }));
-          }
-          finally {
-              frame._active = false;
-          }
-      }
-  }
-  class XRFrame extends interfaceBrands.FrameObject {
-      constructor(session, predictedDisplayTime, _animation, token) {
-          requireGeometryAllocation(token);
-          super();
-          this._animation = _animation;
-          this._active = false;
-          this.hitResults = new Map();
-          this.transientResults = new Map();
-          interfaceBrands.frameValues.set(this, { session, predictedDisplayTime,
-              pose: (matrix, emulated) => new XRPose(XRRigidTransform._fromMatrix(matrix), emulated, geometryAllocation) });
-          this.anchorSnapshot = new XRAnchorSet(session._anchors);
-          this.environmentSnapshot = session._environment.snapshot();
-          if (_animation) {
-              for (const source of session._hitSources)
-                  this.hitResults.set(source, session._device.getHitTestResults(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix), hitTestAllocation)));
-              for (const source of session._transientSources) {
-                  const input = Array.from(session.inputSources).find(input => input.targetRayMode === 'screen' && input.profiles.includes(source._profile));
-                  const hits = session._device.getHitTestResultsForTransientInput(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix), hitTestAllocation));
-                  this.transientResults.set(source, input ? [new XRTransientInputHitTestResult(this, hits, input, hitTestAllocation)] : []);
-              }
-          }
-      }
-      _assertActive(animation = false) { this.session._assertLive(); if (!this._active || (animation && !this._animation))
-          invalidState('XRFrame is not active for this operation.'); }
-      _world(space) {
-          this.session._owns(space);
-          return space._update();
-      }
-      get session() { return frameState(this).session; }
-      get predictedDisplayTime() { return frameState(this).predictedDisplayTime; }
-      getPose(space, baseSpace) {
-          const state = frameState(this);
-          if (arguments.length < 2)
-              throw new TypeError('Expected space and baseSpace.');
-          interfaceValue(space, spaceObjects, 'XRSpace');
-          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
-          this._assertActive();
-          state.session._owns(space);
-          state.session._owns(baseSpace);
-          for (const candidate of [space, baseSpace]) {
-              const joint = interfaceBrands.handAllocations.joints.get(candidate);
-              if (joint && !joint.update())
-                  return null;
-          }
-          const relative = relativePose(space, baseSpace);
-          return relative ? state.pose(relative.matrix, relative.emulated) : null;
-      }
-      getViewerPose(referenceSpace) {
-          const state = frameState(this);
-          if (arguments.length < 1 || !interfaceBrands.referenceOffsets.has(referenceSpace))
-              throw new TypeError('Expected XRReferenceSpace.');
-          this._assertActive(true);
-          state.session._owns(referenceSpace);
-          return interfaceBrands.viewerPoses.get(state.session)(this, referenceSpace);
-      }
-      get detectedPlanes() { frameState(this); this._assertActive(); return this.environmentSnapshot.planes; }
-      get detectedMeshes() { frameState(this); this._assertActive(); return this.environmentSnapshot.meshes; }
-      get trackedAnchors() { this._assertActive(); this.session._require('anchors'); return this.anchorSnapshot; }
-      async createAnchor(pose, space) {
-          this._assertActive();
-          this.session._require('anchors');
-          if (!transformObjects.has(pose))
-              throw new TypeError('Expected XRRigidTransform.');
-          const world = this._world(space);
-          if (!world)
-              throw new DOMException('Space is not tracked.', 'OperationError');
-          const anchor = new XRAnchor(this.session, multiply(create$3(), world, transformMatrix(pose)));
-          return new Promise((resolve, reject) => queueMicrotask(() => {
-              if (this.session.ended) {
-                  anchor.delete();
-                  reject(new DOMException('Session ended before anchor tracking began.', 'InvalidStateError'));
-              }
-              else {
-                  this.session._anchors.add(anchor);
-                  resolve(anchor);
-              }
-          }));
-      }
-      getJointPose(joint, baseSpace) {
-          frameState(this);
-          if (arguments.length < 2)
-              throw new TypeError('Expected joint and baseSpace.');
-          interfaceValue(joint, jointObjects, 'XRJointSpace');
-          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
-          return interfaceBrands.handAllocations.pose(this, joint, baseSpace);
-      }
-      fillJointRadii(joints, radii) {
-          interfaceValue(this, frameObjects, 'XRFrame');
-          if (arguments.length < 2)
-              throw new TypeError('Expected joints and radii.');
-          const list = interfaceSequence(joints, jointObjects, 'XRJointSpace');
-          const capacity = float32Output(radii);
-          this._assertActive();
-          for (const joint of list)
-              this.session._owns(joint);
-          if (capacity < list.length)
-              throw new TypeError('Insufficient radii array.');
-          let valid = true;
-          for (const [index, joint] of list.entries()) {
-              const metadata = interfaceBrands.handAllocations.joints.get(joint);
-              const tracked = metadata.update() !== null;
-              radii[index] = tracked ? metadata.radius : NaN;
-              if (!tracked)
-                  valid = false;
-          }
-          return valid;
-      }
-      fillPoses(spaces, baseSpace, transforms) {
-          interfaceValue(this, frameObjects, 'XRFrame');
-          if (arguments.length < 3)
-              throw new TypeError('Expected spaces, baseSpace and transforms.');
-          const list = interfaceSequence(spaces, spaceObjects, 'XRSpace');
-          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
-          const capacity = float32Output(transforms);
-          this._assertActive();
-          for (const space of list)
-              this.session._owns(space);
-          this.session._owns(baseSpace);
-          if (capacity < list.length * 16)
-              throw new TypeError('Insufficient transform array.');
-          let valid = true;
-          for (const [index, space] of list.entries()) {
-              const pose = this.getPose(space, baseSpace);
-              if (!pose)
-                  valid = false;
-              for (let component = 0; component < 16; component++)
-                  transforms[index * 16 + component] = pose ? transformMatrix(pose.transform)[component] : NaN;
-          }
-          return valid;
-      }
-      getLightEstimate(probe) {
-          this._assertActive();
-          this.session._require('light-estimation');
-          if (!(probe instanceof XRLightProbe))
-              throw new TypeError('Expected XRLightProbe.');
-          if (probe._session !== this.session)
-              invalidState('Light probe belongs to a different session.');
-          return new XRLightEstimate();
-      }
-      getDepthInformation(view) {
-          var _a;
-          this._assertActive(true);
-          this.session._require('depth-sensing');
-          if (viewState(view).frame !== this)
-              invalidState('View belongs to a different frame.');
-          if (!this.session.depthActive || !((_a = this.session._device.arScene) === null || _a === void 0 ? void 0 : _a.room))
-              return null;
-          return new XRCPUDepthInformation(this, view);
-      }
-      getHitTestResults(source) { frameState(this); hitSourceState(source); this._assertActive(); if (!this.hitResults.has(source))
-          invalidState('Hit test source was not active for this frame.'); return this.hitResults.get(source).slice(); }
-      getHitTestResultsForTransientInput(source) { frameState(this); transientHitSourceState(source); this._assertActive(); if (!this.transientResults.has(source))
-          invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source).slice(); }
-  }
-  function frameState(value) {
-      const state = interfaceBrands.frameValues.get(value);
-      if (!state)
-          throw new TypeError('Expected XRFrame.');
-      return state;
-  }
-  function allocateViewerPose(frame, reference) {
-      const session = frameState(frame).session;
-      const relative = relativePose(session._viewer, reference);
-      if (!relative)
-          return null;
-      const viewerWorld = session._viewer._update();
-      if (!viewerWorld)
-          return null;
-      const inverseViewer = invert(create$3(), viewerWorld);
-      const transform = XRRigidTransform._fromMatrix(relative.matrix);
-      const device = session._device;
-      const eyes = session._mode === 'inline' || device.handheld ? ['none'] : ['left', 'right'];
-      const views = eyes.map((eye, index) => {
-          const viewWorld = invert(create$3(), device.getBaseViewMatrix(eye));
-          return new XRView(frame, eye, XRRigidTransform._fromMatrix(multiply(create$3(), relative.matrix, multiply(create$3(), inverseViewer, viewWorld))), device.getProjectionMatrix(eye), viewWorld, index, geometryAllocation);
-      });
-      return new XRViewerPose(transform, views, relative.emulated, geometryAllocation);
-  }
-  enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getJointPose', 'fillPoses', 'fillJointRadii', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
-  Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
-  class XRInputSource extends interfaceBrands.InputSourceObject {
-      constructor(session, raw) {
-          super();
-          this.session = session;
-          this.raw = raw;
-          this.targetWorld = null;
-          this.gripWorld = null;
-          const active = () => Array.from(session.inputSources).includes(this);
-          this.handednessValue = raw.handedness;
-          this.targetRayModeValue = raw.targetRayMode;
-          this.rawProfiles = Object.freeze([...raw.profiles]);
-          this.profilesValue = session.enabledFeatures.includes('hand-tracking') ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
-          this.hasGamepad = raw.gamepad !== null;
-          this.gamepadState = !session.enabledFeatures.includes('hand-tracking') && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
-          const provider = (type) => () => active() ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
-          this.targetSpace = new XRSpace(session, provider('target-ray'));
-          this.grip = ['gaze', 'screen'].includes(this.targetRayModeValue) ? null : new XRSpace(session, provider('grip'));
-      }
-      _matches(raw) {
-          const profiles = raw.profiles;
-          return this.handednessValue === raw.handedness && this.targetRayModeValue === raw.targetRayMode &&
-              this.hasGamepad === (raw.gamepad !== null) && this.rawProfiles.length === profiles.length &&
-              this.rawProfiles.every((profile, index) => profile === profiles[index]);
-      }
-      _retire() { var _a; (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.retire(); }
-      _updatePose() {
-          if (this.session.enabledFeatures.includes('hand-tracking'))
-              this.session._hands.hand(this, this.raw);
-          if (this.gamepadState && this.raw.gamepad)
-              this.gamepadState.sample(this.raw.gamepad);
-          const world = new XRReferenceSpace(this.session, 'local-floor', () => create$3());
-          world._update();
-          const target = this.session._device.getInputPose(this.raw, world, 'target-ray');
-          const grip = this.session._device.getInputPose(this.raw, world, 'grip');
-          this.targetWorld = target ? clone$1(transformMatrix(target.transform)) : null;
-          this.gripWorld = grip ? clone$1(transformMatrix(grip.transform)) : null;
-      }
-      get hand() { var _a; interfaceValue(this, interfaceBrands.inputSources, 'XRInputSource'); return (_a = interfaceBrands.handAllocations.sources.get(this)) !== null && _a !== void 0 ? _a : null; }
-      get targetRaySpace() { return this.targetSpace; }
-      get handedness() { return this.handednessValue; }
-      get targetRayMode() { return this.targetRayModeValue; }
-      get gripSpace() { return this.grip; }
-      get profiles() { return this.profilesValue; }
-      get gamepad() { var _a, _b; return (_b = (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.value) !== null && _b !== void 0 ? _b : null; }
-      get skipRendering() { return false; }
-  }
-  enumerableMembers(XRInputSource.prototype, ['hand']);
-  Object.defineProperty(XRSession.prototype, 'requestReferenceSpace', { enumerable: true });
-  Object.setPrototypeOf(XRSession.prototype, EventTarget.prototype);
-  Object.setPrototypeOf(XRInputSource.prototype, Object.prototype);
-  installEventHandlers(XRSystem.prototype, ['devicechange'], value => value instanceof XRSystem);
-  installEventHandlers(XRSession.prototype, [
-      'end', 'visibilitychange', 'inputsourceschange', 'selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend',
-  ], value => sessionObjects.has(value));
-  enumerableMembers(XRSession.prototype, ['requestHitTestSource', 'requestHitTestSourceForTransientInput']);
-
-  var runtime = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    XREventTarget: XREventTarget,
-    XRFrame: XRFrame,
-    XRInputSource: XRInputSource,
-    XRInputSourceArray: XRInputSourceArray,
-    XRInputSourceEvent: XRInputSourceEvent,
-    XRInputSourcesChangeEvent: XRInputSourcesChangeEvent,
-    XRRenderState: XRRenderState,
-    XRSession: XRSession,
-    XRSessionEvent: XRSessionEvent,
-    XRSystem: XRSystem
-  });
-
-  var EX_API = {
-      XRHitTestResult,
-      XRHitTestSource,
-      XRTransientInputHitTestResult,
-      XRTransientInputHitTestSource,
-      XRRay
-  };
-
-  function dispatchCustomEvent(type, detail) {
-      window.dispatchEvent(new CustomEvent(type, {
-          detail: typeof cloneInto !== 'undefined' ? cloneInto(detail, window) : detail,
-      }));
-  }
+  enumerableMembers(XRRay.prototype, ['origin', 'direction', 'matrix']);
+  Object.defineProperty(XRRay.prototype, Symbol.toStringTag, { value: 'XRRay', configurable: true });
 
   const _raycaster = new Raycaster();
   const _tempVector = new Vector3();
@@ -31378,8 +30048,9 @@ void main() {
   dummyCanvasTexture.colorSpace = SRGBColorSpace;
   const raycaster = new Raycaster();
   class ARScene {
-      constructor(deviceSize, handheld = true) {
+      constructor(deviceSize, handheld = true, realm = window) {
           this.handheld = handheld;
+          this.realm = realm;
           this.room = null;
           this.stereoEffectEnabled = true;
           this.domOverlay = null;
@@ -31396,6 +30067,7 @@ void main() {
           this._init(deviceSize);
       }
       _init(deviceSize) {
+          const window = this.realm, document = window.document;
           const width = window.innerWidth;
           const height = window.innerHeight;
           const canvas = document.createElement('canvas');
@@ -31660,6 +30332,7 @@ void main() {
           this.room = null;
       }
       inject(div) {
+          const document = this.realm.document;
           const appendCanvas = () => {
               div.appendChild(this.renderer.domElement);
           };
@@ -31725,7 +30398,7 @@ void main() {
                   .setRequestHeader(parser.options.requestHeader);
               return { name: 'WEBXR_emulator_image_textures' };
           });
-          loader.parse(buffer, '', gltf => {
+          loader.parse(new Uint8Array(buffer).slice().buffer, '', gltf => {
               this.scene.add(gltf.scene);
               this.room = gltf.scene;
           }, error => {
@@ -31755,34 +30428,37 @@ void main() {
   }
 
   class DOMOverlay {
-      static available() {
-          return typeof HTMLElement.prototype.showPopover === 'function';
+      static available(realm = window) {
+          return typeof realm.HTMLElement.prototype.showPopover === 'function';
       }
-      static accepts(root) {
+      static accepts(root, document = window.document) {
           var _a;
           return (root === null || root === void 0 ? void 0 : root.namespaceURI) === 'http://www.w3.org/1999/xhtml' && root.ownerDocument === document && root.isConnected &&
               root.getRootNode() === document && ((_a = document.body) === null || _a === void 0 ? void 0 : _a.contains(root)) && !document.querySelector(':modal') && !root.matches('canvas, video, audio, img, input, select, textarea') && root !== document.documentElement && !root.closest('[inert]') && !root.matches('iframe, frame, object, embed, :modal') && !root.hasAttribute('popover') &&
               typeof root.showPopover === 'function';
       }
-      constructor(root, scene, width, height, invalidate, flat = false) {
+      constructor(root, scene, width, height, invalidate, flat = false, realm = window) {
           this.root = root;
           this.scene = scene;
           this.width = width;
           this.height = height;
           this.invalidate = invalidate;
-          this.events = new AbortController();
+          this.realm = realm;
+          this.events = new this.realm.AbortController();
           this.disposed = false;
           this.toggleTimer = 0;
           this.visible = false;
-          this.dpr = window.devicePixelRatio;
+          this.dpr = this.realm.devicePixelRatio;
           this.matrix = new Matrix4();
           this.corners = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
           this.toggle = (event) => {
               if (event.newState === 'closed')
-                  this.toggleTimer = window.setTimeout(() => { if (!this.disposed)
+                  this.toggleTimer = this.realm.setTimeout(() => { if (!this.disposed)
                       this.invalidate(); }, 0);
           };
           this.visibility = () => { this.update(); };
+          const window = this.realm, document = window.document;
+          const { HTMLElement, DOMException, MutationObserver } = window, getComputedStyle = window.getComputedStyle.bind(window);
           this.style = root.getAttribute('style');
           this.parent = root.parentNode;
           this.flat = flat || root === document.body || Array.from(root.querySelectorAll('*')).some(node => getComputedStyle(node).position === 'fixed');
@@ -31826,9 +30502,11 @@ void main() {
           }
       }
       valid() {
+          const document = this.realm.document;
           return this.root.isConnected && this.root.ownerDocument === document && this.root.parentNode === this.parent;
       }
       update() {
+          const window = this.realm, document = window.document;
           if (this.disposed)
               return;
           if (!this.valid()) {
@@ -31836,8 +30514,8 @@ void main() {
               return;
           }
           if (this.flat) {
-              this.root.style.setProperty('width', `${Math.max(1, Math.min(560, innerWidth - 48))}px`, 'important');
-              this.root.style.setProperty('height', `${Math.max(1, innerHeight - 48)}px`, 'important');
+              this.root.style.setProperty('width', `${Math.max(1, Math.min(560, window.innerWidth - 48))}px`, 'important');
+              this.root.style.setProperty('height', `${Math.max(1, window.innerHeight - 48)}px`, 'important');
               this.root.style.setProperty('transform', 'translate(24px, 24px)', 'important');
               this.root.style.setProperty('display', document.hidden ? 'none' : this.display, 'important');
               return;
@@ -31875,7 +30553,7 @@ void main() {
           if (this.disposed)
               return;
           this.disposed = true;
-          window.clearTimeout(this.toggleTimer);
+          this.realm.clearTimeout(this.toggleTimer);
           this.events.abort();
           this.observer.disconnect();
           if (this.root.matches(':popover-open'))
@@ -31916,7 +30594,7 @@ void main() {
           this.gamepads = [];
           this.gamepadInputSources = [];
           this.stereoEffectEnabled = config.stereoEffect !== undefined ? config.stereoEffect : true;
-          this.div = document.createElement('div');
+          this.div = this.global.document.createElement('div');
           this.div.style.position = 'absolute';
           this.div.style.width = '100%';
           this.div.style.height = '100%';
@@ -31947,7 +30625,7 @@ void main() {
               const display = this.arScene.renderer.domElement;
               return { width: display.width, height: display.height };
           }
-          return { width: window.innerWidth, height: window.innerHeight };
+          return { width: this.global.innerWidth, height: this.global.innerHeight };
       }
       onBaseLayerSet(sessionId, layer) {
           const session = this.sessions.get(sessionId);
@@ -31960,7 +30638,7 @@ void main() {
               if (session.ar) {
                   const canvas = session.baseLayer._presentationCanvas;
                   this.arScene.setCanvas(canvas);
-                  if (canvas instanceof HTMLCanvasElement && canvas.parentElement) {
+                  if (canvas instanceof this.global.HTMLCanvasElement && canvas.parentElement) {
                       canvas.parentElement.removeChild(canvas);
                   }
               }
@@ -31971,7 +30649,7 @@ void main() {
       }
       isFeatureSupported(featureDescriptor, mode = this.emulationMode) {
           if (featureDescriptor === 'dom-overlay')
-              return this.domOverlayPreview && mode === 'immersive-ar' && this.emulationMode === mode && DOMOverlay.available();
+              return this.domOverlayPreview && mode === 'immersive-ar' && this.emulationMode === mode && DOMOverlay.available(this.global);
           if (featureDescriptor === 'viewer')
               return true;
           if (featureDescriptor === 'local' || featureDescriptor === 'local-floor' || featureDescriptor === 'unbounded')
@@ -32009,7 +30687,7 @@ void main() {
           }
           if (mode === 'immersive-ar') {
               if (!this.arScene) {
-                  this.arScene = new ARScene(this.deviceSize, this.handheld);
+                  this.arScene = new ARScene(this.deviceSize, this.handheld, this.global);
                   this._requestVirtualRoomAsset();
                   this.arScene.onTouch = position => {
                       this.touched = true;
@@ -32045,10 +30723,10 @@ void main() {
           }
           return Promise.resolve(session.id);
       }
-      canPresentDOMOverlay(root) { return DOMOverlay.accepts(root); }
+      canPresentDOMOverlay(root) { return DOMOverlay.accepts(root, this.global.document); }
       startDOMOverlay(root, invalidate) {
-          document.documentElement.appendChild(this.div);
-          const overlay = new DOMOverlay(root, this.arScene, this.resolution.width / window.devicePixelRatio, this.resolution.height / window.devicePixelRatio, invalidate, !this.handheld || this.domOverlayPreviewFlat);
+          this.global.document.documentElement.appendChild(this.div);
+          const overlay = new DOMOverlay(root, this.arScene, this.resolution.width / this.global.devicePixelRatio, this.resolution.height / this.global.devicePixelRatio, invalidate, !this.handheld || this.domOverlayPreviewFlat, this.global);
           this.arScene.domOverlay = overlay;
           return overlay;
       }
@@ -32294,13 +30972,13 @@ void main() {
       _appendBaseLayerCanvasToDiv(sessionId) {
           const session = this.sessions.get(sessionId);
           const canvas = session.baseLayer._presentationCanvas;
-          (session.enabledFeatures.has('dom-overlay') ? document.documentElement : document.body).appendChild(this.div);
-          if (canvas instanceof HTMLCanvasElement)
+          (session.enabledFeatures.has('dom-overlay') ? this.global.document.documentElement : this.global.document.body).appendChild(this.div);
+          if (canvas instanceof this.global.HTMLCanvasElement)
               this.div.appendChild(canvas);
       }
       _removeBaseLayerCanvasFromDiv(sessionId) {
           const canvas = this.sessions.get(sessionId).baseLayer._presentationCanvas;
-          if (canvas instanceof HTMLCanvasElement && canvas.parentElement === this.div)
+          if (canvas instanceof this.global.HTMLCanvasElement && canvas.parentElement === this.div)
               canvas.remove();
           this.div.remove();
       }
@@ -32382,8 +31060,11 @@ void main() {
               hitTestResults.set(source, results);
           }
       }
+      notify(type, detail) {
+          this.global.dispatchEvent(new this.global.CustomEvent(type, { detail }));
+      }
       _notifyPoseUpdate() {
-          dispatchCustomEvent('device-pose', {
+          this.notify('device-pose', {
               position: this.position,
               quaternion: this.quaternion
           });
@@ -32391,20 +31072,20 @@ void main() {
       _notifyInputPoseUpdate(controllerIndex) {
           const pose = this.gamepads[controllerIndex].pose;
           const objectName = controllerIndex === 0 ? 'rightController' : 'leftController';
-          dispatchCustomEvent('device-input-pose', {
+          this.notify('device-input-pose', {
               position: pose.position,
               quaternion: pose.orientation,
               objectName: objectName
           });
       }
       _notifyEnterImmersive() {
-          dispatchCustomEvent('device-enter-immersive', {});
+          this.notify('device-enter-immersive', {});
       }
       _notifyLeaveImmersive() {
-          dispatchCustomEvent('device-leave-immersive', {});
+          this.notify('device-leave-immersive', {});
       }
       _requestVirtualRoomAsset() {
-          dispatchCustomEvent('webxr-virtual-room-request', {});
+          this.notify('webxr-virtual-room-request', {});
       }
       _updateStereoEffect(enabled) {
           this.stereoEffectEnabled = enabled;
@@ -32470,7 +31151,7 @@ void main() {
           }
       }
       _setupEventListeners() {
-          window.addEventListener('webxr-device', event => {
+          this.global.addEventListener('webxr-device', event => {
               const config = event.detail.deviceDefinition;
               for (const session of this.sessions.values()) {
                   if (session.immersive && !session.ended)
@@ -32491,14 +31172,14 @@ void main() {
               }
               this._initializeControllers(config);
           });
-          window.addEventListener('webxr-pose', event => {
+          this.global.addEventListener('webxr-pose', event => {
               var _a;
               const positionArray = event.detail.position;
               const quaternionArray = event.detail.quaternion;
               this._updatePose(positionArray, quaternionArray);
               (_a = this.arScene) === null || _a === void 0 ? void 0 : _a.updateCameraTransform(positionArray, quaternionArray);
           }, false);
-          window.addEventListener('webxr-input-pose', event => {
+          this.global.addEventListener('webxr-input-pose', event => {
               const positionArray = event.detail.position;
               const quaternionArray = event.detail.quaternion;
               const objectName = event.detail.objectName;
@@ -32527,7 +31208,7 @@ void main() {
                   }
               }
           });
-          window.addEventListener('webxr-input-button', event => {
+          this.global.addEventListener('webxr-input-button', event => {
               if (this.handheld) {
                   return;
               }
@@ -32542,10 +31223,10 @@ void main() {
                       break;
               }
           }, false);
-          window.addEventListener('webxr-stereo-effect', event => {
+          this.global.addEventListener('webxr-stereo-effect', event => {
               this._updateStereoEffect(event.detail.enabled);
           });
-          window.addEventListener('webxr-virtual-room-response', event => {
+          this.global.addEventListener('webxr-virtual-room-response', event => {
               var _a;
               const virtualRoomAssetBuffer = event.detail.buffer;
               (_a = this.arScene) === null || _a === void 0 ? void 0 : _a.loadVirtualRoomAsset(virtualRoomAssetBuffer);
@@ -32594,6 +31275,1392 @@ void main() {
       return translate(matrix, matrix, tmpVec3);
   };
 
+  var _a;
+  const typedArray = Object.getPrototypeOf(Float32Array.prototype);
+  const arrayName = Object.getOwnPropertyDescriptor(typedArray, Symbol.toStringTag).get;
+  const arrayBuffer = Object.getOwnPropertyDescriptor(typedArray, 'buffer').get;
+  const arrayLength = Object.getOwnPropertyDescriptor(typedArray, 'length').get;
+  const bufferLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
+  const bufferResizable = (_a = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'resizable')) === null || _a === void 0 ? void 0 : _a.get;
+  function isObject$1(value) { return Object(value) === value; }
+  function interfaceValue(value, brand, name) {
+      if (!isObject$1(value) || !brand.has(value))
+          throw new TypeError(`Expected ${name}.`);
+      return value;
+  }
+  function interfaceSequence(value, brand, name) {
+      if (!isObject$1(value))
+          throw new TypeError('Expected iterable sequence.');
+      const method = value[Symbol.iterator];
+      if (typeof method !== 'function')
+          throw new TypeError('Expected iterable sequence.');
+      const iterator = Reflect.apply(method, value, []);
+      if (!isObject$1(iterator))
+          throw new TypeError('Expected iterator object.');
+      const next = iterator.next;
+      const list = [];
+      while (true) {
+          const step = Reflect.apply(next, iterator, []);
+          if (!isObject$1(step))
+              throw new TypeError('Expected iterator result object.');
+          if (step.done)
+              return list;
+          list.push(interfaceValue(step.value, brand, name));
+      }
+  }
+  function float32Output(value) {
+      if (arrayName.call(value) !== 'Float32Array')
+          throw new TypeError('Expected Float32Array.');
+      const buffer = arrayBuffer.call(value);
+      bufferLength.call(buffer);
+      if (bufferResizable === null || bufferResizable === void 0 ? void 0 : bufferResizable.call(buffer))
+          throw new TypeError('Resizable buffers are not supported.');
+      return arrayLength.call(value);
+  }
+
+  function eventArguments(count, type, value) {
+      if (count < 2)
+          throw new TypeError('Expected type and eventInitDict.');
+      const name = `${type}`;
+      if (value != null && Object(value) !== value)
+          throw new TypeError('Expected event dictionary.');
+      const dictionary = (value !== null && value !== void 0 ? value : {});
+      const init = { bubbles: Boolean(dictionary.bubbles), cancelable: Boolean(dictionary.cancelable), composed: Boolean(dictionary.composed) };
+      return { name, dictionary, init };
+  }
+  function required(dictionary, key) {
+      const value = dictionary[key];
+      if (value === undefined)
+          throw new TypeError(`Missing required ${key}.`);
+      return value;
+  }
+  function data(map, receiver) {
+      const value = map.get(receiver);
+      if (!value)
+          throw new TypeError('Invalid XR event receiver.');
+      return value;
+  }
+  const { eventSessions: sessions, eventInputs: inputs, eventChanges: changes } = interfaceBrands;
+  class XRSessionEvent extends Event {
+      constructor(type, eventInitDict) {
+          const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
+          const session = interfaceValue(required(dictionary, 'session'), interfaceBrands.sessions, 'XRSession');
+          super(name, init);
+          sessions.set(this, { session });
+      }
+      get session() { return data(sessions, this).session; }
+  }
+  class XRInputSourceEvent extends Event {
+      constructor(type, eventInitDict) {
+          const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
+          const frame = interfaceValue(required(dictionary, 'frame'), interfaceBrands.frames, 'XRFrame');
+          const inputSource = interfaceValue(required(dictionary, 'inputSource'), interfaceBrands.inputSources, 'XRInputSource');
+          super(name, init);
+          inputs.set(this, { frame, inputSource });
+      }
+      get frame() { return data(inputs, this).frame; }
+      get inputSource() { return data(inputs, this).inputSource; }
+  }
+  class XRInputSourcesChangeEvent extends Event {
+      constructor(type, eventInitDict) {
+          const { name, dictionary, init } = eventArguments(arguments.length, type, eventInitDict);
+          const added = interfaceSequence(required(dictionary, 'added'), interfaceBrands.inputSources, 'XRInputSource');
+          const removed = interfaceSequence(required(dictionary, 'removed'), interfaceBrands.inputSources, 'XRInputSource');
+          const session = interfaceValue(required(dictionary, 'session'), interfaceBrands.sessions, 'XRSession');
+          super(name, init);
+          changes.set(this, { session, added: Object.freeze(added), removed: Object.freeze(removed) });
+      }
+      get session() { return data(changes, this).session; }
+      get added() { return data(changes, this).added; }
+      get removed() { return data(changes, this).removed; }
+  }
+  for (const [prototype, keys] of [
+      [XRSessionEvent.prototype, ['session']],
+      [XRInputSourceEvent.prototype, ['frame', 'inputSource']],
+      [XRInputSourcesChangeEvent.prototype, ['session', 'added', 'removed']],
+  ])
+      for (const key of keys)
+          Object.defineProperty(prototype, key, { ...Object.getOwnPropertyDescriptor(prototype, key), enumerable: true });
+
+  var realmEvents = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    XRInputSourceEvent: XRInputSourceEvent,
+    XRInputSourcesChangeEvent: XRInputSourcesChangeEvent,
+    XRSessionEvent: XRSessionEvent
+  });
+
+  function isObject(value) {
+      return Object(value) === value;
+  }
+  function dictionary$1(value) {
+      if (value === null || value === undefined)
+          return Object.create(null);
+      if (!isObject(value))
+          throw new TypeError('Expected session initialization dictionary.');
+      return value;
+  }
+  function domString(value) {
+      return `${value}`;
+  }
+  function enumeration(value, allowed) {
+      const string = domString(value);
+      if (!allowed.includes(string))
+          throw new TypeError('Invalid session initialization enum.');
+      return string;
+  }
+  function sequence(value, convert) {
+      if (!isObject(value))
+          throw new TypeError('Expected session initialization sequence.');
+      const method = value[Symbol.iterator];
+      if (typeof method !== 'function')
+          throw new TypeError('Expected iterable sequence.');
+      const iterator = Reflect.apply(method, value, []);
+      if (!isObject(iterator))
+          throw new TypeError('Expected iterator object.');
+      const next = iterator.next;
+      const values = [];
+      while (true) {
+          const step = Reflect.apply(next, iterator, []);
+          if (!isObject(step))
+              throw new TypeError('Expected iterator result object.');
+          if (step.done)
+              return values;
+          values.push(convert(step.value));
+      }
+  }
+  const depthFormats = ['float32', 'unsigned-short', 'luminance-alpha'];
+  function depthInit(value) {
+      const input = dictionary$1(value);
+      const dataFormatPreference = sequence(input.dataFormatPreference, entry => enumeration(entry, depthFormats));
+      const depthType = input.depthTypeRequest;
+      const depthTypeRequest = depthType === undefined ? undefined : sequence(depthType, entry => enumeration(entry, ['raw', 'smooth']));
+      const match = input.matchDepthView;
+      const matchDepthView = match === undefined ? true : Boolean(match);
+      const usagePreference = sequence(input.usagePreference, entry => enumeration(entry, ['cpu-optimized', 'gpu-optimized']));
+      return { dataFormatPreference, depthTypeRequest, matchDepthView, usagePreference };
+  }
+  function convertSessionMode(value) {
+      return enumeration(value, ['inline', 'immersive-vr', 'immersive-ar']);
+  }
+  function convertSessionInit(value) {
+      const input = dictionary$1(value);
+      const init = Object.create(null);
+      const depthSensing = input.depthSensing;
+      if (depthSensing !== undefined)
+          init.depthSensing = depthInit(depthSensing);
+      const domOverlay = input.domOverlay;
+      if (domOverlay !== undefined) {
+          if (domOverlay === null)
+              init.domOverlay = null;
+          else {
+              const root = dictionary$1(domOverlay).root;
+              Element.prototype.hasAttribute.call(root, '');
+              init.domOverlay = { root: root };
+          }
+      }
+      const optionalFeatures = input.optionalFeatures;
+      if (optionalFeatures !== undefined)
+          init.optionalFeatures = sequence(optionalFeatures, domString);
+      const requiredFeatures = input.requiredFeatures;
+      if (requiredFeatures !== undefined)
+          init.requiredFeatures = sequence(requiredFeatures, domString);
+      return init;
+  }
+
+  var realmSessionInit = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    convertSessionInit: convertSessionInit,
+    convertSessionMode: convertSessionMode
+  });
+
+  const hitTestAllocation = Symbol('hit test allocation');
+  function requireHitTestAllocation(token) {
+      if (token !== hitTestAllocation)
+          throw new TypeError('Illegal constructor.');
+  }
+  function dictionary(value) {
+      if (value === undefined || value === null)
+          return {};
+      if (Object(value) !== value)
+          throw new TypeError('Expected hit-test options dictionary.');
+      return value;
+  }
+  function common(value) {
+      const member = value.entityTypes;
+      let entityTypes = ['plane'];
+      if (member !== undefined) {
+          if (member === null || Object(member) !== member)
+              throw new TypeError('Expected entity type sequence.');
+          const method = member[Symbol.iterator];
+          if (typeof method !== 'function')
+              throw new TypeError('Expected entity type sequence.');
+          const iterator = Reflect.apply(method, member, []);
+          if (Object(iterator) !== iterator)
+              throw new TypeError('Expected iterator object.');
+          const next = iterator.next;
+          entityTypes = [];
+          while (true) {
+              const step = Reflect.apply(next, iterator, []);
+              if (Object(step) !== step)
+                  throw new TypeError('Expected iterator result.');
+              if (step.done)
+                  break;
+              const type = `${step.value}`;
+              if (!['plane', 'point', 'mesh'].includes(type))
+                  throw new TypeError('Invalid hit-test entity type.');
+              entityTypes.push(type);
+          }
+      }
+      const offset = value.offsetRay;
+      if (offset !== undefined)
+          rayState(offset);
+      return { entityTypes, offsetRay: offset === undefined ? new XRRay() : offset };
+  }
+  function convertHitTestOptions(value) {
+      const input = dictionary(value), converted = common(input);
+      const space = input.space;
+      return { ...converted, space: interfaceValue(space, spaceObjects, 'XRSpace') };
+  }
+  function convertTransientHitTestOptions(value) {
+      const input = dictionary(value), converted = common(input);
+      const profile = input.profile;
+      if (profile === undefined)
+          throw new TypeError('profile is required.');
+      return { ...converted, profile: `${profile}` };
+  }
+
+  const HALL_PLAY_AREA = Object.freeze([
+      Object.freeze([-1, 0, -1]),
+      Object.freeze([1, 0, -1]),
+      Object.freeze([1, 0, 1]),
+      Object.freeze([-1, 0, 1]),
+  ]);
+
+  function hitSourceState(value) {
+      const state = interfaceBrands.hitSources.get(value);
+      if (!state)
+          throw new TypeError('Expected XRHitTestSource.');
+      return state;
+  }
+  class XRHitTestSource extends interfaceBrands.hitTestAllocations.HitSourceAllocation {
+      constructor(...args) {
+          const [session, options, token] = args;
+          requireHitTestAllocation(token);
+          super(session, options);
+      }
+      cancel() {
+          const state = hitSourceState(this);
+          if (!state.active)
+              invalidState('Source is inactive.');
+          this._deactivate();
+      }
+      _deactivate() {
+          const state = hitSourceState(this);
+          state.session._hitSources.delete(this);
+          state.session._device.removeHitTestSource(this);
+      }
+      get _space() { return hitSourceState(this).space; }
+      get _session() { return hitSourceState(this).session; }
+      get _offsetRay() { return hitSourceState(this).offsetRay; }
+      get _entityTypes() { return hitSourceState(this).entityTypes; }
+      get _active() { return hitSourceState(this).active; }
+  }
+  enumerableMembers(XRHitTestSource.prototype, ['cancel']);
+  Object.defineProperty(XRHitTestSource.prototype, Symbol.toStringTag, { value: 'XRHitTestSource', configurable: true });
+
+  function transientHitSourceState(value) {
+      const state = interfaceBrands.transientHitSources.get(value);
+      if (!state)
+          throw new TypeError('Expected XRTransientInputHitTestSource.');
+      return state;
+  }
+  class XRTransientInputHitTestSource extends interfaceBrands.hitTestAllocations.TransientHitSourceAllocation {
+      constructor(...args) {
+          const [session, options, token] = args;
+          requireHitTestAllocation(token);
+          super(session, options);
+      }
+      cancel() {
+          const state = transientHitSourceState(this);
+          if (!state.active)
+              invalidState('Source is inactive.');
+          this._deactivate();
+      }
+      _deactivate() {
+          const state = transientHitSourceState(this);
+          state.session._transientSources.delete(this);
+          state.session._device.removeHitTestSource(this);
+      }
+      get _profile() { return transientHitSourceState(this).profile; }
+      get _session() { return transientHitSourceState(this).session; }
+      get _offsetRay() { return transientHitSourceState(this).offsetRay; }
+      get _entityTypes() { return transientHitSourceState(this).entityTypes; }
+      get _active() { return transientHitSourceState(this).active; }
+  }
+  enumerableMembers(XRTransientInputHitTestSource.prototype, ['cancel']);
+  Object.defineProperty(XRTransientInputHitTestSource.prototype, Symbol.toStringTag, { value: 'XRTransientInputHitTestSource', configurable: true });
+
+  function resultState$1(value) {
+      const state = interfaceBrands.hitResults.get(value);
+      if (!state)
+          throw new TypeError('Expected XRHitTestResult.');
+      return state;
+  }
+  class XRHitTestResult extends interfaceBrands.hitTestAllocations.HitResultAllocation {
+      constructor(...args) {
+          const [frame, transform, token] = args;
+          requireHitTestAllocation(token);
+          super(frame, transform);
+      }
+      async createAnchor() {
+          const { frame, transform } = resultState$1(this);
+          frame._assertActive();
+          const space = new XRSpace(frame.session, () => clone$1(transformMatrix(transform)));
+          return frame.createAnchor(new XRRigidTransform(), space);
+      }
+      getPose(baseSpace) {
+          const { frame, transform } = resultState$1(this);
+          if (arguments.length < 1)
+              throw new TypeError('Expected baseSpace.');
+          interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+          frame._assertActive();
+          const space = new XRSpace(frame.session, () => clone$1(transformMatrix(transform)));
+          return frame.getPose(space, baseSpace);
+      }
+  }
+  enumerableMembers(XRHitTestResult.prototype, ['getPose', 'createAnchor']);
+  Object.defineProperty(XRHitTestResult.prototype, Symbol.toStringTag, { value: 'XRHitTestResult', configurable: true });
+
+  function resultState(value) {
+      const state = interfaceBrands.transientHitResults.get(value);
+      if (!state)
+          throw new TypeError('Expected XRTransientInputHitTestResult.');
+      return state;
+  }
+  class XRTransientInputHitTestResult extends interfaceBrands.hitTestAllocations.TransientHitResultAllocation {
+      constructor(...args) {
+          const [frame, results, inputSource, token] = args;
+          requireHitTestAllocation(token);
+          super(frame, results, inputSource);
+      }
+      get inputSource() { return resultState(this).inputSource; }
+      get results() { return resultState(this).results; }
+  }
+  enumerableMembers(XRTransientInputHitTestResult.prototype, ['inputSource', 'results']);
+  Object.defineProperty(XRTransientInputHitTestResult.prototype, Symbol.toStringTag, { value: 'XRTransientInputHitTestResult', configurable: true });
+
+  const providers = new WeakMap();
+  const isIndex = (key) => typeof key === 'string' && /^(0|[1-9]\d*)$/.test(key) && Number(key) < 0xffffffff;
+  const isReadonly = (key) => key === 'length' || isIndex(key);
+  class XRInputSourceArray {
+      constructor(provider) {
+          const collection = new Proxy(this, {
+              get: (target, key, receiver) => isIndex(key) ? provider()[Number(key)] : Reflect.get(target, key, receiver),
+              has: (target, key) => isIndex(key) ? Number(key) < provider().length : Reflect.has(target, key),
+              ownKeys: target => [...[...provider().keys()].map(String), ...Reflect.ownKeys(target)],
+              getOwnPropertyDescriptor: (target, key) => isIndex(key)
+                  ? (Number(key) < provider().length ? { value: provider()[Number(key)], writable: false, enumerable: true, configurable: true } : undefined)
+                  : Reflect.getOwnPropertyDescriptor(target, key),
+              set: (target, key, value, receiver) => !isReadonly(key) && Reflect.set(target, key, value, receiver),
+              defineProperty: (target, key, descriptor) => !isReadonly(key) && Reflect.defineProperty(target, key, descriptor),
+              deleteProperty: (target, key) => !isReadonly(key) && Reflect.deleteProperty(target, key),
+              preventExtensions: () => false,
+          });
+          providers.set(collection, provider);
+          return collection;
+      }
+      get length() { return providers.get(this)().length; }
+      get [Symbol.toStringTag]() { return 'XRInputSourceArray'; }
+      *values() { for (let index = 0; index < this.length; index++)
+          yield this[index]; }
+      *keys() { for (let index = 0; index < this.length; index++)
+          yield index; }
+      *entries() { for (const index of this.keys())
+          yield [index, this[index]]; }
+      forEach(callback, thisArg) {
+          if (typeof callback !== 'function')
+              throw new TypeError('Expected callback.');
+          for (const [index, value] of this.entries())
+              callback.call(thisArg, value, index, this);
+      }
+      [Symbol.iterator]() { return this.values(); }
+  }
+
+  const handlers = interfaceBrands.eventHandlers;
+  const add = EventTarget.prototype.addEventListener;
+  const remove = EventTarget.prototype.removeEventListener;
+  const preventDefault = Event.prototype.preventDefault;
+  function installEventHandlers(prototype, names, brand) {
+      for (const name of names)
+          Object.defineProperty(prototype, `on${name}`, {
+              enumerable: true, configurable: true,
+              get() {
+                  var _a, _b, _c;
+                  if (!brand(this))
+                      throw new TypeError('Invalid XR event-handler receiver.');
+                  return (_c = (_b = (_a = handlers.get(this)) === null || _a === void 0 ? void 0 : _a.get(name)) === null || _b === void 0 ? void 0 : _b.value) !== null && _c !== void 0 ? _c : null;
+              },
+              set(value) {
+                  if (!brand(this))
+                      throw new TypeError('Invalid XR event-handler receiver.');
+                  const converted = Object(value) === value ? value : null;
+                  let map = handlers.get(this);
+                  const existing = map === null || map === void 0 ? void 0 : map.get(name);
+                  if (converted === null) {
+                      if (existing) {
+                          remove.call(this, name, existing.listener);
+                          map.delete(name);
+                      }
+                  }
+                  else if (existing)
+                      existing.value = converted;
+                  else {
+                      if (!map)
+                          handlers.set(this, map = new Map());
+                      const handler = { value: converted, listener: event => {
+                              const callback = handler.value;
+                              if (typeof callback === 'function' && Reflect.apply(callback, this, [event]) === false)
+                                  preventDefault.call(event);
+                          } };
+                      map.set(name, handler);
+                      add.call(this, name, handler.listener);
+                  }
+              },
+          });
+  }
+
+  const documentWindow = Object.getOwnPropertyDescriptor(Document.prototype, 'defaultView').get;
+  function createRuntime(document, bindings) {
+      const window = documentWindow.call(document);
+      if (!window)
+          throw new globalThis.TypeError('Expected an active document.');
+      const { navigator, Event, EventTarget, ErrorEvent, DOMException, TypeError, Promise, Float32Array } = window;
+      const setTimeout = window.setTimeout.bind(window), clearTimeout = window.clearTimeout.bind(window), queueMicrotask = window.queueMicrotask.bind(window);
+      const { XRSpace, XRReferenceSpace, XRBoundedReferenceSpace, XRRigidTransform, transformMatrix, transformObjects, XRPose, XRViewerPose, XRView, sessionObjects, frameObjects, spaceObjects, relativePose, geometryAllocation, enumerableMembers, viewState, invalidState, unsupported } = bindings.geometry;
+      const { XRAnchor, XRAnchorSet, XRHand, XRJointSpace, XRJointPose, XRLightProbe, XRLightEstimate, XRCPUDepthInformation, jointObjects } = bindings.sensing;
+      const { XRCompositionLayer, XRProjectionLayer, XRWebGLLayer } = bindings.layers;
+      const { EnvironmentTracker } = bindings.environment;
+      const { XRSessionEvent, XRInputSourceEvent, XRInputSourcesChangeEvent } = bindings.events;
+      const { XRHitTestSource, hitSourceState, XRTransientInputHitTestSource, transientHitSourceState, XRHitTestResult, XRTransientInputHitTestResult, convertHitTestOptions, convertTransientHitTestOptions, hitTestAllocation } = bindings.hitTests;
+      const XRInputSourceArray = bindings.InputSourceArray;
+      const { convertSessionMode, convertSessionInit } = bindings.sessionInit;
+      const runtimeAllocation = Symbol('runtime allocation');
+      const requireRuntimeAllocation = (token) => {
+          if (token !== runtimeAllocation)
+              throw new TypeError('Illegal constructor.');
+      };
+      const SessionBase = interfaceBrands.SessionObject;
+      const FrameBase = interfaceBrands.FrameObject;
+      const InputSourceBase = interfaceBrands.InputSourceObject;
+      const handBackends = new WeakMap();
+      const sourceBackends = new WeakMap();
+      const systemDevices = new WeakMap();
+      const sessionInputs = new WeakMap();
+      class XREventTarget extends EventTarget {
+          _emit(event) { this.dispatchEvent(event); }
+      }
+      Object.freeze(XREventTarget);
+      class XRRenderState {
+          constructor(init = {}) {
+              var _a, _b, _c;
+              this.depthNear = (_a = init.depthNear) !== null && _a !== void 0 ? _a : 0.1;
+              this.depthFar = (_b = init.depthFar) !== null && _b !== void 0 ? _b : 1000;
+              this.inlineVerticalFieldOfView = init.inlineVerticalFieldOfView === undefined ? null : init.inlineVerticalFieldOfView;
+              this.baseLayer = (_c = init.baseLayer) !== null && _c !== void 0 ? _c : null;
+              this.layers = init.layers ? Object.freeze([...init.layers]) : null;
+              Object.freeze(this);
+          }
+      }
+      const minimumDepthNear = 0.01;
+      const maximumDepthFar = 10000;
+      const minimumInlineFov = 0.01;
+      const maximumInlineFov = 3.13;
+      function convertRenderStateInit(value) {
+          if (value == null)
+              return {};
+          if (typeof value !== 'object' && typeof value !== 'function')
+              throw new TypeError('Expected XRRenderStateInit dictionary.');
+          const dictionary = value;
+          const init = {};
+          const baseLayer = dictionary.baseLayer;
+          if (baseLayer !== undefined) {
+              if (baseLayer !== null && !(baseLayer instanceof XRWebGLLayer))
+                  throw new TypeError('Expected XRWebGLLayer.');
+              init.baseLayer = baseLayer;
+          }
+          for (const key of ['depthFar', 'depthNear', 'inlineVerticalFieldOfView']) {
+              const member = dictionary[key];
+              if (member === undefined)
+                  continue;
+              const number = +member;
+              if (!Number.isFinite(number))
+                  throw new TypeError(`${key} must be a finite double.`);
+              init[key] = number;
+          }
+          const layers = dictionary.layers;
+          if (layers !== undefined) {
+              if (layers === null)
+                  init.layers = null;
+              else {
+                  if ((typeof layers !== 'object' && typeof layers !== 'function') || !(Symbol.iterator in layers))
+                      throw new TypeError('Expected layer sequence.');
+                  init.layers = Array.from(layers);
+              }
+          }
+          return init;
+      }
+      class XRSystem extends XREventTarget {
+          constructor(devicePromise, token = undefined) {
+              requireRuntimeAllocation(token);
+              super();
+              this.immersive = null;
+              this.requesting = false;
+              this.sessions = new Set();
+              this.supports = async (mode) => {
+                  return (await systemDevices.get(this)).isSessionSupported(mode);
+              };
+              this.request = async (mode, options) => {
+                  var _a, _b, _c, _d, _e, _f, _g;
+                  const overlayRoot = (_a = options.domOverlay) === null || _a === void 0 ? void 0 : _a.root;
+                  const needsActivation = mode !== 'inline' || [...((_b = options.requiredFeatures) !== null && _b !== void 0 ? _b : []), ...((_c = options.optionalFeatures) !== null && _c !== void 0 ? _c : [])].some(feature => feature !== 'inline-stereo');
+                  if (needsActivation && !navigator.userActivation.isActive)
+                      throw new DOMException('XR session request requires transient user activation.', 'SecurityError');
+                  if (mode !== 'inline' && (this.immersive || this.requesting))
+                      invalidState('An immersive session is already pending or active.');
+                  if (mode !== 'inline')
+                      this.requesting = true;
+                  try {
+                      const device = await systemDevices.get(this);
+                      if (!device.isSessionSupported(mode))
+                          unsupported('The selected profile/mode does not support this session mode.');
+                      const required = new Set(['viewer', ...(mode === 'inline' ? [] : ['local']), ...((_d = options.requiredFeatures) !== null && _d !== void 0 ? _d : [])]);
+                      const enabled = new Set();
+                      for (const feature of new Set([...required, ...((_e = options.optionalFeatures) !== null && _e !== void 0 ? _e : [])])) {
+                          let supported = device.isFeatureSupported(feature, mode);
+                          if (feature === 'dom-overlay')
+                              supported = supported && device.canPresentDOMOverlay(overlayRoot);
+                          if (feature === 'depth-sensing') {
+                              if (!options.depthSensing) {
+                                  supported = false;
+                              }
+                              else {
+                                  const { usagePreference, dataFormatPreference } = options.depthSensing;
+                                  supported = supported && (!usagePreference.length || usagePreference.includes('cpu-optimized')) && (!dataFormatPreference.length || dataFormatPreference.some(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format)));
+                              }
+                          }
+                          if (!supported && required.has(feature))
+                              unsupported(`Required feature ${feature} is unavailable in ${mode}.`);
+                          if (supported)
+                              enabled.add(feature);
+                      }
+                      const depthFormat = (_g = (_f = options.depthSensing) === null || _f === void 0 ? void 0 : _f.dataFormatPreference.find(format => ['float32', 'unsigned-short', 'luminance-alpha'].includes(format))) !== null && _g !== void 0 ? _g : 'float32';
+                      const id = await device.requestSession(mode, enabled);
+                      const session = new XRSession(device, mode, id, enabled, () => {
+                          this.sessions.delete(session);
+                          if (this.immersive === session) {
+                              this.immersive = null;
+                              for (const inline of this.sessions)
+                                  inline._setImmersiveSuppressed(false);
+                          }
+                      }, runtimeAllocation);
+                      session._depthFormat = depthFormat;
+                      if (enabled.has('dom-overlay')) {
+                          try {
+                              session._startDOMOverlay(overlayRoot);
+                          }
+                          catch (_h) {
+                              if (required.has('dom-overlay')) {
+                                  await session.end();
+                                  unsupported('The DOM Overlay Preview root could not be presented.');
+                              }
+                              enabled.delete('dom-overlay');
+                              session._omitDOMOverlay();
+                          }
+                      }
+                      this.sessions.add(session);
+                      if (mode === 'inline' && this.immersive)
+                          session._setImmersiveSuppressed(true);
+                      if (mode !== 'inline') {
+                          this.immersive = session;
+                          for (const other of this.sessions)
+                              if (other !== session)
+                                  other._setImmersiveSuppressed(true);
+                      }
+                      return session;
+                  }
+                  finally {
+                      if (mode !== 'inline')
+                          this.requesting = false;
+                  }
+              };
+              systemDevices.set(this, devicePromise);
+              window.addEventListener('webxr-device', () => this._emit(new Event('devicechange')));
+              window.addEventListener('webxr-exit-immersive', () => { var _a; void ((_a = this.immersive) === null || _a === void 0 ? void 0 : _a.end()); });
+          }
+          isSessionSupported(value) {
+              return new Promise((resolve) => {
+                  const mode = convertSessionMode(value);
+                  resolve(this.supports(mode));
+              });
+          }
+          requestSession(value, dictionary) {
+              return new Promise((resolve) => {
+                  const mode = convertSessionMode(value);
+                  const options = convertSessionInit(dictionary);
+                  resolve(this.request(mode, options));
+              });
+          }
+      }
+      Object.freeze(XRSystem);
+      const inputEvents = ['select-start', 'select-end', 'squeeze-start', 'squeeze-end'];
+      class XRSession extends SessionBase {
+          _emit(event) { this.dispatchEvent(event); }
+          _startDOMOverlay(root) {
+              this.overlay = this._device.startDOMOverlay(root, () => { if (!this.ended)
+                  void this.end(); });
+              this.overlayState = Object.freeze({ type: 'screen' });
+          }
+          _omitDOMOverlay() { this.features = Object.freeze(this.features.filter(feature => feature !== 'dom-overlay')); }
+          constructor(_device, _mode, _id, enabled, onShutdown, token = undefined) {
+              requireRuntimeAllocation(token);
+              super();
+              this._device = _device;
+              this._mode = _mode;
+              this._id = _id;
+              this.onShutdown = onShutdown;
+              this.callbacks = new Map();
+              this.nextCallback = 0;
+              this.frameHandle = 0;
+              this.currentCallbacks = null;
+              this.animationFrame = null;
+              this._webglLayers = new Set();
+              this._inAnimationCallback = false;
+              this.pendingRenderState = null;
+              this.presentation = null;
+              this.presentationChanged = false;
+              this.endedValue = false;
+              this.pendingReferenceRequests = new Set();
+              this.visibility = document.visibilityState;
+              this.sources = Object.freeze([]);
+              this.signals = [];
+              this.listeners = [];
+              this.immersiveSuppressed = false;
+              this.visibilityListener = () => this._setVisibility(document.visibilityState);
+              this._anchors = new Set();
+              this._environment = new EnvironmentTracker(this);
+              this._depthFormat = 'float32';
+              this.roomCaptureCompleted = false;
+              this.inputWrappers = new Map();
+              this.rawSources = [];
+              this.depthRunning = true;
+              this.overlay = null;
+              this.overlayState = null;
+              this.isSystemKeyboardSupported = false;
+              this._hitSources = new Set();
+              this._transientSources = new Set();
+              this.tick = (time) => {
+                  var _a, _b, _c, _d, _e;
+                  if (this.ended)
+                      return;
+                  this.frameHandle = this._device.requestAnimationFrame(this.tick);
+                  if (this.visibility === 'hidden' || this.immersiveSuppressed)
+                      return;
+                  if (this.pendingRenderState) {
+                      const previous = this.presentation;
+                      const state = this.pendingRenderState;
+                      this.activeRenderState = new XRRenderState({ ...state,
+                          depthNear: Math.max(minimumDepthNear, state.depthNear),
+                          depthFar: Math.min(maximumDepthFar, state.depthFar),
+                          inlineVerticalFieldOfView: state.inlineVerticalFieldOfView === null ? null : Math.max(minimumInlineFov, Math.min(maximumInlineFov, state.inlineVerticalFieldOfView)),
+                      });
+                      this.pendingRenderState = null;
+                      this.presentation = (_d = (_a = this.renderState.baseLayer) !== null && _a !== void 0 ? _a : (_c = (_b = this.renderState.layers) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c._binding._presentation) !== null && _d !== void 0 ? _d : null;
+                      if (this.presentation && this.presentation !== previous) {
+                          this.presentationChanged = true;
+                          this._device.onBaseLayerSet(this._id, this.presentation);
+                      }
+                  }
+                  if (!this.presentation || this.presentation.context.isContextLost())
+                      return;
+                  this._viewer._update();
+                  for (const source of this._hitSources)
+                      source._space._update();
+                  this._device.onFrameStart(this._id, { depthNear: this.renderState.depthNear, depthFar: this.renderState.depthFar, inlineVerticalFieldOfView: (_e = this.renderState.inlineVerticalFieldOfView) !== null && _e !== void 0 ? _e : Math.PI / 2 });
+                  this.rawSources = this._mode === 'inline' ? [] : this._device.getInputSources();
+                  const replaced = [];
+                  const next = this.rawSources.map(source => {
+                      const previous = this.inputWrappers.get(source);
+                      if (!previous || !previous._matches(source)) {
+                          if (previous) {
+                              previous._retire();
+                              replaced.push(previous);
+                          }
+                          this.inputWrappers.set(source, new XRInputSource(this, source, runtimeAllocation));
+                      }
+                      return this.inputWrappers.get(source);
+                  });
+                  const added = next.filter(source => !this.sources.includes(source));
+                  const removed = this.sources.filter(source => !next.includes(source) && !replaced.includes(source));
+                  this.sources = Object.freeze([...next, ...removed]);
+                  for (const source of next)
+                      source._updatePose();
+                  if (added.length || replaced.length)
+                      this._emit(new XRInputSourcesChangeEvent('inputsourceschange', { session: this, added, removed: replaced }));
+                  if (this.ended)
+                      return;
+                  for (const signal of this.signals.splice(0)) {
+                      if (this.ended)
+                          break;
+                      const source = this.inputWrappers.get(signal.source);
+                      if (!source)
+                          continue;
+                      const prefix = signal.type.startsWith('squeeze') ? 'squeeze' : 'select';
+                      const starting = signal.type.endsWith('start');
+                      if (!starting)
+                          this.emitInput(prefix, source, time);
+                      this.emitInput(`${prefix}${starting ? 'start' : 'end'}`, source, time);
+                  }
+                  if (this.ended)
+                      return;
+                  this.sources = Object.freeze(next.slice());
+                  for (const source of removed)
+                      source._retire();
+                  if (removed.length)
+                      this._emit(new XRInputSourcesChangeEvent('inputsourceschange', { session: this, added: [], removed: [...removed] }));
+                  if (this.ended)
+                      return;
+                  for (const [raw, wrapper] of this.inputWrappers)
+                      if (removed.includes(wrapper))
+                          this.inputWrappers.delete(raw);
+                  this._device.computeHitTests(this._id);
+                  if (this.enabledFeatures.some(feature => feature === 'plane-detection' || feature === 'mesh-detection'))
+                      this._environment.update(time);
+                  const frame = new XRFrame(this, time, true, runtimeAllocation);
+                  const layers = this.renderState.layers;
+                  if (layers === null || layers === void 0 ? void 0 : layers.length)
+                      layers[0]._binding._prepare(layers);
+                  const callbacks = this.currentCallbacks = this.callbacks;
+                  this.callbacks = new Map();
+                  frame._active = true;
+                  this.animationFrame = frame;
+                  for (const layer of this._webglLayers)
+                      layer._clear();
+                  try {
+                      for (const [id, callback] of callbacks) {
+                          if (this.ended)
+                              break;
+                          callbacks.delete(id);
+                          this._inAnimationCallback = true;
+                          for (const layer of this._webglLayers)
+                              layer._activate(true);
+                          try {
+                              callback(time, frame);
+                          }
+                          catch (error) {
+                              window.dispatchEvent(new ErrorEvent('error', { error, message: String(error) }));
+                          }
+                          finally {
+                              this._inAnimationCallback = false;
+                              for (const layer of this._webglLayers)
+                                  layer._activate(false);
+                          }
+                      }
+                      if (!this.ended && !this.presentation.context.isContextLost()) {
+                          if (layers === null || layers === void 0 ? void 0 : layers.length)
+                              layers[0]._binding._compose(frame, layers);
+                          this.presentation._present(this.presentationChanged);
+                          this.presentationChanged = false;
+                      }
+                  }
+                  finally {
+                      frame._active = false;
+                      this.animationFrame = null;
+                      this.currentCallbacks = null;
+                      if (!this.ended)
+                          this._device.onFrameEnd(this._id);
+                  }
+              };
+              this.features = Object.freeze([...enabled]);
+              this.interactionMode = _device.handheld ? 'screen-space' : 'world-space';
+              sessionInputs.set(this, new XRInputSourceArray(() => this.sources));
+              handBackends.set(this, initializeHandBackend(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype));
+              this._hands = new interfaceBrands.handAllocations.HandTracker(this, XRHand.prototype, XRJointSpace.prototype, XRJointPose.prototype);
+              this.activeRenderState = new XRRenderState({ inlineVerticalFieldOfView: _mode === 'inline' ? Math.PI / 2 : null });
+              const viewerMatrix = () => clone$1(_device.getBasePoseMatrix());
+              this._viewer = new XRReferenceSpace(this, 'viewer', viewerMatrix);
+              interfaceBrands.roomCaptures.set(this, async () => {
+                  this._assertLive();
+                  if (this.roomCaptureCompleted)
+                      invalidState('Room capture already completed.');
+                  this._require('plane-detection');
+                  this.roomCaptureCompleted = true;
+              });
+              interfaceBrands.viewerPoses.set(this, (frame, reference) => allocateViewerPose(frame, reference));
+              interfaceBrands.referenceSpaceRequests.set(this, type => new Promise((resolve, reject) => {
+                  let settled = false;
+                  let task;
+                  const settle = (action) => {
+                      if (settled)
+                          return;
+                      settled = true;
+                      if (task !== undefined)
+                          clearTimeout(task);
+                      this.pendingReferenceRequests.delete(cancel);
+                      try {
+                          action();
+                      }
+                      catch (error) {
+                          reject(error);
+                      }
+                  };
+                  const cancel = () => settle(() => reject(new DOMException('The session has ended.', 'InvalidStateError')));
+                  if (!this.ended)
+                      this.pendingReferenceRequests.add(cancel);
+                  const queue = (action) => {
+                      if (settled)
+                          return;
+                      task = setTimeout(() => settle(action), 0);
+                  };
+                  if (!enabled.has(type)) {
+                      queue(() => reject(new DOMException(`Reference space ${type} was not enabled.`, 'NotSupportedError')));
+                      return;
+                  }
+                  try {
+                      const ready = type === 'viewer' ? Promise.resolve(null) : _device.requestFrameOfReferenceTransform(type, undefined);
+                      void ready.then(inverse => {
+                          queue(() => {
+                              if (type === 'viewer') {
+                                  resolve(new XRReferenceSpace(this, type, viewerMatrix));
+                              }
+                              else {
+                                  const world = invert(create$3(), inverse);
+                                  resolve(type === 'bounded-floor'
+                                      ? new XRBoundedReferenceSpace(this, () => world, HALL_PLAY_AREA)
+                                      : new XRReferenceSpace(this, type, () => world));
+                              }
+                          });
+                      }, error => { queue(() => reject(error)); });
+                  }
+                  catch (error) {
+                      queue(() => reject(error));
+                  }
+              }));
+              for (const type of inputEvents) {
+                  const listener = (detail) => { if (detail.sessionId === _id)
+                      this.signals.push({ type, source: detail.inputSource }); };
+                  this.listeners.push([`@@webxr-polyfill/input-${type}`, listener]);
+                  _device.addEventListener(`@@webxr-polyfill/input-${type}`, listener);
+              }
+              this.endListener = id => { if (id === _id)
+                  this._finish(); };
+              _device.addEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
+              document.addEventListener('visibilitychange', this.visibilityListener);
+              this.frameHandle = _device.requestAnimationFrame(this.tick);
+          }
+          get enabledFeatures() { return this.features; }
+          get ended() { return this.endedValue; }
+          get renderState() { return this.activeRenderState; }
+          get visibilityState() { return this.visibility; }
+          get inputSources() {
+              const inputs = sessionInputs.get(this);
+              if (!inputs)
+                  throw new TypeError('Expected backend XRSession.');
+              return inputs;
+          }
+          assertDepthConfiguration() { if (!this.enabledFeatures.includes('depth-sensing'))
+              invalidState('Depth sensing was not enabled.'); }
+          assertDepthFrame() {
+              var _a;
+              this._assertLive();
+              if (!((_a = this.animationFrame) === null || _a === void 0 ? void 0 : _a._active))
+                  invalidState('Depth sensing can only be changed during an active animation frame.');
+              this._require('depth-sensing');
+          }
+          get depthUsage() { this.assertDepthConfiguration(); return 'cpu-optimized'; }
+          get depthDataFormat() { this.assertDepthConfiguration(); return this._depthFormat; }
+          get depthType() { this.assertDepthConfiguration(); return 'smooth'; }
+          get depthActive() { this.assertDepthConfiguration(); return this.depthRunning; }
+          pauseDepthSensing() { this.assertDepthFrame(); this.depthRunning = false; }
+          resumeDepthSensing() { this.assertDepthFrame(); this.depthRunning = true; }
+          get preferredReflectionFormat() { return 'srgba8'; }
+          get persistentAnchors() { return Object.freeze([]); }
+          async restorePersistentAnchor(_uuid) { this._require('anchors'); return unsupported('Persistent anchors are not simulated.'); }
+          async deletePersistentAnchor(_uuid) { this._require('anchors'); unsupported('Persistent anchors are not simulated.'); }
+          async requestLightProbe(options = {}) {
+              this._require('light-estimation');
+              if (options.reflectionFormat && !['srgba8', 'rgba16f'].includes(options.reflectionFormat))
+                  throw new TypeError('Invalid XRReflectionFormat.');
+              if (options.reflectionFormat === 'rgba16f')
+                  unsupported('Only srgba8 reflection format is supported.');
+              return new XRLightProbe(this);
+          }
+          get environmentBlendMode() { return this._mode === 'immersive-ar' ? 'alpha-blend' : 'opaque'; }
+          get domOverlayState() { return this.overlayState; }
+          get _currentAnimationFrame() { return this.animationFrame; }
+          _assertLive() { if (this.ended)
+              invalidState('The session has ended.'); }
+          _require(feature) { this._assertLive(); if (!this.enabledFeatures.includes(feature))
+              unsupported(`${feature} was not enabled.`); }
+          _owns(space) {
+              interfaceValue(space, spaceObjects, 'XRSpace');
+              if (space._session !== this)
+                  invalidState('Space belongs to a different session.');
+          }
+          _setVisibility(value) {
+              if (this.ended || value === this.visibility)
+                  return;
+              this.visibility = value;
+              this._emit(new XRSessionEvent('visibilitychange', { session: this }));
+          }
+          _setImmersiveSuppressed(value) {
+              this.immersiveSuppressed = value;
+          }
+          initiateRoomCapture() {
+              try {
+                  const capture = interfaceBrands.roomCaptures.get(this);
+                  if (!capture)
+                      throw new TypeError('Expected XRSession receiver.');
+                  return capture();
+              }
+              catch (error) {
+                  return Promise.reject(error);
+              }
+          }
+          requestReferenceSpace(type) {
+              try {
+                  if (!sessionObjects.has(this))
+                      throw new TypeError('Expected XRSession receiver.');
+                  const request = interfaceBrands.referenceSpaceRequests.get(this);
+                  if (!request)
+                      throw new TypeError('Expected XRSession receiver.');
+                  if (arguments.length === 0)
+                      throw new TypeError('XRReferenceSpaceType is required.');
+                  const converted = `${type}`;
+                  if (!['viewer', 'local', 'local-floor', 'bounded-floor', 'unbounded'].includes(converted))
+                      throw new TypeError('Invalid XRReferenceSpaceType.');
+                  return request(converted);
+              }
+              catch (error) {
+                  return Promise.reject(error);
+              }
+          }
+          updateRenderState(value = {}) {
+              var _a;
+              const init = convertRenderStateInit(value);
+              this._assertLive();
+              if (init.baseLayer && (!(init.baseLayer instanceof XRWebGLLayer) || init.baseLayer._session !== this))
+                  invalidState('Layer belongs to a different session.');
+              if (init.inlineVerticalFieldOfView !== undefined && this._mode !== 'inline')
+                  invalidState('Immersive sessions cannot set inlineVerticalFieldOfView.');
+              if (Object.keys(init).length === 0)
+                  return;
+              if (init.baseLayer !== undefined && init.layers !== undefined)
+                  unsupported('baseLayer and layers cannot both be supplied.');
+              if (init.layers !== undefined && init.layers !== null) {
+                  if (!this.enabledFeatures.includes('layers') && (init.layers.length > 1 || init.layers.some(layer => !(layer instanceof XRProjectionLayer))))
+                      unsupported('Only a single projection layer is supported without the layers feature.');
+                  if (new Set(init.layers).size !== init.layers.length)
+                      throw new TypeError('Duplicate composition layers.');
+                  for (const layer of init.layers)
+                      if (!(layer instanceof XRCompositionLayer) || layer._binding._session !== this || layer._destroyed)
+                          invalidState('Invalid composition layer.');
+                  if (init.layers.some(layer => layer._binding._context !== init.layers[0]._binding._context))
+                      unsupported('All layers must share one WebGL context.');
+              }
+              const state = { ...((_a = this.pendingRenderState) !== null && _a !== void 0 ? _a : this.renderState), ...init };
+              if (init.baseLayer !== undefined)
+                  state.layers = null;
+              if (init.layers !== undefined)
+                  state.baseLayer = null;
+              this.pendingRenderState = new XRRenderState(state);
+          }
+          _removeLayer(layer) {
+              var _a, _b;
+              const state = (_a = this.pendingRenderState) !== null && _a !== void 0 ? _a : this.renderState;
+              if (!((_b = state.layers) === null || _b === void 0 ? void 0 : _b.includes(layer)))
+                  return;
+              this.pendingRenderState = new XRRenderState({ ...state, layers: state.layers.filter(entry => entry !== layer) });
+          }
+          requestAnimationFrame(callback) { if (typeof callback !== 'function')
+              throw new TypeError('Expected callback.'); if (this.ended)
+              return 0; const id = ++this.nextCallback; this.callbacks.set(id, callback); return id; }
+          cancelAnimationFrame(id) { var _a; this.callbacks.delete(id); (_a = this.currentCallbacks) === null || _a === void 0 ? void 0 : _a.delete(id); }
+          async end() {
+              this._assertLive();
+              this._device.endSession(this._id);
+              this._finish();
+              await new Promise(resolve => setTimeout(resolve, 0));
+          }
+          _finish() {
+              var _a, _b;
+              if (this.ended)
+                  return;
+              (_a = this.overlay) === null || _a === void 0 ? void 0 : _a.dispose();
+              this.overlay = null;
+              this.endedValue = true;
+              for (const cancel of this.pendingReferenceRequests)
+                  cancel();
+              for (const layer of this._webglLayers)
+                  layer._dispose();
+              this._device.cancelAnimationFrame(this.frameHandle);
+              for (const [type, listener] of this.listeners)
+                  this._device.removeEventListener(type, listener);
+              this._device.removeEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
+              document.removeEventListener('visibilitychange', this.visibilityListener);
+              for (const anchor of this._anchors)
+                  anchor.delete();
+              this._environment.clear();
+              for (const source of this.inputWrappers.values())
+                  source._retire();
+              this.inputWrappers.clear();
+              this.callbacks.clear();
+              (_b = this.currentCallbacks) === null || _b === void 0 ? void 0 : _b.clear();
+              this.signals = [];
+              this.sources = Object.freeze([]);
+              for (const source of [...this._hitSources, ...this._transientSources])
+                  source._deactivate();
+              this._hitSources.clear();
+              this._transientSources.clear();
+              setTimeout(() => this._emit(new XRSessionEvent('end', { session: this })), 0);
+              this.onShutdown();
+          }
+          async requestHitTestSource(value) {
+              interfaceValue(this, sessionObjects, 'XRSession');
+              const options = convertHitTestOptions(value);
+              if (!this.enabledFeatures.includes('hit-test'))
+                  unsupported('hit-test was not enabled.');
+              this._assertLive();
+              this._owns(options.space);
+              const source = new XRHitTestSource(this, options, hitTestAllocation);
+              this._hitSources.add(source);
+              this._device.addHitTestSource(source);
+              return source;
+          }
+          async requestHitTestSourceForTransientInput(value) {
+              interfaceValue(this, sessionObjects, 'XRSession');
+              const options = convertTransientHitTestOptions(value);
+              if (!this.enabledFeatures.includes('hit-test'))
+                  unsupported('hit-test was not enabled.');
+              this._assertLive();
+              const source = new XRTransientInputHitTestSource(this, options, hitTestAllocation);
+              this._transientSources.add(source);
+              this._device.addHitTestSourceForTransientInput(source);
+              return source;
+          }
+          emitInput(type, inputSource, time) {
+              const frame = new XRFrame(this, time, false, runtimeAllocation);
+              frame._active = true;
+              try {
+                  this._emit(new XRInputSourceEvent(type, { frame, inputSource }));
+              }
+              finally {
+                  frame._active = false;
+              }
+          }
+      }
+      Object.freeze(XRSession);
+      class XRFrame extends FrameBase {
+          constructor(session, predictedDisplayTime, _animation, token) {
+              requireRuntimeAllocation(token);
+              super();
+              this._animation = _animation;
+              this._active = false;
+              this.hitResults = new Map();
+              this.transientResults = new Map();
+              interfaceBrands.frameValues.set(this, { session, predictedDisplayTime,
+                  pose: (matrix, emulated) => new XRPose(XRRigidTransform._fromMatrix(matrix), emulated, geometryAllocation) });
+              handBackends.get(session).frame(this, (matrix, emulated) => new XRPose(XRRigidTransform._fromMatrix(matrix), emulated, geometryAllocation));
+              this.anchorSnapshot = new XRAnchorSet(session._anchors);
+              this.environmentSnapshot = session._environment.snapshot();
+              if (_animation) {
+                  for (const source of session._hitSources)
+                      this.hitResults.set(source, session._device.getHitTestResults(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix), hitTestAllocation)));
+                  for (const source of session._transientSources) {
+                      const input = Array.from(session.inputSources).find(input => input.targetRayMode === 'screen' && input.profiles.includes(source._profile));
+                      const hits = session._device.getHitTestResultsForTransientInput(source).map(matrix => new XRHitTestResult(this, XRRigidTransform._fromMatrix(matrix), hitTestAllocation));
+                      this.transientResults.set(source, input ? [new XRTransientInputHitTestResult(this, hits, input, hitTestAllocation)] : []);
+                  }
+              }
+          }
+          _assertActive(animation = false) { this.session._assertLive(); if (!this._active || (animation && !this._animation))
+              invalidState('XRFrame is not active for this operation.'); }
+          _world(space) {
+              this.session._owns(space);
+              return space._update();
+          }
+          get session() { return frameState(this).session; }
+          get predictedDisplayTime() { return frameState(this).predictedDisplayTime; }
+          getPose(space, baseSpace) {
+              const state = frameState(this);
+              if (arguments.length < 2)
+                  throw new TypeError('Expected space and baseSpace.');
+              interfaceValue(space, spaceObjects, 'XRSpace');
+              interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+              this._assertActive();
+              state.session._owns(space);
+              state.session._owns(baseSpace);
+              for (const candidate of [space, baseSpace]) {
+                  const joint = interfaceBrands.handAllocations.joints.get(candidate);
+                  if (joint && !joint.update())
+                      return null;
+              }
+              const relative = relativePose(space, baseSpace);
+              return relative ? state.pose(relative.matrix, relative.emulated) : null;
+          }
+          getViewerPose(referenceSpace) {
+              const state = frameState(this);
+              if (arguments.length < 1 || !interfaceBrands.referenceOffsets.has(referenceSpace))
+                  throw new TypeError('Expected XRReferenceSpace.');
+              this._assertActive(true);
+              state.session._owns(referenceSpace);
+              return interfaceBrands.viewerPoses.get(state.session)(this, referenceSpace);
+          }
+          get detectedPlanes() { frameState(this); this._assertActive(); return this.environmentSnapshot.planes; }
+          get detectedMeshes() { frameState(this); this._assertActive(); return this.environmentSnapshot.meshes; }
+          get trackedAnchors() { this._assertActive(); this.session._require('anchors'); return this.anchorSnapshot; }
+          async createAnchor(pose, space) {
+              this._assertActive();
+              this.session._require('anchors');
+              if (!transformObjects.has(pose))
+                  throw new TypeError('Expected XRRigidTransform.');
+              const world = this._world(space);
+              if (!world)
+                  throw new DOMException('Space is not tracked.', 'OperationError');
+              const anchor = new XRAnchor(this.session, multiply(create$3(), world, transformMatrix(pose)));
+              return new Promise((resolve, reject) => queueMicrotask(() => {
+                  if (this.session.ended) {
+                      anchor.delete();
+                      reject(new DOMException('Session ended before anchor tracking began.', 'InvalidStateError'));
+                  }
+                  else {
+                      this.session._anchors.add(anchor);
+                      resolve(anchor);
+                  }
+              }));
+          }
+          getJointPose(joint, baseSpace) {
+              frameState(this);
+              if (arguments.length < 2)
+                  throw new TypeError('Expected joint and baseSpace.');
+              interfaceValue(joint, jointObjects, 'XRJointSpace');
+              interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+              return interfaceBrands.handAllocations.pose(this, joint, baseSpace);
+          }
+          fillJointRadii(joints, radii) {
+              interfaceValue(this, frameObjects, 'XRFrame');
+              if (arguments.length < 2)
+                  throw new TypeError('Expected joints and radii.');
+              const list = interfaceSequence(joints, jointObjects, 'XRJointSpace');
+              const capacity = float32Output(radii);
+              this._assertActive();
+              for (const joint of list)
+                  this.session._owns(joint);
+              if (capacity < list.length)
+                  throw new TypeError('Insufficient radii array.');
+              let valid = true;
+              for (const [index, joint] of list.entries()) {
+                  const metadata = interfaceBrands.handAllocations.joints.get(joint);
+                  const tracked = metadata.update() !== null;
+                  radii[index] = tracked ? metadata.radius : NaN;
+                  if (!tracked)
+                      valid = false;
+              }
+              return valid;
+          }
+          fillPoses(spaces, baseSpace, transforms) {
+              interfaceValue(this, frameObjects, 'XRFrame');
+              if (arguments.length < 3)
+                  throw new TypeError('Expected spaces, baseSpace and transforms.');
+              const list = interfaceSequence(spaces, spaceObjects, 'XRSpace');
+              interfaceValue(baseSpace, spaceObjects, 'XRSpace');
+              const capacity = float32Output(transforms);
+              this._assertActive();
+              for (const space of list)
+                  this.session._owns(space);
+              this.session._owns(baseSpace);
+              if (capacity < list.length * 16)
+                  throw new TypeError('Insufficient transform array.');
+              let valid = true;
+              for (const [index, space] of list.entries()) {
+                  const pose = this.getPose(space, baseSpace);
+                  if (!pose)
+                      valid = false;
+                  for (let component = 0; component < 16; component++)
+                      transforms[index * 16 + component] = pose ? transformMatrix(pose.transform)[component] : NaN;
+              }
+              return valid;
+          }
+          getLightEstimate(probe) {
+              this._assertActive();
+              this.session._require('light-estimation');
+              if (!(probe instanceof XRLightProbe))
+                  throw new TypeError('Expected XRLightProbe.');
+              if (probe._session !== this.session)
+                  invalidState('Light probe belongs to a different session.');
+              return new XRLightEstimate();
+          }
+          getDepthInformation(view) {
+              var _a;
+              this._assertActive(true);
+              this.session._require('depth-sensing');
+              if (viewState(view).frame !== this)
+                  invalidState('View belongs to a different frame.');
+              if (!this.session.depthActive || !((_a = this.session._device.arScene) === null || _a === void 0 ? void 0 : _a.room))
+                  return null;
+              return new XRCPUDepthInformation(this, view);
+          }
+          getHitTestResults(source) { frameState(this); hitSourceState(source); this._assertActive(); if (!this.hitResults.has(source))
+              invalidState('Hit test source was not active for this frame.'); return this.hitResults.get(source).slice(); }
+          getHitTestResultsForTransientInput(source) { frameState(this); transientHitSourceState(source); this._assertActive(); if (!this.transientResults.has(source))
+              invalidState('Transient source was not active for this frame.'); return this.transientResults.get(source).slice(); }
+      }
+      function frameState(value) {
+          const state = interfaceBrands.frameValues.get(value);
+          if (!state)
+              throw new TypeError('Expected XRFrame.');
+          return state;
+      }
+      Object.freeze(XRFrame);
+      function allocateViewerPose(frame, reference) {
+          const session = frameState(frame).session;
+          const relative = relativePose(session._viewer, reference);
+          if (!relative)
+              return null;
+          const viewerWorld = session._viewer._update();
+          if (!viewerWorld)
+              return null;
+          const inverseViewer = invert(create$3(), viewerWorld);
+          const transform = XRRigidTransform._fromMatrix(relative.matrix);
+          const device = session._device;
+          const eyes = session._mode === 'inline' || device.handheld ? ['none'] : ['left', 'right'];
+          const views = eyes.map((eye, index) => {
+              const viewWorld = invert(create$3(), device.getBaseViewMatrix(eye));
+              return new XRView(frame, eye, XRRigidTransform._fromMatrix(multiply(create$3(), relative.matrix, multiply(create$3(), inverseViewer, viewWorld))), device.getProjectionMatrix(eye), viewWorld, index, geometryAllocation);
+          });
+          return new XRViewerPose(transform, views, relative.emulated, geometryAllocation);
+      }
+      enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getJointPose', 'fillPoses', 'fillJointRadii', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
+      Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
+      class XRInputSource extends InputSourceBase {
+          constructor(session, raw, token) {
+              requireRuntimeAllocation(token);
+              super();
+              this.session = session;
+              this.raw = raw;
+              this.targetWorld = null;
+              this.gripWorld = null;
+              sourceBackends.set(this, { session, raw });
+              const active = () => Array.from(session.inputSources).includes(this);
+              this.handednessValue = raw.handedness;
+              this.targetRayModeValue = raw.targetRayMode;
+              this.rawProfiles = Object.freeze([...raw.profiles]);
+              this.profilesValue = session.enabledFeatures.includes('hand-tracking') ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
+              this.hasGamepad = raw.gamepad !== null;
+              this.gamepadState = !session.enabledFeatures.includes('hand-tracking') && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
+              const provider = (type) => () => active() ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
+              this.targetSpace = new XRSpace(session, provider('target-ray'));
+              this.grip = ['gaze', 'screen'].includes(this.targetRayModeValue) ? null : new XRSpace(session, provider('grip'));
+          }
+          _matches(raw) {
+              const profiles = raw.profiles;
+              return this.handednessValue === raw.handedness && this.targetRayModeValue === raw.targetRayMode &&
+                  this.hasGamepad === (raw.gamepad !== null) && this.rawProfiles.length === profiles.length &&
+                  this.rawProfiles.every((profile, index) => profile === profiles[index]);
+          }
+          _retire() { var _a; (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.retire(); }
+          _updatePose() {
+              const backend = sourceBackends.get(this);
+              if (!backend)
+                  throw new TypeError('Expected backend XRInputSource.');
+              const { session, raw } = backend;
+              if (session.enabledFeatures.includes('hand-tracking')) {
+                  const controller = session._device.gamepadInputSources.findIndex(input => input.inputSource === raw);
+                  if (controller < 0)
+                      throw new TypeError('Expected connected backend input.');
+                  handBackends.get(session).hand(this, controller);
+              }
+              if (this.gamepadState && this.raw.gamepad)
+                  this.gamepadState.sample(this.raw.gamepad);
+              const world = new XRReferenceSpace(this.session, 'local-floor', () => create$3());
+              world._update();
+              const target = this.session._device.getInputPose(this.raw, world, 'target-ray');
+              const grip = this.session._device.getInputPose(this.raw, world, 'grip');
+              this.targetWorld = target ? clone$1(transformMatrix(target.transform)) : null;
+              this.gripWorld = grip ? clone$1(transformMatrix(grip.transform)) : null;
+          }
+          get hand() { var _a; interfaceValue(this, interfaceBrands.inputSources, 'XRInputSource'); return (_a = interfaceBrands.handAllocations.sources.get(this)) !== null && _a !== void 0 ? _a : null; }
+          get targetRaySpace() { return this.targetSpace; }
+          get handedness() { return this.handednessValue; }
+          get targetRayMode() { return this.targetRayModeValue; }
+          get gripSpace() { return this.grip; }
+          get profiles() { return this.profilesValue; }
+          get gamepad() { var _a, _b; return (_b = (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.value) !== null && _b !== void 0 ? _b : null; }
+          get skipRendering() { return false; }
+      }
+      Object.freeze(XRInputSource);
+      enumerableMembers(XRInputSource.prototype, ['hand']);
+      Object.defineProperty(XRSession.prototype, 'requestReferenceSpace', { enumerable: true });
+      Object.setPrototypeOf(XRSession.prototype, EventTarget.prototype);
+      Object.setPrototypeOf(XRInputSource.prototype, Object.prototype);
+      installEventHandlers(XRSystem.prototype, ['devicechange'], value => value instanceof XRSystem);
+      installEventHandlers(XRSession.prototype, [
+          'end', 'visibilitychange', 'inputsourceschange', 'selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend',
+      ], value => sessionObjects.has(value));
+      enumerableMembers(XRSession.prototype, ['requestHitTestSource', 'requestHitTestSourceForTransientInput']);
+      const device = new Promise(resolve => {
+          const init = (event) => {
+              window.removeEventListener('webxr-device-init', init);
+              resolve(new EmulatedXRDevice(window, { ...event.detail.deviceDefinition, stereoEffect: event.detail.stereoEffect }));
+          };
+          window.addEventListener('webxr-device-init', init);
+      });
+      const promiseOperations = [
+          [XRSession.prototype, ['restorePersistentAnchor', 'deletePersistentAnchor', 'requestLightProbe', 'end', 'requestHitTestSource', 'requestHitTestSourceForTransientInput']],
+          [XRFrame.prototype, ['createAnchor']],
+      ];
+      for (const [prototype, names] of promiseOperations)
+          for (const name of names) {
+              const descriptor = Object.getOwnPropertyDescriptor(prototype, name), original = descriptor.value;
+              const operation = function (...args) {
+                  return new Promise(resolve => { resolve(Reflect.apply(original, this, args)); });
+              };
+              Object.defineProperties(operation, { name: { value: original.name }, length: { value: original.length } });
+              Object.defineProperty(prototype, name, { ...descriptor, value: operation });
+          }
+      const xr = new XRSystem(device, runtimeAllocation);
+      return { XREventTarget, XRRenderState, XRSystem, XRSession, XRFrame, XRInputSource, xr };
+  }
+  const runtimeKey = Symbol.for('WebXR-emulator.runtime-factory');
+  const runtimeHost = brandHost;
+  if (!Object.prototype.hasOwnProperty.call(runtimeHost, runtimeKey)) {
+      Object.defineProperty(runtimeHost, runtimeKey, { value: Object.freeze(createRuntime) });
+  }
+  const { XREventTarget, XRRenderState, XRSystem, XRSession, XRFrame, XRInputSource, xr } = runtimeHost[runtimeKey](document, { geometry: geometry, sensing: sensing, layers: layers, environment: environment, events: realmEvents, sessionInit: realmSessionInit, InputSourceArray: XRInputSourceArray,
+      hitTests: { XRHitTestSource, hitSourceState, XRTransientInputHitTestSource, transientHitSourceState, XRHitTestResult, XRTransientInputHitTestResult, convertHitTestOptions, convertTransientHitTestOptions, hitTestAllocation } });
+
+  var runtime = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    XREventTarget: XREventTarget,
+    XRFrame: XRFrame,
+    XRInputSource: XRInputSource,
+    XRInputSourceArray: XRInputSourceArray,
+    XRInputSourceEvent: XRInputSourceEvent,
+    XRInputSourcesChangeEvent: XRInputSourcesChangeEvent,
+    XRRenderState: XRRenderState,
+    XRSession: XRSession,
+    XRSessionEvent: XRSessionEvent,
+    XRSystem: XRSystem,
+    xr: xr
+  });
+
+  var EX_API = {
+      XRHitTestResult,
+      XRHitTestSource,
+      XRTransientInputHitTestResult,
+      XRTransientInputHitTestSource,
+      XRRay
+  };
+
   class CustomWebXRPolyfill {
       constructor() {
           const global = window;
@@ -32601,14 +32668,7 @@ void main() {
               if (name.startsWith('XR'))
                   global[name] = value;
           }
-          const device = new Promise(resolve => {
-              const init = (event) => {
-                  window.removeEventListener('webxr-device-init', init);
-                  resolve(new EmulatedXRDevice(global, { ...event.detail.deviceDefinition, stereoEffect: event.detail.stereoEffect }));
-              };
-              window.addEventListener('webxr-device-init', init);
-          });
-          this.xr = new XRSystem(device, geometryAllocation);
+          this.xr = xr;
           Object.defineProperty(navigator, 'xr', { value: this.xr, configurable: true });
           installWebGLCompatibility();
       }

@@ -2,7 +2,7 @@ import type { DeviceConfig, DeviceSize, SessionMode, EmulatedGamepad } from '../
 import type { PolyfillGlobal, BaseLayer, RenderState, Viewport } from '../types/polyfill';
 import {geometryAllocation, XRSpace} from './api/geometry';
 import type XRHitTestSource from './api/XRHitTestSource';
-import { dispatchCustomEvent } from '../types/contracts';
+import type {EmulatorEvents} from '../types/contracts';
 import {DeviceAdapter as XRDevice, ControllerInput as GamepadXRInputSource, type DeviceInput as XRInputSource} from './device-adapter';
 import XRTransientInputHitTestSource from './api/XRTransientInputHitTestSource';
 import {interfaceBrands} from './api/interface-brand';
@@ -94,7 +94,7 @@ export default class EmulatedXRDevice extends XRDevice {
     // @TODO: Edit this comment
     // For case where baseLayer's canvas isn't in document.body
 
-    this.div = document.createElement('div');
+    this.div = this.global.document.createElement('div');
     this.div.style.position = 'absolute';
     this.div.style.width = '100%';
     this.div.style.height = '100%';
@@ -131,7 +131,7 @@ export default class EmulatedXRDevice extends XRDevice {
       const display = this.arScene!.renderer.domElement;
       return {width: display.width, height: display.height};
     }
-    return {width: window.innerWidth, height: window.innerHeight};
+    return {width: this.global.innerWidth, height: this.global.innerHeight};
   }
 
   onBaseLayerSet(sessionId: number, layer: BaseLayer) {
@@ -148,7 +148,7 @@ export default class EmulatedXRDevice extends XRDevice {
       if (session.ar) {
         const canvas = session.baseLayer!._presentationCanvas;
         this.arScene!.setCanvas(canvas);
-        if (canvas instanceof HTMLCanvasElement && canvas.parentElement) {
+        if (canvas instanceof this.global.HTMLCanvasElement && canvas.parentElement) {
           // Not sure why but this is necessary for Firefox.
           // Otherwise, the canvas won't be rendered in AR scene.
           // @TODO: Figure out the root issue and resolve.
@@ -164,7 +164,7 @@ export default class EmulatedXRDevice extends XRDevice {
 
   isFeatureSupported(featureDescriptor: string, mode: SessionMode = this.emulationMode) {
     // Explicit emulator preview only; screen state does not claim UA conformance.
-    if (featureDescriptor === 'dom-overlay') return this.domOverlayPreview && mode === 'immersive-ar' && this.emulationMode === mode && DOMOverlay.available();
+    if (featureDescriptor === 'dom-overlay') return this.domOverlayPreview && mode === 'immersive-ar' && this.emulationMode === mode && DOMOverlay.available(this.global);
     if (featureDescriptor === 'viewer') return true;
     if (featureDescriptor === 'local' || featureDescriptor === 'local-floor' || featureDescriptor === 'unbounded') return mode !== 'inline';
     if (featureDescriptor === 'bounded-floor') return this.features.includes(featureDescriptor) && mode !== 'inline' && this.isSessionSupported(mode);
@@ -195,7 +195,7 @@ export default class EmulatedXRDevice extends XRDevice {
     }
     if (mode === 'immersive-ar') {
       if (!this.arScene) {
-        this.arScene = new ARScene(this.deviceSize, this.handheld);
+        this.arScene = new ARScene(this.deviceSize, this.handheld, this.global);
         this._requestVirtualRoomAsset();
         this.arScene!.onTouch = position => {
           this.touched = true;
@@ -232,12 +232,12 @@ export default class EmulatedXRDevice extends XRDevice {
     return Promise.resolve(session.id);
   }
 
-  canPresentDOMOverlay(root: Element | undefined) { return DOMOverlay.accepts(root); }
+  canPresentDOMOverlay(root: Element | undefined) { return DOMOverlay.accepts(root, this.global.document); }
 
   startDOMOverlay(root: HTMLElement, invalidate: () => void) {
-    document.documentElement.appendChild(this.div);
-    const overlay = new DOMOverlay(root, this.arScene!, this.resolution.width / window.devicePixelRatio,
-      this.resolution.height / window.devicePixelRatio, invalidate, !this.handheld || this.domOverlayPreviewFlat);
+    this.global.document.documentElement.appendChild(this.div);
+    const overlay = new DOMOverlay(root, this.arScene!, this.resolution.width / this.global.devicePixelRatio,
+      this.resolution.height / this.global.devicePixelRatio, invalidate, !this.handheld || this.domOverlayPreviewFlat, this.global);
     this.arScene!.domOverlay = overlay;
     return overlay;
   }
@@ -505,13 +505,13 @@ export default class EmulatedXRDevice extends XRDevice {
     const session = this.sessions.get(sessionId)!;
     const canvas = session.baseLayer!._presentationCanvas;
 
-    (session.enabledFeatures.has('dom-overlay') ? document.documentElement : document.body).appendChild(this.div);
-    if (canvas instanceof HTMLCanvasElement) this.div.appendChild(canvas);
+    (session.enabledFeatures.has('dom-overlay') ? this.global.document.documentElement : this.global.document.body).appendChild(this.div);
+    if (canvas instanceof this.global.HTMLCanvasElement) this.div.appendChild(canvas);
   }
 
   _removeBaseLayerCanvasFromDiv(sessionId: number) {
     const canvas = this.sessions.get(sessionId)!.baseLayer!._presentationCanvas;
-    if (canvas instanceof HTMLCanvasElement && canvas.parentElement === this.div) canvas.remove();
+    if (canvas instanceof this.global.HTMLCanvasElement && canvas.parentElement === this.div) canvas.remove();
     this.div.remove();
   }
 
@@ -606,10 +606,14 @@ export default class EmulatedXRDevice extends XRDevice {
     }
   }
 
+  private notify<K extends keyof EmulatorEvents>(type: K, detail: EmulatorEvents[K]) {
+    this.global.dispatchEvent(new this.global.CustomEvent(type, {detail}));
+  }
+
   // Notify the update to panel
 
   _notifyPoseUpdate() {
-    dispatchCustomEvent('device-pose', {
+    this.notify('device-pose', {
       position: this.position,
       quaternion: this.quaternion
     });
@@ -619,7 +623,7 @@ export default class EmulatedXRDevice extends XRDevice {
   _notifyInputPoseUpdate(controllerIndex: number) {
     const pose = this.gamepads[controllerIndex].pose;
     const objectName = controllerIndex === 0 ? 'rightController' : 'leftController';
-    dispatchCustomEvent('device-input-pose', {
+    this.notify('device-input-pose', {
       position: pose.position,
       quaternion: pose.orientation,
       objectName: objectName
@@ -627,17 +631,17 @@ export default class EmulatedXRDevice extends XRDevice {
   }
 
   _notifyEnterImmersive() {
-    dispatchCustomEvent('device-enter-immersive', {});
+    this.notify('device-enter-immersive', {});
   }
 
   _notifyLeaveImmersive() {
-    dispatchCustomEvent('device-leave-immersive', {});
+    this.notify('device-leave-immersive', {});
   }
 
   // Send request to content-scripts
 
   _requestVirtualRoomAsset() {
-    dispatchCustomEvent('webxr-virtual-room-request', {});
+    this.notify('webxr-virtual-room-request', {});
   }
 
   // Device status update methods invoked from event listeners.
@@ -707,7 +711,7 @@ export default class EmulatedXRDevice extends XRDevice {
   // Set up event listeners. Events are sent from panel via background.
 
   _setupEventListeners() {
-    window.addEventListener('webxr-device', event => {
+    this.global.addEventListener('webxr-device', event => {
       const config = event.detail.deviceDefinition;
 
       // Finish presentation before replacing its views, canvas, and input sources.
@@ -730,14 +734,14 @@ export default class EmulatedXRDevice extends XRDevice {
       this._initializeControllers(config);
     });
 
-    window.addEventListener('webxr-pose', event => {
+    this.global.addEventListener('webxr-pose', event => {
       const positionArray = event.detail.position;
       const quaternionArray = event.detail.quaternion;
       this._updatePose(positionArray, quaternionArray);
       this.arScene?.updateCameraTransform(positionArray, quaternionArray);
     }, false);
 
-    window.addEventListener('webxr-input-pose', event => {
+    this.global.addEventListener('webxr-input-pose', event => {
       const positionArray = event.detail.position;
       const quaternionArray = event.detail.quaternion;
       const objectName = event.detail.objectName;
@@ -769,7 +773,7 @@ export default class EmulatedXRDevice extends XRDevice {
       }
     });
 
-    window.addEventListener('webxr-input-button', event => {
+    this.global.addEventListener('webxr-input-button', event => {
       // The phone receives transient screen touches instead of controller buttons.
       if (this.handheld) {
         return;
@@ -789,11 +793,11 @@ export default class EmulatedXRDevice extends XRDevice {
       }
     }, false);
 
-    window.addEventListener('webxr-stereo-effect', event => {
+    this.global.addEventListener('webxr-stereo-effect', event => {
       this._updateStereoEffect(event.detail.enabled);
     });
 
-    window.addEventListener('webxr-virtual-room-response', event => {
+    this.global.addEventListener('webxr-virtual-room-response', event => {
       const virtualRoomAssetBuffer = event.detail.buffer;
       this.arScene?.loadVirtualRoomAsset(virtualRoomAssetBuffer);
     });

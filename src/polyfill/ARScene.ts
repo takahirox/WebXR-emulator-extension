@@ -59,7 +59,7 @@ export default class ARScene {
   onTouch: ((position: number[]) => void) | null;
   onRelease: (() => void) | null;
 
-  constructor(deviceSize: DeviceSize, private handheld = true) {
+  constructor(deviceSize: DeviceSize, private handheld = true, private realm: Window = window) {
 
     // for mouse click on the tablet screen
     this.isTouched = false;
@@ -72,6 +72,7 @@ export default class ARScene {
   }
 
   _init(deviceSize: DeviceSize) {
+    const window = this.realm, document = window.document;
     const width = window.innerWidth;
     const height = window.innerHeight;
 
@@ -398,6 +399,7 @@ export default class ARScene {
   }
 
   inject(div: HTMLElement) {
+    const document = this.realm.document;
     const appendCanvas = () => {
       div.appendChild(this.renderer.domElement);
     };
@@ -468,7 +470,9 @@ export default class ARScene {
         .setRequestHeader(parser.options.requestHeader);
       return {name: 'WEBXR_emulator_image_textures'};
     });
-    loader.parse(buffer, '', gltf => {
+    // The shared runtime's loader requires a buffer in its own realm. The
+    // extension bridge can deliver a genuine ArrayBuffer from a child realm.
+    loader.parse(new Uint8Array(buffer).slice().buffer, '', gltf => {
       this.scene.add(gltf.scene);
       this.room = gltf.scene;
     }, error => {
