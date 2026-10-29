@@ -11,6 +11,7 @@ import {attachTarget, getTargets} from './cdp-target';
 import {referenceSpaceCases} from './reference-space';
 import {rigidTransformCases} from './rigid-transform';
 import {poseViewCases} from './pose-view';
+import {hapticCases} from './haptics';
 import {handCases} from './hands';
 import {meshCases} from './meshes';
 import {runMeshApplications} from './mesh-applications';
@@ -20,6 +21,7 @@ import {runHitTestApplications} from './hit-test-applications';
 import {runPlaneApplications} from './plane-applications';
 
 const browser = process.argv[2];
+const haptics = process.argv[3] === 'haptics';
 const hands = process.argv[3] === 'hands';
 const meshApplications = process.argv[3] === 'mesh-applications';
 const meshes = process.argv[3] === 'meshes';
@@ -30,11 +32,11 @@ const runApplications = meshApplications ? runMeshApplications : hitApplications
 const planes = process.argv[3] === 'planes';
 const transforms = process.argv[3] === 'transforms';
 const poses = process.argv[3] === 'poses';
-const selection = hands ? 'hands-contract' : meshApplications ? 'mesh-applications' : meshes ? 'meshes-contract' : hitApplications ? 'hit-test-applications' : hitTests ? 'hit-test-contract' : applications ? 'planes-applications' : planes ? 'planes-contract' : poses ? 'pose-view' : transforms ? 'rigid-transform' : 'reference-space';
-const cases = hands ? handCases : meshes ? meshCases : hitTests ? hitTestCases : planes ? planeCases : poses ? poseViewCases : transforms ? rigidTransformCases : referenceSpaceCases;
+const selection = haptics ? 'haptics-contract' : hands ? 'hands-contract' : meshApplications ? 'mesh-applications' : meshes ? 'meshes-contract' : hitApplications ? 'hit-test-applications' : hitTests ? 'hit-test-contract' : applications ? 'planes-applications' : planes ? 'planes-contract' : poses ? 'pose-view' : transforms ? 'rigid-transform' : 'reference-space';
+const cases = haptics ? hapticCases : hands ? handCases : meshes ? meshCases : hitTests ? hitTestCases : planes ? planeCases : poses ? poseViewCases : transforms ? rigidTransformCases : referenceSpaceCases;
 assert(['chromium', 'firefox'].includes(browser), 'Select chromium or firefox');
 const {origin, server, provenance} = await serveFirefoxFixtures();
-const report: any = {issue: hands ? 61 : meshes || meshApplications ? 55 : hitTests || hitApplications ? 53 : planes ? 57 : applications ? 51 : poses ? 49 : transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: applications ? [
+const report: any = {issue: haptics ? 63 : hands ? 61 : meshes || meshApplications ? 55 : hitTests || hitApplications ? 53 : planes ? 57 : applications ? 51 : poses ? 49 : transforms ? 47 : 41, browser, status: 'running', startedAt: new Date().toISOString(), results: [], failures: [], skips: [], instrumentation: applications ? [
   ...(hitApplications ? ['Unchanged pinned hit-test applications and dependencies; API and scene observation retains original calls/results/exceptions. Actual panel buttons and phone screen pointer events exercise selection.'] : ['Unchanged pinned applications and their dependencies; only Sample existing overlay checkbox disabled.']),
   'Three.js observe events installed before scripts; original scene.onBeforeRender called with original arguments. Chromium panel bootstrap paused once to install observer, then resumed before running scenarios.',
   ...(hitApplications ? ['XR request/frame/hit-result pose and original scene-node observation preserves calls, return values and exceptions; actual presentation pixels and backend cleanup counters. Additional observer-owned Android transient subscriptions exercise matching/unmatched profiles and pointer movement; application requests remain unchanged.'] : ['XR request/frame/pose/createAnchor observation preserves arguments, return values and exceptions; inspect application scene geometry, actual presentation canvas, retained plane spaces and cleanup counters.']),
@@ -51,6 +53,7 @@ const report: any = {issue: hands ? 61 : meshes || meshApplications ? 55 : hitTe
   'Proxy transform matrix counts numeric allocation reads; count timer calls from late adapter continuations.',
   'Call real device endSession; inline additionally emits its presentation-end notification because it has no presentation.',
 ]};
+if (haptics) report.instrumentation = ['Actual unpacked/packaged extension and genuine WebXR DevTools panel, application actuator calls, real WebGL, RAF and timers.', 'Controlled backend source activation and session visibility for deterministic retirement/visibility checks; native child removal for pagehide. Separate deterministic clock tests replay stale callbacks.', 'Cross-realm calls use separately injected live documents; no public registration hook or hardware vibration. Panel text, computed background and independent left/right states observed before acknowledgement.'];
 if (hands) report.instrumentation = ['Genuine extension and panel; separately injected populated parent/child Quest sessions and borrowed collection, iterator, joint and frame bindings in both directions.', 'Controlled existing backend translation, rotation, trigger, whole-hand slot loss and source activation; restored in finally; no production testing API. Real RAF and input-event frames. Shared registry readers, constructor/superclass/reflective allocation and buffer mutations probed. Verified uninjected about:blank child publishes a fake session getter and copied registry predicates; attached/removed attempts record synchronous errors, predicate/getter calls and registered joints without replacing genuine bindings. Caller-owned source records/collections cannot allocate through a public tracker. Owned child bindings restored and frames removed in finally.'];
 if (meshes || meshApplications) report.instrumentation = [
   'Actual unpacked extension, real DevTools panel and genuine separately injected same-origin realms. No synthetic XR adapter, GL or frame clock.',
@@ -64,6 +67,29 @@ async function saveRendering(result: any, device: string) {
     await writeFile(file, Buffer.from(render.png.replace(/^data:image\/png;base64,/, ''), 'base64'));
     delete render.png; render.capture = file;
   }
+}
+const panelObservations: any[] = []; report.panelObservations = panelObservations;
+async function observeHaptics(evaluate: (script: string) => Promise<any>, panel: (script: string) => Promise<any>, capture?: (label: string) => Promise<void>, action?: (stage: string) => Promise<void>) {
+  if (!haptics) return;
+  const stage = await evaluate('return {name:window.hapticPanelStage,ack:window.hapticPanelAck,side:window.hapticPanelSide}');
+  if (!stage.name || stage.name === stage.ack) return;
+  const expected = ['right','frames','tab-routing','session-end','settings'].includes(stage.name) ? 'playing' : stage.name.startsWith('idle') || ['frame-removed','all-idle'].includes(stage.name) ? 'idle' : stage.name;
+  const observation = await panel(`const e=document.getElementById('${stage.side}ControllerHaptics');return {state:e.dataset.state,text:e.textContent,background:getComputedStyle(e).backgroundColor,other:document.getElementById('${stage.side === 'left' ? 'right' : 'left'}ControllerHaptics').dataset.state};`);
+  if (observation.state !== expected) return;
+  if (expected !== 'idle') {
+    assert(observation.text.includes(stage.side === 'left' ? 'strong 0.80 / weak 0.40' : 'strong 0.25 / weak 1.00'));
+    assert.notEqual(observation.background, 'rgba(0, 0, 0, 0)');
+    assert.equal(observation.other, stage.name === 'frames' ? 'playing' : 'idle');
+  }
+  panelObservations.push({stage:stage.name,...observation});
+  if (capture && ['playing','right','frames'].includes(stage.name)) await capture(stage.side + '-' + stage.name);
+  if (stage.name === 'frame-removed') assert.equal(observation.other, 'playing');
+  if (['tab-routing','settings'].includes(stage.name)) {
+    await action!(stage.name);
+    if (stage.name === 'settings') await eventually(() => panel(`return document.getElementById('${stage.side}ControllerHaptics').dataset.state`), value => value === 'idle', 'lifecycle clears actual haptics panel');
+    else assert(!(await panel(`return document.getElementById('${stage.side}ControllerHaptics').textContent`)).includes('0.99'), 'another tab cannot spoof this panel');
+  }
+  await evaluate(`window.hapticPanelAck=${JSON.stringify(stage.name)};return true`);
 }
 let close: (() => Promise<void>) | undefined;
 try {
@@ -103,6 +129,22 @@ try {
           const element = await firefox.request<Record<string,string>>('POST', '/element', {using:'css selector', value:'#reference-space-session'});
           await firefox.request('POST', `/element/${element['element-6066-11e4-a52e-4f735466cecf']}/click`, {});
         }
+        await observeHaptics(script => firefox.evaluate(script), script => firefox.panel(script), async label => {
+          await firefox.panel(`document.getElementById(arguments[0]+'ControllerHaptics').scrollIntoView({block:'center'});`,[label.startsWith('left') ? 'left' : 'right']);
+          const data = await firefox.chrome<string>(`const t=Services.wm.getMostRecentWindow('navigator:browser').webxrTestToolbox;const d=t.getAdditionalTools().find(d=>d.label==='WebXR');const b=t.doc.getElementById('toolbox-panel-iframe-'+d.id).contentDocument.querySelector('browser');const bitmap=await b.browsingContext.currentWindowGlobal.drawSnapshot(null,1,'white');const c=t.doc.createElementNS('http://www.w3.org/1999/xhtml','canvas');c.width=bitmap.width;c.height=bitmap.height;c.getContext('2d').drawImage(bitmap,0,0);bitmap.close();return c.toDataURL('image/png').split(',')[1];`);
+          await writeFile(`test-results/haptics-${browser}-${mode}-${label}.png`,Buffer.from(data,'base64'));
+        }, async stage => {
+          if (stage === 'tab-routing') {
+            const inspected = await firefox.request<string>('GET','/window');
+            const other = await firefox.request<{handle:string}>('POST','/window/new',{type:'tab'});
+            await firefox.request('POST','/window',{handle:other.handle}); await firefox.navigate(origin+'/csp');
+            await firefox.evaluate(`window.dispatchEvent(new CustomEvent('device-haptics',{detail:{objectName:'leftController',sessionId:999,sourceId:999,state:'playing',duration:5000,startDelay:0,strongMagnitude:0.99,weakMagnitude:0.99,tabId:1}}));`);
+            await firefox.request('DELETE','/window'); await firefox.request('POST','/window',{handle:inspected});
+          } else {
+            await configure(firefox,device,selected === 'immersive-vr' ? 'immersive-ar' : 'immersive-vr');
+            await configure(firefox,device,selected);
+          }
+        });
         const value = await firefox.evaluate<any>('return {...window.referenceSpaceOutcome,progress:window.rigidTransformProgress,visibility:document.visibilityState,realm:window.poseViewRealm}');
         if (poses && value.state === 'running' && value.realm === 'popup') {
           const handles = await firefox.request<string[]>('GET', '/window/handles');
@@ -118,6 +160,14 @@ try {
       assert.deepEqual(errors, [], 'no application runtime errors');
       report.results.push({device, selected, ...result as object, errors});
       await writeFile(filename, JSON.stringify(report, null, 2));
+    }
+    if (haptics) {
+      await configure(firefox,'Meta Quest 3','immersive-vr'); await firefox.navigate(origin+'/csp');
+      await activate(firefox, `const s=await navigator.xr.requestSession('immersive-vr');window.hapticUnloadSession=s;const g=document.createElement('canvas').getContext('webgl2');await g.makeXRCompatible();s.updateRenderState({baseLayer:new XRWebGLLayer(s,g)});await new Promise(resolve=>s.requestAnimationFrame(resolve));window.hapticUnloadGamepad=s.inputSources[0].gamepad;window.hapticUnloadResult='pending';void window.hapticUnloadGamepad.vibrationActuator.playEffect('dual-rumble',{duration:5000,strongMagnitude:1}).then(result=>{window.hapticUnloadResult=result;});return true;`);
+      await firefox.uninstall();
+      await eventually(() => firefox.evaluate('return window.hapticUnloadResult'),value=>value==='preempted','extension unload settles haptic output',7000);
+      assert.equal(await firefox.evaluate('return window.hapticUnloadGamepad.connected'),false);
+      report.hapticUnload = {result:'preempted', disconnected:true};
     }
     report.browserFetches=firefox.network;report.runtimeErrors=firefox.logs.filter(log=>log.level==='error');
     if(applications)assert.deepEqual(report.runtimeErrors,[],'no application runtime errors');
@@ -189,6 +239,24 @@ try {
       await page.evaluate(`(function(){${expression}})(${JSON.stringify(mode)})`);
       const outcome = await eventually(async () => {
         if (await page.locator('#reference-space-session').count()) await page.locator('#reference-space-session').click();
+        await observeHaptics(script => page.evaluate(`(function(){${script}})()`), async script => {
+          const result = await panel.command<any>('Runtime.evaluate', {expression:`(function(){${script}})()`,returnByValue:true}); return result.result.value;
+        }, async label => {
+          const shot = await devtools.command<{data:string}>('Page.captureScreenshot', {format:'png'});
+          await writeFile(`test-results/haptics-${browser}-${mode}-${label}.png`, Buffer.from(shot.data,'base64'));
+        }, async stage => {
+          if (stage === 'tab-routing') {
+            const other = await context.newPage(); await other.goto(origin+'/csp');
+            await other.bringToFront();
+            await other.evaluate(() => window.dispatchEvent(new CustomEvent('device-haptics',{detail:{objectName:'leftController',sessionId:999,sourceId:999,state:'playing',duration:5000,startDelay:0,strongMagnitude:0.99,weakMagnitude:0.99,tabId:1}})));
+            await other.close(); await page.bringToFront();
+          } else {
+            for (const value of [selected === 'immersive-vr' ? 'immersive-ar' : 'immersive-vr', selected]) {
+              await panel.evaluate(value => {const m=document.querySelector('#questModeSelect') as HTMLSelectElement;m.value=value;m.dispatchEvent(new Event('change'));},value);
+              await eventually(() => worker.evaluate(async () => JSON.parse((await chrome.storage.local.get('webxr-extension'))['webxr-extension'] as string)), config => config.questMode === value, 'saved mode change');
+            }
+          }
+        });
         return page.evaluate(() => ({...(window as any).referenceSpaceOutcome, progress:(window as any).rigidTransformProgress, visibility:document.visibilityState}));
       }, value => value?.state !== 'running', 'focused reference-space outcome', 60000);
       assert.equal(outcome.state, 'passed', outcome.failure + '\n' + outcome.stack);
@@ -207,7 +275,7 @@ finally {
   report.completedAt = new Date().toISOString();
   report.servedSources=[...provenance.values()];
   report.provenance = {};
-  for (const file of ['src/polyfill/api/hand-allocation.ts', 'tests/hands.ts', 'src/polyfill/api/bulk-input.ts', 'src/polyfill/api/session-init.ts', 'src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/hit-test-allocation.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/DOMOverlay.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'package.json', 'src/polyfill/api/layer-allocation.ts', 'tests/environment.ts', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/pose-view.ts', 'src/polyfill/api/environment.ts', 'src/polyfill/api/plane-regions.ts', 'src/polyfill/api/plane-allocation.ts', 'tests/meshes.ts', 'tests/mesh-applications.ts', 'src/polyfill/api/mesh-allocation.ts', 'src/polyfill/api/room-surfaces.ts', 'tests/planes.ts', 'tests/plane-applications.ts', 'tests/hit-test.ts', 'tests/hit-test-applications.ts', 'tests/hit-test-sample-observer.js', 'src/polyfill/api/hit-test-options.ts', 'src/polyfill/api/hit-test-geometry.ts', 'src/polyfill/api/XRHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestResult.ts', 'src/polyfill/ARScene.ts', 'src/polyfill/api/sensing.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
+  for (const file of ['tests/haptics.ts', 'tests/haptics-clock.ts', 'src/polyfill/api/haptics.ts', 'src/app/panel.ts', 'src/types/contracts.ts', 'src/polyfill/api/hand-allocation.ts', 'tests/hands.ts', 'src/polyfill/api/bulk-input.ts', 'src/polyfill/api/session-init.ts', 'src/polyfill/api/runtime.ts', 'src/polyfill/api/interface-brand.ts', 'src/polyfill/api/hit-test-allocation.ts', 'src/polyfill/api/geometry.ts', 'src/polyfill/api/XRRay.ts', 'src/polyfill/api/XRHitTestResult.ts', 'src/polyfill/api/layers.ts', 'src/polyfill/CustomWebXRPolyfill.ts', 'tests/firefox-upstream.ts', 'src/polyfill/DOMOverlay.ts', 'src/polyfill/EmulatedXRDevice.ts', 'package-lock.json', 'package.json', 'src/polyfill/api/layer-allocation.ts', 'tests/environment.ts', 'tests/rigid-transform.ts', 'tests/reference-space.ts', 'tests/pose-view.ts', 'src/polyfill/api/environment.ts', 'src/polyfill/api/plane-regions.ts', 'src/polyfill/api/plane-allocation.ts', 'tests/meshes.ts', 'tests/mesh-applications.ts', 'src/polyfill/api/mesh-allocation.ts', 'src/polyfill/api/room-surfaces.ts', 'tests/planes.ts', 'tests/plane-applications.ts', 'tests/hit-test.ts', 'tests/hit-test-applications.ts', 'tests/hit-test-sample-observer.js', 'src/polyfill/api/hit-test-options.ts', 'src/polyfill/api/hit-test-geometry.ts', 'src/polyfill/api/XRHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestSource.ts', 'src/polyfill/api/XRTransientInputHitTestResult.ts', 'src/polyfill/ARScene.ts', 'src/polyfill/api/sensing.ts', 'tests/reference-space-browser.ts', 'polyfill/webxr-polyfill.js', 'build/firefox/polyfill/webxr-polyfill.js']) {
     report.provenance[file] = createHash('sha256').update(await readFile(file)).digest('hex');
   }
   await writeFile(filename, JSON.stringify(report, null, 2));

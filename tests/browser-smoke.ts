@@ -66,6 +66,9 @@ const server = createServer((request, response) => {
     response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
     response.setHeader('Content-Type', 'text/html');
     response.end('<!doctype html><body>Isolated bulk buffer fixture</body>');
+  } else if (request.url === '/deferred-session') {
+    response.setHeader('Content-Type', 'text/html');
+    response.end('<!doctype html><body>Deferred extension configuration fixture</body>');
   } else if (request.url === '/' || request.url === '/frame' || request.url === '/csp') {
     // Embedded AR images may use blob URLs, but must not need blob connections.
     if (request.url === '/csp') response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' blob: data:; frame-src 'self' http://localhost:*; style-src 'self' 'unsafe-inline'; object-src 'none'");
@@ -534,7 +537,9 @@ try {
     const ray = new xrWindow.XRRay(new xrWindow.XRRigidTransform({x: 1, y: 2, z: 3}));
     return {origin: [ray.origin.x, ray.origin.y, ray.origin.z], direction: [ray.direction.x, ray.direction.y, ray.direction.z]};
   });
-  assert.deepEqual(ray, {origin: [1, 2, 3], direction: [0, 0, -1]});
+  assert.deepEqual(ray.origin, [1, 2, 3]);
+  // Translation leaves the direction unchanged; signed zeros are equivalent.
+  assert(ray.direction.every((value, index) => value === [0, 0, -1][index]), 'XRRay direction after translation');
   await page.evaluate(() => (window as unknown as SmokeWindow).smoke.cancelHitTests());
   await page.waitForFunction(() => (window as unknown as SmokeWindow).smoke.state.hits === 0);
   const ar = await page.evaluate(() => (window as unknown as SmokeWindow).smoke.state);
@@ -576,10 +581,9 @@ try {
     device.value = 'Generic Android Phone (ARCore)'; device.dispatchEvent(new Event('change'));
   });
   await eventually(() => panel.evaluate(() => (document.querySelector('#deviceSelect') as HTMLSelectElement).value), value => value === 'Generic Android Phone (ARCore)', 'phone conformance profile');
-  await eventually(() => page.evaluate(async () => {
-    const xr = (window as unknown as SmokeWindow).navigator.xr as unknown as {devicePromise: Promise<{handheld: boolean}>};
-    return (await xr.devicePromise).handheld;
-  }), Boolean, 'phone profile reaches the page runtime');
+  // The XRSystem device promise is private. Reuse the existing held-session
+  // fixture's adapter observation rather than restoring a public backend handle.
+  await eventually(() => profileSwitchProbe.evaluate(saved => saved.session._device.handheld), Boolean, 'phone profile reaches the page runtime');
   const deviceChange = await deviceChangeProbe.evaluate(probe => { probe.cleanup(); return probe.state; });
   await deviceChangeProbe.dispose();
   assert.deepEqual(deviceChange, {valid: true, order: ['listener', 'property']}, 'real devicechange reaches both styles once within native dispatch');
@@ -606,6 +610,16 @@ try {
       await deferredPage.waitForFunction(() => !!(window as unknown as {sessionRequestStartup?: unknown}).sessionRequestStartup);
       const startup = await deferredPage.evaluate(() => (window as unknown as {sessionRequestStartup: {passed: string[]; failures: string[]}}).sessionRequestStartup);
       assert.deepEqual(startup.failures, [], 'session argument conversion and activation without a gesture');
+      // Exercise a fresh injected runtime, holding its genuine async init event.
+      // Reconstructing CustomWebXRPolyfill now reuses the installed XRSystem.
+      await deferredPage.addInitScript(() => {
+        window.addEventListener('webxr-device-init', event => {
+          const state = window as unknown as {allowDeferredDeviceInit?: boolean; deferredInitHeld?: boolean};
+          if (!state.allowDeferredDeviceInit) { event.stopImmediatePropagation(); state.deferredInitHeld = true; }
+        }, true);
+      });
+      await deferredPage.goto(origin + '/deferred-session');
+      await deferredPage.waitForFunction(() => (window as unknown as {deferredInitHeld?: boolean}).deferredInitHeld);
       deferredSessionRequests.push({...await runDeferredSessionRequest(deferredPage, mode, {...definitions.devices[deviceKey], emulationMode: mode === 'inline' ? 'immersive-ar' : mode, domOverlayPreview: true}), deviceKey, startup});
     } finally { await deferredPage.close(); }
   }

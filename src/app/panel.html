@@ -1,5 +1,6 @@
 <html lang="en">
   <head>
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <link href="https://fonts.googleapis.com/css?family=Roboto+Mono&display=swap" rel="stylesheet">
     <style>
@@ -153,6 +154,9 @@
         color: #929294;
         margin-left: -15px;
       }
+      .haptic-output { padding: 5px; border-left: 3px solid transparent; white-space: pre-line; }
+      .haptic-output[data-state="playing"] { border-color: #38bdff; background: #16425b; color: #fff; box-shadow: 0 0 8px #38bdff; }
+      .haptic-output[data-state="delayed"] { border-color: #e0ab42; background: #554423; color: #fff; }
     </style>
   </head>
   <body>
@@ -192,6 +196,7 @@
       <div id="rightControllerComponent" class="component device-property-component">
         <div class="title-bar"><span class="icon">&#9660;</span><span id="rightControllerTitle">Right controller</span></div>
         <div class="component device-property-content">
+          <div id="rightControllerHaptics" class="haptic-output" data-state="idle" role="status">Haptics: idle</div>
           <div><span class="key">position:</span> <span class="value" id="rightControllerPosition"></span></div>
           <div><span class="key">rotation:</span> <span class="value" id="rightControllerRotation"></span></div>
           <div><button class="trigger-button" id="rightSelectButton">select button</button></div>
@@ -201,6 +206,7 @@
       <div id="leftControllerComponent" class="component device-property-component">
         <div class="title-bar"><span class="icon">&#9660;</span><span id="leftControllerTitle">Left controller</span></div>
         <div class="component device-property-content">
+          <div id="leftControllerHaptics" class="haptic-output" data-state="idle" role="status">Haptics: idle</div>
           <div><span class="key">position:</span> <span class="value" id="leftControllerPosition"></span></div>
           <div><span class="key">rotation:</span> <span class="value" id="leftControllerRotation"></span></div>
           <div><button class="trigger-button" id="leftSelectButton">select button</button></div>

@@ -22,6 +22,11 @@
             case 'webxr-startup':
             case 'device-enter-immersive':
             case 'device-leave-immersive': return true;
+            case 'device-haptics': return isController(value.objectName) &&
+                ['idle', 'delayed', 'playing'].includes(value.state) &&
+                ['sessionId', 'sourceId'].every(key => Number.isSafeInteger(value[key]) && value[key] > 0) &&
+                ['duration', 'startDelay', 'strongMagnitude', 'weakMagnitude'].every(key => typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0 && value[key] <= (key.endsWith('Magnitude') ? 1 : 5000)) &&
+                value.duration + value.startDelay <= 5000;
             case 'device-pose': return isPose(value);
             case 'device-input-pose': return isPose(value) && isController(value.objectName);
             default: return false;
@@ -44,7 +49,7 @@
     }
 
     chrome.runtime.onMessage.addListener((envelope, sender, respond) => {
-        var _a;
+        var _a, _b;
         if (sender.id !== chrome.runtime.id || !(envelope === null || envelope === void 0 ? void 0 : envelope.message))
             return;
         const message = envelope.message;
@@ -53,7 +58,7 @@
             respond();
         };
         if (envelope.source === 'content' && ((_a = sender.tab) === null || _a === void 0 ? void 0 : _a.id) !== undefined && isDeviceMessage(message)) {
-            chrome.runtime.sendMessage({ source: 'background', message: { ...message, tabId: sender.tab.id } }, complete);
+            chrome.runtime.sendMessage({ source: 'background', message: { ...message, tabId: sender.tab.id, frameId: (_b = sender.frameId) !== null && _b !== void 0 ? _b : 0 } }, complete);
             return true;
         }
         if (envelope.source === 'panel' && !sender.tab &&

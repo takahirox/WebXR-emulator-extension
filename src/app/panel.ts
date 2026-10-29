@@ -6,8 +6,48 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import type { Capabilities, DeviceDefinition, ControllerName } from '../types/contracts';
 import ConfigurationManager from '../ConfigurationManager';
 import type { ExtensionMessage, RuntimeMessage } from '../types/contracts';
+import {isDeviceMessage, type HapticState} from '../types/contracts';
 import { sendRuntimeMessage } from '../extension/messaging';
 const tabId = chrome.devtools.inspectedWindow.tabId;
+
+// Entries are scoped to the browser-stamped frame and source/session. An old
+// source's idle event must never clear a replacement or another frame's effect.
+const hapticEntries = new Map<string, HapticState & {frameId: number; timer: number}>();
+function renderHaptics() {
+  for (const objectName of ['leftController', 'rightController'] as const) {
+    const element = document.getElementById(objectName + 'Haptics')!;
+    const entries = [...hapticEntries.values()].filter(entry => entry.objectName === objectName);
+    element.dataset.state = entries.some(entry => entry.state === 'playing') ? 'playing' : entries.length ? 'delayed' : 'idle';
+    element.textContent = entries.length ? entries.map(entry =>
+      `Haptics: ${entry.state} · strong ${entry.strongMagnitude.toFixed(2)} / weak ${entry.weakMagnitude.toFixed(2)} · ${entry.duration} ms` +
+      (entry.startDelay ? ` · delay ${entry.startDelay} ms` : '') + ` (frame ${entry.frameId})`).join('\n') : 'Haptics: idle';
+  }
+}
+function clearHaptics(frameId?: number) {
+  for (const [key, entry] of hapticEntries) if (frameId === undefined || entry.frameId === frameId) {
+    clearTimeout(entry.timer); hapticEntries.delete(key);
+  }
+  renderHaptics();
+}
+function updateHaptics(message: HapticState, frameId: number) {
+  const key = `${frameId}:${message.sessionId}:${message.sourceId}`;
+  const previous = hapticEntries.get(key);
+  if (previous) clearTimeout(previous.timer);
+  hapticEntries.delete(key);
+  if (message.state !== 'idle') {
+    // Bounded fallback clears feedback if a frame or extension disappears
+    // before its final notification. No perpetual animation or UI work.
+    const timer = window.setTimeout(() => { hapticEntries.delete(key); renderHaptics(); }, message.startDelay + message.duration + 250);
+    // Bound page-controlled diagnostics, including forged source identifiers.
+    if (hapticEntries.size >= 32) {
+      const oldest = hapticEntries.keys().next().value!;
+      clearTimeout(hapticEntries.get(oldest)!.timer); hapticEntries.delete(oldest);
+    }
+    hapticEntries.set(key, {...message, frameId, timer});
+  }
+  renderHaptics();
+}
+chrome.devtools.network.onNavigated.addListener(() => clearHaptics());
 
 // receive message from contentScript via background
 
@@ -15,7 +55,11 @@ chrome.runtime.onMessage.addListener((envelope: RuntimeMessage) => {
   if (envelope?.source !== 'background' || envelope.message.tabId !== tabId) return;
   const message = envelope.message;
   switch (message.action) {
+    case 'device-haptics':
+      if (isDeviceMessage(message)) updateHaptics(message, message.frameId ?? 0);
+      break;
     case 'webxr-startup':
+      clearHaptics(message.frameId ?? 0);
       // notify the poses to sync
       // if main page is reloaded while panel is opened
       notifyPoses();
@@ -91,6 +135,7 @@ const notifyInputButtonPressed = (key: string, buttonKey: number, pressed: boole
 };
 
 const notifyDeviceChange = (deviceDefinition: DeviceDefinition) => {
+  clearHaptics();
   postMessage({
     action: 'webxr-device',
     deviceDefinition: deviceDefinition

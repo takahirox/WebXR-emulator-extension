@@ -64,6 +64,23 @@ Changing the profile or Quest mode ends the current immersive session. Start a n
 
 Stereo effect enables two side-by-side headset views in both Quest VR and MR. Disabling it draws one full-width view while retaining the two-eye session structure. The phone uses one monoscopic `none` view regardless of this preference.
 
+### Simulated controller haptics
+
+Quest VR and MR tracked controllers expose a stable `inputSource.gamepad.vibrationActuator`. Applications can inspect vibration requests in DevTools → **WebXR**: each controller has its own highlighted haptics readout with delayed/playing state, independent strong/weak magnitudes and duration.
+
+```js
+// After sources appear in an active Quest immersive-vr or immersive-ar session:
+const source = [...session.inputSources].find(input => input.handedness === 'left');
+const actuator = source.gamepad.vibrationActuator;
+console.log(actuator.effects); // ['dual-rumble'] (frozen)
+const outcome = await actuator.playEffect('dual-rumble', {
+  startDelay: 0, duration: 250, strongMagnitude: 0.8, weakMagnitude: 0.4
+}); // 'complete', or 'preempted' if stopped/replaced
+await actuator.reset(); // 'complete', including when already idle
+```
+
+This is desktop visualization with browser timers, without physical force or hardware timing fidelity. Delay plus duration is capped at 5,000 ms. Replacement, reset, hidden documents, source retirement and session shutdown stop the old effect; its Promise resolves to `preempted`. Disconnected actuators permanently reject new requests. Phone screen inputs have no Gamepad; inline sessions have no controllers. No `haptics` WebXR feature descriptor is needed or supported. `trigger-rumble` is unsupported; legacy `hapticActuators` remains empty and `pulse()` is absent. See the [precise contract and reproduction steps](docs/webxr-haptics.md).
+
 ## AR mode
 
 WebXR emulator extension also supports AR. You can test WebXR AR application on an emulated device in a virtual room, on your desktop browser.
@@ -167,7 +184,7 @@ const shifted = space.getOffsetReferenceSpace(new XRRigidTransform({x: 0.5}));
 
 For a developer visualization, serve the repository root over localhost (for example `python3 -m http.server 8000` after `npm ci`) and open [the floor-outline demo](http://localhost:8000/examples/bounded-floor.html) with the unpacked extension installed. Start the matching mode; move the Quest headset or Android left-controller/tablet pose to look down at the green outline. Exit with the panel's immersive-session control. The browser suite exercises this demo's renderer in all three immersive combinations, compares its vertices with the returned polygon and checks visible green pixels. `npm run test:environment` verifies complete floor coverage and a clear 1.8 m-high prism against the actual hall asset; this is a virtual geometry check only.
 
-CPU `depth-sensing` accepts `float32`, `unsigned-short` and `luminance-alpha`, choosing the first supported requested format. Sixteen-bit buffers contain millimeters (`rawValueToMeters=0.001`); zero means unknown, including distances outside the 16-bit range. GPU depth, marker/image tracking, persistent anchors, reflections, extra layer/texture variants, camera access, secondary views, WebGPU XR rendering and controller haptics remain unsupported. See the [status matrix and concrete blockers](docs/webxr-conformance.md#consolidated-triage-and-decisions-issue-19) for exact rejection/omission behavior and future prerequisites. `npm run test:environment` checks deterministic room fixtures; the browser and external sample suites exercise the new APIs through the unpacked extension.
+CPU `depth-sensing` accepts `float32`, `unsigned-short` and `luminance-alpha`, choosing the first supported requested format. Sixteen-bit buffers contain millimeters (`rawValueToMeters=0.001`); zero means unknown, including distances outside the 16-bit range. GPU depth, marker/image tracking, persistent anchors, reflections, extra layer/texture variants, camera access, secondary views and WebGPU XR rendering remain unsupported. See the [status matrix and concrete blockers](docs/webxr-conformance.md#consolidated-triage-and-decisions-issue-19) for exact rejection/omission behavior and future prerequisites. `npm run test:environment` checks deterministic room fixtures; the browser and external sample suites exercise the new APIs through the unpacked extension.
 
 ### Interactive DOM Overlay Preview (opt-in)
 

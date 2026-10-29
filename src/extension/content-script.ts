@@ -62,6 +62,16 @@ window.addEventListener('webxr-extension-check', () => {
 // Set up listeners for events coming from EmulatedXRDevice.
 // Transfer to panel via background.
 
+window.addEventListener('device-haptics', event => {
+  const detail = event.detail;
+  if (!isDeviceMessage({...detail, action: 'device-haptics'})) return;
+  // Copy only allowlisted primitive fields. Page data never selects tab/frame.
+  postMessage({action: 'device-haptics', objectName: detail.objectName,
+    sessionId: detail.sessionId, sourceId: detail.sourceId, state: detail.state,
+    startDelay: detail.startDelay, duration: detail.duration,
+    strongMagnitude: detail.strongMagnitude, weakMagnitude: detail.weakMagnitude});
+}, false);
+
 window.addEventListener('device-pose', event => {
   if (!isDeviceMessage({...event.detail, action: 'device-pose'})) return;
   postMessage({

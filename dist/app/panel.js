@@ -28287,6 +28287,38 @@ void main() {
 	    }
 	}
 
+	function isRecord(value) {
+	    return typeof value === 'object' && value !== null;
+	}
+	function isVector(value, length) {
+	    return (Array.isArray(value) || ArrayBuffer.isView(value)) &&
+	        Array.from(value).length === length &&
+	        Array.from(value).every(v => typeof v === 'number' && Number.isFinite(v));
+	}
+	function isPose(value) {
+	    return isVector(value.position, 3) && isVector(value.quaternion, 4);
+	}
+	function isController(value) {
+	    return value === 'rightController' || value === 'leftController';
+	}
+	function isDeviceMessage(value) {
+	    if (!isRecord(value))
+	        return false;
+	    switch (value.action) {
+	        case 'webxr-startup':
+	        case 'device-enter-immersive':
+	        case 'device-leave-immersive': return true;
+	        case 'device-haptics': return isController(value.objectName) &&
+	            ['idle', 'delayed', 'playing'].includes(value.state) &&
+	            ['sessionId', 'sourceId'].every(key => Number.isSafeInteger(value[key]) && value[key] > 0) &&
+	            ['duration', 'startDelay', 'strongMagnitude', 'weakMagnitude'].every(key => typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0 && value[key] <= (key.endsWith('Magnitude') ? 1 : 5000)) &&
+	            value.duration + value.startDelay <= 5000;
+	        case 'device-pose': return isPose(value);
+	        case 'device-input-pose': return isPose(value) && isController(value.objectName);
+	        default: return false;
+	    }
+	}
+
 	function sendRuntimeMessage(envelope) {
 	    var _a;
 	    if (!((_a = chrome.runtime) === null || _a === void 0 ? void 0 : _a.id))
@@ -28297,12 +28329,54 @@ void main() {
 	}
 
 	const tabId = chrome.devtools.inspectedWindow.tabId;
+	const hapticEntries = new Map();
+	function renderHaptics() {
+	    for (const objectName of ['leftController', 'rightController']) {
+	        const element = document.getElementById(objectName + 'Haptics');
+	        const entries = [...hapticEntries.values()].filter(entry => entry.objectName === objectName);
+	        element.dataset.state = entries.some(entry => entry.state === 'playing') ? 'playing' : entries.length ? 'delayed' : 'idle';
+	        element.textContent = entries.length ? entries.map(entry => `Haptics: ${entry.state} · strong ${entry.strongMagnitude.toFixed(2)} / weak ${entry.weakMagnitude.toFixed(2)} · ${entry.duration} ms` +
+	            (entry.startDelay ? ` · delay ${entry.startDelay} ms` : '') + ` (frame ${entry.frameId})`).join('\n') : 'Haptics: idle';
+	    }
+	}
+	function clearHaptics(frameId) {
+	    for (const [key, entry] of hapticEntries)
+	        if (frameId === undefined || entry.frameId === frameId) {
+	            clearTimeout(entry.timer);
+	            hapticEntries.delete(key);
+	        }
+	    renderHaptics();
+	}
+	function updateHaptics(message, frameId) {
+	    const key = `${frameId}:${message.sessionId}:${message.sourceId}`;
+	    const previous = hapticEntries.get(key);
+	    if (previous)
+	        clearTimeout(previous.timer);
+	    hapticEntries.delete(key);
+	    if (message.state !== 'idle') {
+	        const timer = window.setTimeout(() => { hapticEntries.delete(key); renderHaptics(); }, message.startDelay + message.duration + 250);
+	        if (hapticEntries.size >= 32) {
+	            const oldest = hapticEntries.keys().next().value;
+	            clearTimeout(hapticEntries.get(oldest).timer);
+	            hapticEntries.delete(oldest);
+	        }
+	        hapticEntries.set(key, { ...message, frameId, timer });
+	    }
+	    renderHaptics();
+	}
+	chrome.devtools.network.onNavigated.addListener(() => clearHaptics());
 	chrome.runtime.onMessage.addListener((envelope) => {
+	    var _a, _b;
 	    if ((envelope === null || envelope === void 0 ? void 0 : envelope.source) !== 'background' || envelope.message.tabId !== tabId)
 	        return;
 	    const message = envelope.message;
 	    switch (message.action) {
+	        case 'device-haptics':
+	            if (isDeviceMessage(message))
+	                updateHaptics(message, (_a = message.frameId) !== null && _a !== void 0 ? _a : 0);
+	            break;
 	        case 'webxr-startup':
+	            clearHaptics((_b = message.frameId) !== null && _b !== void 0 ? _b : 0);
 	            notifyPoses();
 	            break;
 	        case 'device-pose':
@@ -28367,6 +28441,7 @@ void main() {
 	    });
 	};
 	const notifyDeviceChange = (deviceDefinition) => {
+	    clearHaptics();
 	    postMessage({
 	        action: 'webxr-device',
 	        deviceDefinition: deviceDefinition
