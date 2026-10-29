@@ -33,7 +33,10 @@
     "test:hands:chromium": "tsx tests/reference-space-browser.ts chromium hands",
     "test:hands:firefox": "tsx tests/reference-space-browser.ts firefox hands",
     "test:hand-applications:chromium": "tsx tests/hand-applications.ts chromium",
-    "test:hand-applications:firefox": "tsx tests/hand-applications.ts firefox"
+    "test:hand-applications:firefox": "tsx tests/hand-applications.ts firefox",
+    "test:haptics:chromium": "tsx tests/reference-space-browser.ts chromium haptics",
+    "test:haptics:firefox": "tsx tests/reference-space-browser.ts firefox haptics",
+    "test:haptics": "tsx --test tests/haptics-clock.ts"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",

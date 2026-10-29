@@ -26227,6 +26227,136 @@ void main() {
     roomSurfaces: roomSurfaces
   });
 
+  const backends = new WeakMap();
+  function createHaptics(window) {
+      const { Promise, TypeError, DOMException, String: toString } = window;
+      const toNumber = window.Math.min.bind(window.Math);
+      const document = window.document;
+      const schedule = window.setTimeout.bind(window), unschedule = window.clearTimeout.bind(window);
+      const requireBackend = (value) => {
+          const backend = backends.get(value);
+          if (!backend)
+              throw new TypeError('Expected virtual GamepadHapticActuator receiver.');
+          return backend;
+      };
+      const assertLive = (backend) => {
+          const detached = window.frameElement !== null && !window.frameElement.isConnected;
+          if (document.visibilityState === 'hidden' || !document.defaultView || window.closed || detached || !backend.live()) {
+              throw new DOMException('The document or XR input source is inactive.', 'InvalidStateError');
+          }
+      };
+      function convert(value) {
+          if (value != null && typeof value !== 'object' && typeof value !== 'function')
+              throw new TypeError('Expected GamepadEffectParameters dictionary.');
+          const dictionary = (value !== null && value !== void 0 ? value : {});
+          const result = {};
+          for (const key of ['duration', 'leftTrigger', 'rightTrigger', 'startDelay', 'strongMagnitude', 'weakMagnitude']) {
+              const member = dictionary[key];
+              let number = member === undefined ? 0 : toNumber(member);
+              if (key === 'duration' || key === 'startDelay') {
+                  number = !Number.isFinite(number) || number === 0 ? 0 : Number(BigInt.asUintN(64, BigInt(Math.trunc(number))));
+              }
+              else if (!Number.isFinite(number))
+                  throw new TypeError(`${key} must be finite.`);
+              result[key] = number;
+          }
+          return result;
+      }
+      const prototype = window.Object.defineProperties(window.Object.create(window.Object.prototype), Object.getOwnPropertyDescriptors({
+          get effects() { return requireBackend(this).effects; },
+          playEffect(type, parameters = {}) {
+              return new Promise(resolve => {
+                  const backend = requireBackend(this);
+                  if (arguments.length === 0)
+                      throw new TypeError('Effect type is required.');
+                  if (typeof type === 'symbol')
+                      throw new TypeError('Effect type cannot be a Symbol.');
+                  const effect = toString(type);
+                  if (effect !== 'dual-rumble' && effect !== 'trigger-rumble')
+                      throw new TypeError('Invalid GamepadHapticEffectType.');
+                  const params = convert(parameters);
+                  for (const key of effect === 'dual-rumble' ? ['strongMagnitude', 'weakMagnitude'] : ['strongMagnitude', 'weakMagnitude', 'leftTrigger', 'rightTrigger']) {
+                      if (params[key] < 0 || params[key] > 1)
+                          throw new TypeError(`${key} must be in [0, 1].`);
+                  }
+                  assertLive(backend);
+                  backend.cancel();
+                  if (effect !== 'dual-rumble')
+                      throw new DOMException('Only dual-rumble is simulated.', 'NotSupportedError');
+                  resolve(backend.play(params));
+              });
+          },
+          reset() {
+              return new Promise(resolve => {
+                  const backend = requireBackend(this);
+                  assertLive(backend);
+                  resolve(backend.reset());
+              });
+          },
+          [Symbol.toStringTag]: 'GamepadHapticActuator',
+      }));
+      return (live, emit) => {
+          const effects = Object.freeze(window.Array.of('dual-rumble'));
+          const settlements = new Map();
+          const settle = (resolve, result) => {
+              const timer = schedule(() => { settlements.delete(timer); resolve(result); }, 0);
+              settlements.set(timer, { resolve, result });
+          };
+          let pending;
+          const stop = (result, teardown = false) => {
+              const previous = pending;
+              if (!previous)
+                  return;
+              pending = undefined;
+              for (const timer of previous.timers)
+                  unschedule(timer);
+              emit({ state: 'idle', startDelay: 0, duration: 0, strongMagnitude: 0, weakMagnitude: 0 }, teardown);
+              if (teardown)
+                  previous.resolve(result);
+              else
+                  settle(previous.resolve, result);
+          };
+          const backend = {
+              effects, live, cancel: () => stop('preempted'),
+              reset: () => new Promise(resolve => { stop('preempted'); settle(resolve, 'complete'); }),
+              play: parameters => new Promise(resolve => {
+                  const startDelay = Math.min(5000, parameters.startDelay);
+                  const duration = Math.min(5000 - startDelay, parameters.duration);
+                  const state = { startDelay, duration, strongMagnitude: parameters.strongMagnitude, weakMagnitude: parameters.weakMagnitude };
+                  const request = { resolve, timers: [] };
+                  pending = request;
+                  const start = () => {
+                      if (pending !== request)
+                          return;
+                      if (!live() || document.visibilityState === 'hidden') {
+                          stop('preempted');
+                          return;
+                      }
+                      emit({ ...state, startDelay: 0, state: 'playing' });
+                      request.timers.push(schedule(() => { if (pending === request)
+                          stop('complete'); }, duration));
+                  };
+                  if (startDelay) {
+                      emit({ ...state, state: 'delayed' });
+                      request.timers.push(schedule(start, startDelay));
+                  }
+                  else
+                      start();
+              }),
+          };
+          const value = Object.freeze(window.Object.create(prototype));
+          backends.set(value, backend);
+          return { value, cancel: backend.cancel, retire: () => {
+                  stop('preempted', true);
+                  for (const [timer, settlement] of settlements) {
+                      unschedule(timer);
+                      settlement.resolve(settlement.result);
+                  }
+                  settlements.clear();
+              } };
+      };
+  }
+
   class DeviceAdapter {
       constructor(global) {
           this.global = global;
@@ -26281,7 +26411,7 @@ void main() {
       }
   }
   class SourceGamepad {
-      constructor(mapping) {
+      constructor(mapping, actuator = null) {
           this.connected = true;
           this.timestamp = 0;
           this.axes = Object.freeze([]);
@@ -26293,7 +26423,7 @@ void main() {
               get timestamp() { return state.timestamp; },
               get axes() { return state.axes; },
               get buttons() { return state.buttons; },
-              vibrationActuator: null, hapticActuators: Object.freeze([]),
+              vibrationActuator: actuator, hapticActuators: Object.freeze([]),
           });
       }
       sample(gamepad) {
@@ -31729,6 +31859,7 @@ void main() {
           });
   }
 
+  let nextHapticSource = 0;
   const documentWindow = Object.getOwnPropertyDescriptor(Document.prototype, 'defaultView').get;
   function createRuntime(document, bindings) {
       const window = documentWindow.call(document);
@@ -31754,6 +31885,9 @@ void main() {
       const InputSourceBase = interfaceBrands.InputSourceObject;
       const handBackends = new WeakMap();
       const sourceBackends = new WeakMap();
+      const allocateHaptics = createHaptics(window);
+      const retireHaptics = new WeakMap();
+      const sourceHaptics = new WeakMap();
       const systemDevices = new WeakMap();
       const sessionInputs = new WeakMap();
       class XREventTarget extends EventTarget {
@@ -31945,6 +32079,8 @@ void main() {
               this.signals = [];
               this.listeners = [];
               this.immersiveSuppressed = false;
+              this.pagehideListener = () => { if (!this.ended)
+                  void this.end(); };
               this.visibilityListener = () => this._setVisibility(document.visibilityState);
               this._anchors = new Set();
               this._environment = new EnvironmentTracker(this);
@@ -32155,6 +32291,7 @@ void main() {
                   this._finish(); };
               _device.addEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
               document.addEventListener('visibilitychange', this.visibilityListener);
+              window.addEventListener('pagehide', this.pagehideListener);
               this.frameHandle = _device.requestAnimationFrame(this.tick);
           }
           get enabledFeatures() { return this.features; }
@@ -32207,8 +32344,12 @@ void main() {
                   invalidState('Space belongs to a different session.');
           }
           _setVisibility(value) {
+              var _a;
               if (this.ended || value === this.visibility)
                   return;
+              if (value === 'hidden')
+                  for (const source of this.inputWrappers.values())
+                      (_a = sourceHaptics.get(source)) === null || _a === void 0 ? void 0 : _a.cancel();
               this.visibility = value;
               this._emit(new XRSessionEvent('visibilitychange', { session: this }));
           }
@@ -32307,6 +32448,7 @@ void main() {
                   this._device.removeEventListener(type, listener);
               this._device.removeEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
               document.removeEventListener('visibilitychange', this.visibilityListener);
+              window.removeEventListener('pagehide', this.pagehideListener);
               for (const anchor of this._anchors)
                   anchor.delete();
               this._environment.clear();
@@ -32540,9 +32682,10 @@ void main() {
           return new XRViewerPose(transform, views, relative.emulated, geometryAllocation);
       }
       enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getJointPose', 'fillPoses', 'fillJointRadii', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
-      Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
+      Object.setPrototypeOf(XRFrame.prototype, window.Object.prototype);
       class XRInputSource extends InputSourceBase {
           constructor(session, raw, token) {
+              var _a;
               requireRuntimeAllocation(token);
               super();
               this.session = session;
@@ -32556,7 +32699,26 @@ void main() {
               this.rawProfiles = Object.freeze([...raw.profiles]);
               this.profilesValue = session.enabledFeatures.includes('hand-tracking') ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
               this.hasGamepad = raw.gamepad !== null;
-              this.gamepadState = !session.enabledFeatures.includes('hand-tracking') && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
+              const hasGamepad = !session.enabledFeatures.includes('hand-tracking') && this.targetRayModeValue !== 'screen' && this.hasGamepad;
+              let retired = false;
+              const sourceId = ++nextHapticSource;
+              const haptics = hasGamepad && this.targetRayModeValue === 'tracked-pointer' && ['left', 'right'].includes(this.handednessValue)
+                  ? allocateHaptics(() => !retired && !session.ended && active() && session.visibilityState !== 'hidden', (state, teardown) => {
+                      const detail = { ...state, sessionId: session._id, sourceId,
+                          objectName: this.handednessValue === 'left' ? 'leftController' : 'rightController' };
+                      const publish = () => {
+                          if (retired && detail.state !== 'idle')
+                              return;
+                          window.dispatchEvent(new window.CustomEvent('device-haptics', { detail }));
+                      };
+                      if (teardown)
+                          publish();
+                      else
+                          queueMicrotask(publish);
+                  }) : null;
+              sourceHaptics.set(this, { cancel: () => haptics === null || haptics === void 0 ? void 0 : haptics.cancel() });
+              retireHaptics.set(this, () => { retired = true; haptics === null || haptics === void 0 ? void 0 : haptics.retire(); });
+              this.gamepadState = hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '', (_a = haptics === null || haptics === void 0 ? void 0 : haptics.value) !== null && _a !== void 0 ? _a : null) : null;
               const provider = (type) => () => active() ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
               this.targetSpace = new XRSpace(session, provider('target-ray'));
               this.grip = ['gaze', 'screen'].includes(this.targetRayModeValue) ? null : new XRSpace(session, provider('grip'));
@@ -32567,7 +32729,7 @@ void main() {
                   this.hasGamepad === (raw.gamepad !== null) && this.rawProfiles.length === profiles.length &&
                   this.rawProfiles.every((profile, index) => profile === profiles[index]);
           }
-          _retire() { var _a; (_a = this.gamepadState) === null || _a === void 0 ? void 0 : _a.retire(); }
+          _retire() { var _a, _b; (_a = retireHaptics.get(this)) === null || _a === void 0 ? void 0 : _a(); (_b = this.gamepadState) === null || _b === void 0 ? void 0 : _b.retire(); }
           _updatePose() {
               const backend = sourceBackends.get(this);
               if (!backend)
@@ -32601,7 +32763,7 @@ void main() {
       enumerableMembers(XRInputSource.prototype, ['hand']);
       Object.defineProperty(XRSession.prototype, 'requestReferenceSpace', { enumerable: true });
       Object.setPrototypeOf(XRSession.prototype, EventTarget.prototype);
-      Object.setPrototypeOf(XRInputSource.prototype, Object.prototype);
+      Object.setPrototypeOf(XRInputSource.prototype, window.Object.prototype);
       installEventHandlers(XRSystem.prototype, ['devicechange'], value => value instanceof XRSystem);
       installEventHandlers(XRSession.prototype, [
           'end', 'visibilitychange', 'inputsourceschange', 'selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend',

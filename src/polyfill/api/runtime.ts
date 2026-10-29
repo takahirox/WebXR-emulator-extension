@@ -1,3 +1,4 @@
+import {createHaptics} from './haptics';
 import {mat4} from 'gl-matrix';
 import EmulatedXRDevice from '../EmulatedXRDevice';
 import type {PolyfillGlobal} from '../../types/polyfill';
@@ -30,6 +31,7 @@ export {XRInputSourceArray, XRSessionEvent, XRInputSourceEvent, XRInputSourcesCh
 // The registry publishes a fixed factory, never its captured backend writer.
 // Related injections execute this implementation with their own geometry. No
 // discovered window callback, getter or predicate participates in allocation.
+let nextHapticSource = 0;
 const documentWindow = Object.getOwnPropertyDescriptor(Document.prototype, 'defaultView')!.get!;
 type RuntimeBindings = {geometry: typeof realmGeometry; sensing: typeof realmSensing; layers: typeof realmLayers;
   hitTests: {XRHitTestSource: typeof XRHitTestSource; hitSourceState: typeof hitSourceState; XRTransientInputHitTestSource: typeof XRTransientInputHitTestSource; transientHitSourceState: typeof transientHitSourceState; XRHitTestResult: typeof XRHitTestResult; XRTransientInputHitTestResult: typeof XRTransientInputHitTestResult; convertHitTestOptions: typeof convertHitTestOptions; convertTransientHitTestOptions: typeof convertTransientHitTestOptions; hitTestAllocation: typeof hitTestAllocation};
@@ -60,6 +62,9 @@ function createRuntime(document: Document, bindings: RuntimeBindings) {
   const sourceBackends = new WeakMap<XRInputSource, {session: XRSession; raw: DeviceInput}>();
 // Backend permission is module-private, separate from the publicly reachable
 // shared interface constructors and from diagnostic properties on their objects.
+const allocateHaptics = createHaptics(window);
+const retireHaptics = new WeakMap<XRInputSource, () => void>();
+const sourceHaptics = new WeakMap<XRInputSource, {cancel: () => void}>();
 const systemDevices = new WeakMap<XRSystem, Promise<EmulatedXRDevice>>();
 const sessionInputs = new WeakMap<XRSession, XRInputSourceArray>();
 
@@ -226,6 +231,7 @@ class XRSession extends SessionBase {
   private listeners: [string, (detail: InputSignal) => void][] = [];
   private endListener: (id: number) => void;
   private immersiveSuppressed = false;
+  private pagehideListener = () => { if (!this.ended) void this.end(); };
   private visibilityListener = () => this._setVisibility(document.visibilityState);
   readonly _hands: {hand(source: XRInputSource, raw?: DeviceInput): XRHand};
   readonly _anchors = new Set<XRAnchor>();
@@ -322,6 +328,7 @@ class XRSession extends SessionBase {
     this.endListener = id => { if (id === _id) this._finish(); };
     _device.addEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
     document.addEventListener('visibilitychange', this.visibilityListener);
+    window.addEventListener('pagehide', this.pagehideListener);
     this.frameHandle = _device.requestAnimationFrame(this.tick);
   }
   get enabledFeatures() { return this.features; }
@@ -366,6 +373,7 @@ class XRSession extends SessionBase {
   }
   _setVisibility(value: typeof this.visibility) {
     if (this.ended || value === this.visibility) return;
+    if (value === 'hidden') for (const source of this.inputWrappers.values()) sourceHaptics.get(source)?.cancel();
     this.visibility = value; this._emit(new XRSessionEvent('visibilitychange', {session: this}));
   }
   _setImmersiveSuppressed(value: boolean) {
@@ -433,6 +441,7 @@ class XRSession extends SessionBase {
     for (const [type, listener] of this.listeners) this._device.removeEventListener(type, listener);
     this._device.removeEventListener('@@webxr-polyfill/vr-present-end', this.endListener);
     document.removeEventListener('visibilitychange', this.visibilityListener);
+    window.removeEventListener('pagehide', this.pagehideListener);
     for (const anchor of this._anchors) anchor.delete();
     this._environment.clear();
     for (const source of this.inputWrappers.values()) source._retire();
@@ -699,7 +708,7 @@ function allocateViewerPose(frame: XRFrame, reference: XRReferenceSpace) {
 }
 enumerableMembers(XRFrame.prototype, ['session', 'predictedDisplayTime', 'getPose', 'getViewerPose', 'getJointPose', 'fillPoses', 'fillJointRadii', 'getHitTestResults', 'getHitTestResultsForTransientInput']);
 // Share allocation branding while retaining the public prototype's own realm.
-Object.setPrototypeOf(XRFrame.prototype, Object.prototype);
+Object.setPrototypeOf(XRFrame.prototype, window.Object.prototype);
 
 /** Every exposed space and input identity is owned by exactly one session. */
 class XRInputSource extends InputSourceBase {
@@ -723,7 +732,27 @@ class XRInputSource extends InputSourceBase {
     this.rawProfiles = Object.freeze([...raw.profiles]);
     this.profilesValue = session.enabledFeatures.includes('hand-tracking') ? Object.freeze(['generic-hand-select']) : this.rawProfiles;
     this.hasGamepad = raw.gamepad !== null;
-    this.gamepadState = !session.enabledFeatures.includes('hand-tracking') && this.targetRayModeValue !== 'screen' && this.hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '') : null;
+    const hasGamepad = !session.enabledFeatures.includes('hand-tracking') && this.targetRayModeValue !== 'screen' && this.hasGamepad;
+    let retired = false;
+    const sourceId = ++nextHapticSource;
+    const haptics = hasGamepad && this.targetRayModeValue === 'tracked-pointer' && ['left', 'right'].includes(this.handednessValue)
+      ? allocateHaptics(() => !retired && !session.ended && active() && session.visibilityState !== 'hidden', (state, teardown) => {
+        const detail = {...state, sessionId: session._id, sourceId,
+          objectName: this.handednessValue === 'left' ? 'leftController' as const : 'rightController' as const};
+        // Diagnostics must not invoke page listeners inside actuator mutation:
+        // reentrant play/reset calls could otherwise strand a replaced Promise.
+        const publish = () => {
+          if (retired && detail.state !== 'idle') return;
+          window.dispatchEvent(new window.CustomEvent('device-haptics', {detail}));
+        };
+        // Retirement has already invalidated the source; publish its final
+        // clear before a discarded frame can lose queued microtasks.
+        if (teardown) publish(); else queueMicrotask(publish);
+      }) : null;
+    sourceHaptics.set(this, {cancel: () => haptics?.cancel()});
+    // Retirement is permanent even if a page retains the old source/actuator.
+    retireHaptics.set(this, () => { retired = true; haptics?.retire(); });
+    this.gamepadState = hasGamepad ? new SourceGamepad(this.targetRayModeValue === 'tracked-pointer' ? 'xr-standard' : '', haptics?.value ?? null) : null;
     const provider = (type: string) => () => active() ? (type === 'grip' ? this.gripWorld : this.targetWorld) : null;
     this.targetSpace = new XRSpace(session, provider('target-ray'));
     this.grip = ['gaze', 'screen'].includes(this.targetRayModeValue) ? null : new XRSpace(session, provider('grip'));
@@ -734,7 +763,7 @@ class XRInputSource extends InputSourceBase {
       this.hasGamepad === (raw.gamepad !== null) && this.rawProfiles.length === profiles.length &&
       this.rawProfiles.every((profile, index) => profile === profiles[index]);
   }
-  _retire() { this.gamepadState?.retire(); }
+  _retire() { retireHaptics.get(this)?.(); this.gamepadState?.retire(); }
   _updatePose() {
     const backend = sourceBackends.get(this);
     if (!backend) throw new TypeError('Expected backend XRInputSource.');
@@ -769,7 +798,8 @@ Object.defineProperty(XRSession.prototype, 'requestReferenceSpace', {enumerable:
 
 // Shared allocation bases do not replace public realm-local inheritance.
 Object.setPrototypeOf(XRSession.prototype, EventTarget.prototype);
-Object.setPrototypeOf(XRInputSource.prototype, Object.prototype);
+// Keep source ancestry with its owning document, including shared factories.
+Object.setPrototypeOf(XRInputSource.prototype, window.Object.prototype);
 installEventHandlers(XRSystem.prototype, ['devicechange'], value => value instanceof XRSystem);
 installEventHandlers(XRSession.prototype, [
   'end', 'visibilitychange', 'inputsourceschange', 'selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend',

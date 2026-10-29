@@ -2,6 +2,11 @@
 export type SessionMode = 'inline' | 'immersive-vr' | 'immersive-ar';
 export type ImmersiveMode = Exclude<SessionMode, 'inline'>;
 export type ControllerName = 'rightController' | 'leftController';
+export interface HapticState {
+  objectName: ControllerName; sessionId: number; sourceId: number;
+  state: 'idle' | 'delayed' | 'playing';
+  startDelay: number; duration: number; strongMagnitude: number; weakMagnitude: number;
+}
 export interface Capabilities { hasPosition: boolean; hasRotation: boolean; hasSqueezeButton?: boolean }
 export interface ControllerDefinition extends Capabilities {
   id?: string; buttonNum: number; primaryButtonIndex: number; primarySqueezeButtonIndex?: number;
@@ -29,6 +34,7 @@ export interface EmulatorEvents {
   'webxr-extension-check': Record<never, never>;
   'webxr-extension-alive': Record<never, never>;
   'webxr-exit-immersive': Record<never, never>;
+  'device-haptics': HapticState;
   'device-enter-immersive': Record<never, never>;
   'device-leave-immersive': Record<never, never>;
   'webxr-virtual-room-request': Record<never, never>;
@@ -39,7 +45,7 @@ type BridgeEvent = Exclude<keyof EmulatorEvents,
 export type ExtensionMessage = (
   {[K in BridgeEvent]: {action: K} & EmulatorEvents[K]}[BridgeEvent]
   | {action: 'webxr-startup'}
-) & {tabId?: number};
+) & {tabId?: number; frameId?: number};
 export interface EmulatedGamepad {
   id: string; hand: 'right' | 'left'; mapping: string; axes: number[];
   pose: {hasPosition: boolean; position: number[]; orientation: number[]};
@@ -79,6 +85,11 @@ export function isDeviceMessage(value: unknown): value is ExtensionMessage {
     case 'webxr-startup':
     case 'device-enter-immersive':
     case 'device-leave-immersive': return true;
+    case 'device-haptics': return isController(value.objectName) &&
+      ['idle', 'delayed', 'playing'].includes(value.state as string) &&
+      ['sessionId', 'sourceId'].every(key => Number.isSafeInteger(value[key]) && (value[key] as number) > 0) &&
+      ['duration', 'startDelay', 'strongMagnitude', 'weakMagnitude'].every(key => typeof value[key] === 'number' && Number.isFinite(value[key]) && (value[key] as number) >= 0 && (value[key] as number) <= (key.endsWith('Magnitude') ? 1 : 5000)) &&
+      (value.duration as number) + (value.startDelay as number) <= 5000;
     case 'device-pose': return isPose(value);
     case 'device-input-pose': return isPose(value) && isController(value.objectName);
     default: return false;

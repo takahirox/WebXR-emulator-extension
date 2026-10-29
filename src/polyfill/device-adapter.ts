@@ -1,7 +1,8 @@
 import type {EmulatedGamepad} from '../types/contracts';
 import type {PolyfillGlobal} from '../types/polyfill';
+import type {VirtualHapticActuator} from './api/haptics';
 
-export type XRGamepad = Omit<Gamepad, 'vibrationActuator'> & {vibrationActuator: null; hapticActuators: readonly GamepadHapticActuator[]};
+export type XRGamepad = Omit<Gamepad, 'vibrationActuator'> & {vibrationActuator: VirtualHapticActuator | null; hapticActuators: readonly GamepadHapticActuator[]};
 
 export interface DeviceInput {
   readonly handedness: string;
@@ -70,7 +71,7 @@ export class SourceGamepad {
   private axes: readonly number[] = Object.freeze([]);
   private buttons: readonly GamepadButton[] = Object.freeze([]);
   readonly value: XRGamepad;
-  constructor(mapping: '' | 'xr-standard') {
+  constructor(mapping: '' | 'xr-standard', actuator: VirtualHapticActuator | null = null) {
     const state = this;
     this.value = Object.freeze({
       id: '', index: -1, mapping,
@@ -78,7 +79,7 @@ export class SourceGamepad {
       get timestamp() { return state.timestamp; },
       get axes() { return state.axes; },
       get buttons() { return state.buttons; },
-      vibrationActuator: null, hapticActuators: Object.freeze([]),
+      vibrationActuator: actuator, hapticActuators: Object.freeze([]),
     });
   }
   sample(gamepad: XRGamepad) {

@@ -191,12 +191,9 @@ export async function runSessionRequest(page: Page, mode: SessionMode, handheld:
 /** Fresh packaged polyfill + real device, with only the init event held by the harness. */
 export async function runDeferredSessionRequest(page: Page, mode: SessionMode, deviceDefinition: DeviceConfig) {
   await page.evaluate('globalThis.__name = value => value');
-  // Drain the extension's automatic configuration before constructing the fresh
-  // instance, so the real webxr-device-init below is the only init it receives.
-  await page.evaluate(() => (window as unknown as XRWindow).navigator.xr.isSessionSupported('inline'));
+  // The caller holds automatic configuration in this fresh injected document.
   return page.evaluate(async ({mode, deviceDefinition}) => {
     const w = window as unknown as XRWindow;
-    new w.CustomWebXRPolyfill();
     const xr = w.navigator.xr;
     const passed: string[] = [];
     function check(value: unknown, label: string) { if (!value) throw new Error(`${mode}: ${label}`); passed.push(label); }
@@ -230,6 +227,7 @@ export async function runDeferredSessionRequest(page: Page, mode: SessionMode, d
     }
     await new Promise<void>(resolve => setTimeout(resolve, 30));
     check(!settled && !original.hasAttribute('popover') && !replacement.hasAttribute('popover'), 'request waits with no presentation resources');
+    (window as unknown as {allowDeferredDeviceInit: boolean}).allowDeferredDeviceInit = true;
     window.dispatchEvent(new CustomEvent('webxr-device-init', {detail: {deviceDefinition, stereoEffect: true}}));
     const session = await pending;
     try {

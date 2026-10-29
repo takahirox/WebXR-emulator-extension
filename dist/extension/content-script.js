@@ -163,6 +163,11 @@
             case 'webxr-startup':
             case 'device-enter-immersive':
             case 'device-leave-immersive': return true;
+            case 'device-haptics': return isController(value.objectName) &&
+                ['idle', 'delayed', 'playing'].includes(value.state) &&
+                ['sessionId', 'sourceId'].every(key => Number.isSafeInteger(value[key]) && value[key] > 0) &&
+                ['duration', 'startDelay', 'strongMagnitude', 'weakMagnitude'].every(key => typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0 && value[key] <= (key.endsWith('Magnitude') ? 1 : 5000)) &&
+                value.duration + value.startDelay <= 5000;
             case 'device-pose': return isPose(value);
             case 'device-input-pose': return isPose(value) && isController(value.objectName);
             default: return false;
@@ -224,6 +229,15 @@
         if ((_a = chrome.runtime) === null || _a === void 0 ? void 0 : _a.id)
             dispatchCustomEvent('webxr-extension-alive', {});
     });
+    window.addEventListener('device-haptics', event => {
+        const detail = event.detail;
+        if (!isDeviceMessage({ ...detail, action: 'device-haptics' }))
+            return;
+        postMessage({ action: 'device-haptics', objectName: detail.objectName,
+            sessionId: detail.sessionId, sourceId: detail.sourceId, state: detail.state,
+            startDelay: detail.startDelay, duration: detail.duration,
+            strongMagnitude: detail.strongMagnitude, weakMagnitude: detail.weakMagnitude });
+    }, false);
     window.addEventListener('device-pose', event => {
         if (!isDeviceMessage({ ...event.detail, action: 'device-pose' }))
             return;

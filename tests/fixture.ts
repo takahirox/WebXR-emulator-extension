@@ -54,6 +54,12 @@
       state.hits = 0;
       state.transientHits = 0;
       const activeSession = session;
+      // Attach before async GL/reference-space setup can deliver first inputs.
+      for (const type of ['selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend']) {
+        session.addEventListener(type, () => { state.eventOrder.push(type); state.events[type] = (state.events[type] || 0) + 1; });
+      }
+      session.addEventListener('inputsourceschange', ((event: Event & {added: unknown[]; removed: unknown[]}) => { if (event.added.length) state.eventOrder.push('added'); if (event.removed.length) state.eventOrder.push('removed'); }) as () => void);
+      session.addEventListener('end', () => { state.ended = true; });
       document.body.appendChild(canvas);
       const gl = canvas.getContext('webgl', {alpha: true, premultipliedAlpha: false});
       if (!gl) throw new Error('WebGL unavailable');
@@ -65,11 +71,6 @@
         hitSource = await session.requestHitTestSource({space: await session.requestReferenceSpace('viewer')});
         transientSource = await session.requestHitTestSourceForTransientInput({profile: 'generic-touchscreen'});
       }
-      for (const type of ['selectstart', 'select', 'selectend', 'squeezestart', 'squeeze', 'squeezeend']) {
-        session.addEventListener(type, () => { state.eventOrder.push(type); state.events[type] = (state.events[type] || 0) + 1; });
-      }
-      session.addEventListener('inputsourceschange', ((event: Event & {added: unknown[]; removed: unknown[]}) => { if (event.added.length) state.eventOrder.push('added'); if (event.removed.length) state.eventOrder.push('removed'); }) as () => void);
-      session.addEventListener('end', () => { state.ended = true; });
       const frame: Parameters<typeof activeSession.requestAnimationFrame>[0] = (time, xrFrame) => {
         try {
           state.frames++;

@@ -13,7 +13,7 @@ chrome.runtime.onMessage.addListener((envelope: RuntimeMessage, sender, respond)
   };
   if (envelope.source === 'content' && sender.tab?.id !== undefined && isDeviceMessage(message)) {
     // Derive the tab from Chrome, never from data the inspected page supplies.
-    chrome.runtime.sendMessage({source: 'background', message: {...message, tabId: sender.tab.id}}, complete);
+    chrome.runtime.sendMessage({source: 'background', message: {...message, tabId: sender.tab.id, frameId: sender.frameId ?? 0}}, complete);
     return true;
   }
   if (envelope.source === 'panel' && !sender.tab &&

@@ -124,11 +124,22 @@ export async function visibilityCases(mode: SessionMode) {
         snapshot(records, `${exit}/immersive-visible`);
         check(records.every(r => r.events.length === 0 && r.calls.length === 0 && r.session.callbacks.size === 2), 'immersive entry emits no visibility and retains ordered callbacks');
       }
+      const actuator = immersive?.session.inputSources[0]?.gamepad?.vibrationActuator;
+      const haptic = actuator?.playEffect('dual-rumble', exit === 'explicit' ? {startDelay:5000,strongMagnitude:1} : {duration:5000,strongMagnitude:1});
       await nativeVisibility('hidden');
+      if (actuator) {
+        check(await haptic === 'preempted', 'native hidden document preempts active/delayed haptics');
+        for (const operation of [() => actuator.playEffect('dual-rumble'), () => actuator.reset()]) {
+          let error: any; try { await operation(); } catch (e) { error = e; }
+          check(error?.name === 'InvalidStateError', 'native hidden document rejects haptic operations');
+        }
+      }
       snapshot(records, `${exit}/hidden`);
       if (immersive) {
         check(records.every(r => r.calls.length === 0), 'hidden immersive retains callbacks');
-        await nativeVisibility('visible'); snapshot(records, `${exit}/shown-during-immersive`);
+        await nativeVisibility('visible');
+        if (actuator) check(await actuator.playEffect('dual-rumble') === 'complete', 'native visibility restoration enables haptics');
+        snapshot(records, `${exit}/shown-during-immersive`);
         check(records.every(r => r.calls.length === 0), 'show during immersive keeps callbacks suspended');
         await nativeVisibility('hidden'); snapshot(records, `${exit}/hidden-again`);
       } else {

@@ -99,7 +99,7 @@ export async function runInputLifecycle(page: Page, mode: SessionMode, handheld:
         let source = await next(() => session.inputSources[0]);
         const saved = metadata(source, profiles, 'Quest controller');
         const gamepad = source.gamepad!;
-        check(gamepad.id === '' && gamepad.index === -1 && gamepad.mapping === 'xr-standard' && gamepad.connected && gamepad.vibrationActuator === null && gamepad.hapticActuators.length === 0, 'Quest Gamepad identity, mapping and absent haptics');
+        check(gamepad.id === '' && gamepad.index === -1 && gamepad.mapping === 'xr-standard' && gamepad.connected && gamepad.vibrationActuator?.effects.join() === 'dual-rumble' && gamepad.hapticActuators.length === 0, 'Quest Gamepad identity, mapping and simulated haptics');
         for (let frame = 0; frame < 3; frame++) await next(() => check(session.inputSources[0] === source && source.profiles === saved.profiles && source.targetRaySpace === saved.targetRaySpace && source.gripSpace === saved.gripSpace && source.gamepad === gamepad, 'multiple frames preserve SameObject attributes'));
         device._updateInputButtonPressed(true, 0, 0); device._updateInputAxes(0, 0.25, -0.5);
         await next(() => {
