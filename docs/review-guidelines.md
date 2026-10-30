@@ -14,6 +14,7 @@ Verify that the PR implements every requirement it claims to resolve. A delibera
 - Check compatibility with the existing extension, emulator panel, device configuration, and polyfill architecture where relevant.
 - Reject unrelated refactoring, unnecessary abstractions, speculative extensibility, frameworks, or configuration without a demonstrated need.
 - Check that documentation matches the changed behavior and that existing useful instructions remain intact.
+- Review applicable interface changes against the [UI/UX principles](../README.md#uiux).
 
 ## Check pre-merge acceptance and post-merge verification
 

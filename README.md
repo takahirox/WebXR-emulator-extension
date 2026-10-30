@@ -15,6 +15,16 @@ WebXR emulator extension is a browser extension which helps your WebXR content c
 - Cross browsers support with [WebExtensions API](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions)
 <!-- - [Virtual controller (WIP)](./screenshots/virtual-controller.gif) -->
 
+## UI/UX
+
+Apply these principles to the WebXR DevTools panel, toolbar popup, AR and DOM Overlay previews, and user-facing messages and examples.
+
+1. **Keep it simple.** Show only necessary information and actions; avoid unnecessary UI elements.
+2. **Show, don't tell.** Prefer layout, spacing and visual hierarchy over explanatory labels or prose to communicate structure.
+3. **Intuitive and predictable.** Keep appearance and behavior consistent with user expectations; don't interrupt the user's work.
+
+Preserve necessary control labels, accessible names and accessibility information, error messages, and information needed to use the interface. Simplification must preserve meaningful consent, necessary user decisions, destructive-action safeguards, and necessary warnings.
+
 ## Status
 
 - Standards work targets the [9 June 2026 WebXR Device API draft](https://www.w3.org/TR/2026/CRD-webxr-20260609/) and pinned module drafts. See the [capability matrix, test evidence and remaining scope](docs/webxr-conformance.md); full standards conformance is not claimed.
