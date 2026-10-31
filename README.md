@@ -138,6 +138,8 @@ For contributions and AI-assisted work, follow the [development flow](docs/devel
 
 Use the [Issue template](.github/ISSUE_TEMPLATE/issue.md) and [PR template](.github/pull_request_template.md). AI contributors should start with [AGENTS.md](AGENTS.md).
 
+Choose checks using the [testing and CI performance principles](docs/development-flow.md#testing-and-ci-performance-principles).
+
 ### How to install the newest version
 
 Download this repository and run the build below. In Chrome/Chromium, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the repository root containing `manifest.json`. Reload any existing WebXR pages, then open DevTools → **WebXR**. The toolbar popup explains where to find the controls. Enable **Allow access to file URLs** in the extension's details if you use local `file:` pages; ordinary browser restrictions on file pages still apply.
