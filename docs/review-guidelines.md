@@ -20,6 +20,10 @@ Verify that the PR implements every requirement it claims to resolve. A delibera
 
 Require mandatory pre-merge acceptance to be achievable and verifiable before merge. Evaluate the validation actually performed against the changed files and the repository's [available tooling](development-flow.md#2-implement-and-validate-the-change). Check accurate reporting of failures, skipped checks, and unperformed checks; do not treat an unperformed required check as passing.
 
+Apply the [testing and CI performance principles](development-flow.md#testing-and-ci-performance-principles): identify the additional defect coverage, overlap with existing checks, and added execution and maintenance cost of new or expanded tests.
+
+> Does this change provide sufficient confidence with the lightest appropriate validation, without redundant execution?
+
 For collaboration templates or documentation only, verify template front matter, Markdown structure, links, whitespace, and consistency. Do not require new runtime tests, a polyfill build, physical-device/headset checks, or deployed-site verification for that scope.
 
 Require human confirmation, subjective evaluation, physical-device testing, or external approval only when necessary for the actual Issue, with a stated reason and expected result. Optional checks do not block approval.
