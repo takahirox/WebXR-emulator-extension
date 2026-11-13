@@ -17,7 +17,7 @@ Describe what should be true when this Issue is resolved.
 
 ## Context
 
-Add relevant files, examples, logs, and related Issues. For bugs, include reproduction steps, expected and actual behavior, and relevant browser/extension versions. Omit reproduction steps when they do not apply.
+Add relevant files, examples, logs, and related Issues. For bugs, include reproduction steps, expected and actual behavior, and relevant browser/extension versions. For a post-merge defect, also identify the affected revision and original Issue/PR. Omit reproduction steps when they do not apply.
 
 ## Pre-merge acceptance
 
@@ -31,4 +31,4 @@ List helpful additional checks separately from mandatory acceptance, or state th
 
 ## Required post-merge verification
 
-None, unless this Issue needs checks possible only after merge. If needed, describe the checks and expected results separately; report them as pending until performed. Pre-merge validation does not prove deployment or publication succeeded. See the [review guidance](https://github.com/takahirox/WebXR-emulator-extension/blob/dev/docs/review-guidelines.md#check-pre-merge-acceptance-and-post-merge-verification).
+None, unless this Issue needs checks possible only after merge. If needed, describe the checks and expected results separately; report them as pending until performed. These checks follow merge and closure of the fully implemented Issue, under the [post-merge lifecycle](https://github.com/takahirox/WebXR-emulator-extension/blob/dev/docs/development-flow.md#6-perform-required-post-merge-verification), including evidence recording and linked defect Issues. Closure does not claim pending checks passed; pre-merge validation does not prove deployment or publication succeeded.

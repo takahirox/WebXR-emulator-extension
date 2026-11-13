@@ -53,7 +53,7 @@ The repository currently has local checks in [package.json](../package.json), wi
 
 Use the [PR template](../.github/pull_request_template.md). Explain the problem, resulting behavior, focused changes, related Issues, and validation actually performed. Report failures, skipped checks, and unperformed checks accurately, including reasons and remaining limitations.
 
-Claim to close an Issue only when the PR fully implements its requirements. If intentionally partial, state the remaining work and leave the Issue open. Record required post-merge checks separately as pending; pending checks possible only after merge do not make a complete implementation partial.
+Use and preserve the normal `Closes #N` reference when the PR fully implements the Issue and satisfies applicable mandatory pre-merge acceptance. If intentionally partial, state the remaining work, use a non-closing Issue reference, and leave the parent Issue open. Record required post-merge checks separately as pending; pending checks possible only after merge do not make a complete implementation partial. Missing implementation, mandatory pre-merge tests, required protections, and genuinely necessary pre-merge human acceptance remain blockers; do not relabel them as post-merge verification.
 
 ## 4. Review and revise as needed
 
@@ -61,12 +61,22 @@ Every PR should be reviewed before merge using the [review guidelines](review-gu
 
 Request revisions for agent-fixable findings, update the PR, and review the updated change again. If genuinely necessary human input is missing, record the specific question and expected answer, then use the workflow's wait path. Distinguish waiting for human input from requests for code fixes; do not repeatedly ask for revisions that cannot resolve the missing answer.
 
+ProjectWeave publication adds `Closes #N`. Review must not request removing that reference, keeping an otherwise complete Issue open, or withholding otherwise warranted approval solely because post-merge-only verification is pending. Doing so makes review and publication undo each other in a Review → Fix → Publish → Review loop.
+
 ## 5. Merge
 
 Approve and merge when the implementation and mandatory pre-merge checks are sufficient and no blocking review findings remain. Follow applicable repository merge requirements and the current task's authorization; guidance describing the normal flow does not authorize an agent to merge independently.
 
+After successful merge, close the fully implemented source Issue, then perform any required post-merge verification. Issue closure does not claim that pending checks passed.
+
 ## 6. Perform required post-merge verification
 
-When the Issue requires post-merge checks, perform them after merge and record actual results, including failures and follow-up work. Keep unperformed checks pending. If none are required, no post-merge validation is needed; templates/documentation-only work does not require deployment or publication checks.
+When the actual change requires post-merge checks, perform them after merge and Issue closure. Record the checked revision, environment, procedure, and actual results in the merged PR, closed Issue, or a linked validation report. Keep unperformed or environment-blocked checks explicitly pending with reasons; an unavailable test environment alone is not evidence of a product defect. Pre-merge evidence does not prove deployment or publication succeeded.
+
+If verification finds an actual defect, check for an equivalent existing Issue first. Use that Issue or create a new linked Issue with reproduction steps, affected revision, expected and actual behavior, and links to the original Issue and PR. Do not keep or reopen the original Issue solely for post-merge follow-up.
+
+If none are required, no post-merge validation is needed. Documentation/template changes do not acquire routine manual approval, physical-device, heavyweight-model-download, or deployment gates from this lifecycle. Existing verification requirements remain in force.
+
+This lifecycle supersedes older instructions to keep an implemented Issue open solely for post-merge verification. Preserve historical test outcomes and evidence without rewriting them; actual unfinished implementation and missing pre-merge acceptance remain distinct from pending post-merge checks.
 
 These files adapt the current GitWeave [Issue template](https://github.com/takahirox/gitweave/blob/main/.github/ISSUE_TEMPLATE/issue.md), [PR template](https://github.com/takahirox/gitweave/blob/main/.github/pull_request_template.md), [development flow](https://github.com/takahirox/gitweave/blob/main/docs/development-flow.md), and [review guidelines](https://github.com/takahirox/gitweave/blob/main/docs/review-guidelines.md) to this repository.

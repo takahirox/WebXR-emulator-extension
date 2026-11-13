@@ -30,6 +30,8 @@ Require human confirmation, subjective evaluation, physical-device testing, or e
 
 Record genuinely necessary checks possible only after merge separately as pending; they must not be prerequisites for pre-merge approval. For example, verify a merge-triggered publication after merge. Pre-merge build or other validation does not prove publication succeeded. This separation preserves all implementation requirements and applicable pre-merge checks. State that no post-merge verification is required when appropriate.
 
+For a fully implemented Issue with applicable mandatory pre-merge acceptance satisfied, preserve `Closes #N`. Do not request removing it, keeping the source Issue open, or withholding approval solely for pending post-merge-only checks. ProjectWeave publication restores the closing reference; reversing it in review creates a Review → Fix → Publish → Review loop. Pending post-merge verification does not make complete implementation partial. Missing implementation, mandatory pre-merge tests, required protections, and genuinely necessary pre-merge human acceptance remain blockers.
+
 ## Review outcome and revision
 
 Clearly distinguish these outcomes:
@@ -44,4 +46,6 @@ Separate optional suggestions from blocking findings. Waiting for checks possibl
 
 After review passes, merge into `dev` by default, subject to applicable repository requirements and the current task's authorization. Review the latest revision before merging; earlier approval does not establish that later changes pass review.
 
-Perform only the post-merge verification required by the Issue, if any. Report actual results honestly, including failures or pending work, and record needed follow-up. Do not claim deployment or publication succeeded based on pre-merge evidence.
+After successful merge, close the fully implemented source Issue, then perform only its genuinely required post-merge verification, if any. Follow the [post-merge lifecycle](development-flow.md#6-perform-required-post-merge-verification) for evidence recording and new linked defect Issues, checking for an equivalent existing Issue first. Do not keep or reopen the original Issue solely for that follow-up.
+
+Report actual results honestly, including unperformed, pending, or environment-blocked checks; closure does not claim they passed. An unavailable test environment alone does not establish a product defect. Do not claim deployment or publication succeeded based on pre-merge evidence. The current lifecycle supersedes older keep-open instructions solely for post-merge verification while preserving historical results and evidence.
