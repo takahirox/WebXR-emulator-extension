@@ -1,7 +1,0 @@
-
-> WebXR-Emulator-Extension-WebXR-Polyfill@0.0.1 test:hand-applications:firefox
-> tsx tests/hand-applications.ts firefox
-
-hand application firefox cycle 0
-hand application firefox cycle 1
-{"status":"passed","browser":"firefox","cycles":2,"failures":[],"cleanup":{"temporaryAddonRemoved":true,"sessionDeleted":true,"browserStopped":true,"driverStopped":true,"profileRemoved":true}}
